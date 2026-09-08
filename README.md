@@ -33,6 +33,47 @@ Gera um site estático em `build/` (adapter-static), pronto para publicar em
 Cloudflare Pages, Netlify, Vercel etc. — ou atrás de um Worker próprio, como
 os outros apps da família (nextgoals).
 
+## Banco de dados (D1) — sincronizar entre aparelhos
+
+Sem banco, o Plena funciona sozinho salvando no `localStorage` do navegador
+(ok para uso num só aparelho). Para sincronizar entre celular, computador
+etc., ligue um banco D1 da Cloudflare — o app já sabe usá-lo assim que ele
+existir, sem mudar nada no código.
+
+Passo a passo, uma vez só:
+
+```bash
+npm install -g wrangler   # se ainda não tiver
+wrangler login
+
+# cria o banco (uma vez só)
+wrangler d1 create plena-db
+# copie o "database_id" que aparecer e cole em wrangler.jsonc, no lugar de
+# COLE_AQUI_O_DATABASE_ID_DEPOIS_DO_WRANGLER_D1_CREATE
+
+# cria a tabela no banco remoto (o que o site publicado usa)
+wrangler d1 execute plena-db --remote --file=schema.sql
+```
+
+Depois disso, `git push` (o deploy no Cloudflare já está configurado com
+`wrangler.jsonc` apontando pro binding `DB`) — o Worker publicado passa a
+ler/gravar em `/api/plena/state` e `/api/<coleção>/<id>`, e o app troca
+sozinho de "Salvo neste navegador" para "Salvo no banco de dados" (veja o
+rodapé da barra lateral).
+
+**Sobre segurança:** por enquanto essas rotas ficam abertas — quem souber a
+URL do site consegue ler/gravar os dados, sem login. Se quiser travar isso,
+dá pra colocar o mesmo esquema de login do nextgoals (Cloudflare Access,
+"Entrar com o Google") na frente do domínio inteiro; é só pedir.
+
+Para testar localmente contra o banco (em vez de só localStorage):
+
+```bash
+wrangler d1 execute plena-db --file=schema.sql   # tabela no banco local
+npm run build
+wrangler dev
+```
+
 ## Estrutura
 
 ```

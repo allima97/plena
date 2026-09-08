@@ -3,12 +3,21 @@
 	"name": "plena",
 	"main": ".svelte-kit/cloudflare/_worker.js",
 	"compatibility_date": "2026-09-07",
-	"compatibility_flags": ["nodejs_compat"],
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
 	"observability": {
 		"enabled": true
 	},
 	"assets": {
 		"binding": "ASSETS",
 		"directory": ".svelte-kit/cloudflare"
-	}
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "plena-db",
+			"database_id": "COLE_AQUI_O_DATABASE_ID_DEPOIS_DO_WRANGLER_D1_CREATE"
+		}
+	]
 }
