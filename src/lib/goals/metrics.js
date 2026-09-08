@@ -138,6 +138,44 @@ export function computeGoalAchievedDate(resources, resourceMoves, target) {
 }
 
 /**
+ * Resumo de encargos (juros + correção monetária + seguros + taxas) e do
+ * abatimento total de um subconjunto de prestações (installmentRows, já
+ * com delta/extraAmortizacao calculados por installmentsWithDelta) --
+ * portado 1:1 do nextgoals. period: '''currentYear''' | '''last12''' | '''year''' | '''all'''.
+ */
+export function encargosAbatimentoSummary(all, period, year) {
+	let subset;
+	if (period === '''last12''') {
+		subset = all.slice(-12);
+	} else if (period === '''currentYear''') {
+		const cy = new Date().getFullYear();
+		subset = all.filter((it) => new Date(it.date + '''T12:00:00''').getFullYear() === cy);
+	} else if (period === '''year''') {
+		subset = all.filter((it) => new Date(it.date + '''T12:00:00''').getFullYear() === year);
+	} else {
+		subset = all;
+	}
+	const totalJuros = subset.reduce((s, it) => s + (it.juros || 0), 0);
+	const totalCorrecao = subset.reduce((s, it) => s + (it.correcaoMonetaria || 0), 0);
+	const totalSeguros = subset.reduce((s, it) => s + (it.seguros || 0), 0);
+	const totalTaxas = subset.reduce((s, it) => s + (it.taxas || 0), 0);
+	const totalEncargos = totalJuros + totalCorrecao + totalSeguros + totalTaxas;
+	const totalAmortizacaoParcela = subset.reduce((s, it) => s + (it.amortizacao || 0), 0);
+	const totalExtra = subset.reduce((s, it) => s + (it.extraAmortizacao || 0), 0);
+	const totalAbatimento = subset.reduce((s, it) => s + (it.delta || 0), 0);
+	const totalValorPrestacao = subset.reduce((s, it) => s + (it.valorPrestacao || 0), 0);
+	const totalPago = totalValorPrestacao + totalExtra;
+	return { subset, totalJuros, totalCorrecao, totalSeguros, totalTaxas, totalEncargos, totalAmortizacaoParcela, totalExtra, totalAbatimento, totalValorPrestacao, totalPago };
+}
+
+/** Anos (mais recentes primeiro, limitado a 5) presentes numa lista de prestações. */
+export function installmentYearsOf(installments) {
+	const years = Array.from(new Set(installments.map((i) => new Date(i.date + '''T12:00:00''').getFullYear())));
+	years.sort((a, b) => b - a);
+	return years.slice(0, 5);
+}
+
+/**
  * Métricas completas de um objetivo: acumulado, meta efetiva, ritmo médio,
  * previsão de conclusão e status (adiantado/no ritmo/atrasado/concluído).
  */

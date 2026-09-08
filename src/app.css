@@ -42,6 +42,24 @@
 	--shadow-cta: 0 12px 24px rgba(23, 33, 43, 0.15);
 	--font-body: 'DM Sans', -apple-system, 'Segoe UI', sans-serif;
 	--font-display: 'Space Grotesk', 'DM Sans', sans-serif;
+
+	/* nextgoals (Rumo Financeiro) accent tokens -- Objetivos KPI tiles + encargos swatches */
+	--kpi-green: #26825c;
+	--kpi-green-soft: #e1f0e8;
+	--kpi-amber: #a67c1e;
+	--kpi-amber-soft: #f6e6ce;
+	--kpi-rose: #be4368;
+	--kpi-rose-soft: #fce7eb;
+	--kpi-blue: #2e6da4;
+	--kpi-blue-soft: #e1ebf5;
+	--kpi-gold: #9a7b0a;
+	--kpi-gold-soft: #f8f1d0;
+	--cat-amort: #3457a6;
+	--cat-juros: #0e8a72;
+	--cat-seguros: #a8791e;
+	--cat-taxas: #8b4b8c;
+	--cat-correcao: #b5502a;
+	--cat-diferenca: #0a82a6;
 }
 
 * {
@@ -821,6 +839,67 @@ table.list .num {
 	font-weight: 600;
 	color: var(--ink-faint);
 }
+.stat-value.good {
+	color: var(--income);
+}
+.stat-value.warn {
+	color: #c38b35;
+}
+.stat-value.danger {
+	color: var(--expense);
+}
+.stat-caption-link {
+	background: none;
+	border: none;
+	padding: 0;
+	font: inherit;
+	font-weight: 700;
+	color: var(--accent-fg);
+	cursor: pointer;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+.stat-card.kpi-green {
+	background: var(--kpi-green-soft);
+}
+.stat-card.kpi-green .stat-value {
+	color: var(--kpi-green);
+}
+.stat-card.kpi-amber {
+	background: var(--kpi-amber-soft);
+}
+.stat-card.kpi-amber .stat-value {
+	color: var(--kpi-amber);
+}
+.stat-card.kpi-rose {
+	background: var(--kpi-rose-soft);
+}
+.stat-card.kpi-rose .stat-value {
+	color: var(--kpi-rose);
+}
+.stat-card.kpi-blue {
+	background: var(--kpi-blue-soft);
+}
+.stat-card.kpi-blue .stat-value {
+	color: var(--kpi-blue);
+}
+.stat-card.kpi-gold {
+	background: var(--kpi-gold-soft);
+}
+.stat-card.kpi-gold .stat-value {
+	color: var(--kpi-gold);
+}
+.goal-pace-row {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 14px;
+	margin-bottom: 24px;
+}
+@media (max-width: 480px) {
+	.goal-pace-row {
+		grid-template-columns: 1fr;
+	}
+}
 
 .page-head {
 	display: flex;
@@ -1568,6 +1647,237 @@ table.list .num {
 	}
 	.resource-body {
 		padding: 8px 12px 12px;
+	}
+}
+
+/* ---------- objetivos: paginacao (recursos, amortizacoes, prestacoes) -- portado do nextgoals ---------- */
+
+.list-nav {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	gap: 14px;
+	margin-top: 10px;
+}
+.list-nav-btn {
+	background: none;
+	border: 1px solid var(--border);
+	color: var(--ink-soft);
+	border-radius: 8px;
+	padding: 6px 12px;
+	font-size: 11.5px;
+	font-weight: 700;
+	cursor: pointer;
+}
+.list-nav-btn:hover:not(:disabled) {
+	background: var(--surface-2);
+}
+.list-nav-btn:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+.list-nav-range {
+	font-size: 11px;
+	color: var(--ink-faint);
+	font-weight: 600;
+}
+
+/* ---------- objetivos: prestacoes (accordion "Ultimas Prestacoes") -- portado do nextgoals ---------- */
+
+.inst-find {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+.inst-find input {
+	height: 34px;
+	border-radius: 999px;
+	border: 1px solid var(--border);
+	background: var(--card);
+	padding: 0 12px;
+	font-size: 12px;
+	font-weight: 700;
+	color: var(--ink-soft);
+}
+.inst-find-clear {
+	background: none;
+	border: none;
+	color: var(--ink-faint);
+	cursor: pointer;
+	padding: 4px;
+	display: flex;
+}
+.inst-find-clear:hover {
+	color: var(--ink);
+}
+.inst-card {
+	border: 1px solid var(--border);
+	border-radius: var(--radius-md);
+	overflow: hidden;
+	margin-bottom: 10px;
+}
+.inst-card:last-child {
+	margin-bottom: 0;
+}
+.inst-card.is-ref {
+	border-color: var(--ring);
+}
+.inst-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	padding: 12px 14px;
+	background: var(--card);
+	border: none;
+	cursor: pointer;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+}
+.inst-num {
+	font-size: 11px;
+	color: var(--ink-faint);
+	flex-shrink: 0;
+	font-variant-numeric: tabular-nums;
+}
+.inst-date {
+	font-size: 12.5px;
+	color: var(--ink-soft);
+	flex-shrink: 0;
+	width: 72px;
+}
+.inst-val {
+	font-weight: 700;
+	flex: 1;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+.inst-actions {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	flex-shrink: 0;
+}
+.inst-body {
+	border-top: 1px solid var(--border-soft);
+	background: var(--surface-2);
+	padding: 12px 14px 14px;
+}
+.inst-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 8px 18px;
+}
+.inst-grid .k {
+	font-size: 11.5px;
+	color: var(--ink-soft);
+}
+.inst-grid .v {
+	font-weight: 700;
+	font-size: 12.5px;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+.inst-grid .full {
+	grid-column: 1 / -1;
+	border-top: 1px solid var(--border-soft);
+	margin-top: 4px;
+	padding-top: 8px;
+}
+.inst-body-actions {
+	display: none;
+}
+@media (max-width: 640px) {
+	.inst-actions {
+		display: none;
+	}
+	.inst-body-actions {
+		display: flex;
+		gap: 10px;
+		margin-top: 12px;
+		padding-top: 12px;
+		border-top: 1px solid var(--border-soft);
+	}
+	.inst-body-actions .btn {
+		flex: 1;
+		justify-content: center;
+	}
+	.inst-row {
+		flex-wrap: wrap;
+		row-gap: 6px;
+	}
+	.inst-date {
+		width: auto;
+	}
+	.inst-val {
+		flex: 1 1 auto;
+		min-width: 90px;
+	}
+}
+
+/* ---------- objetivos: encargos e abatimentos -- portado do nextgoals ---------- */
+
+.encargos-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+.comp-legend {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+	gap: 8px;
+	margin-top: 14px;
+}
+.comp-legend-item {
+	background: var(--surface-2);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-md);
+	padding: 10px 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.comp-legend-top {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 11.5px;
+	color: var(--ink-soft);
+	font-weight: 600;
+}
+.comp-legend-swatch {
+	width: 9px;
+	height: 9px;
+	border-radius: 2px;
+	flex-shrink: 0;
+}
+.comp-legend-bottom {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 6px;
+}
+.comp-legend-pct {
+	font-weight: 800;
+	font-size: 15px;
+}
+.comp-legend-val {
+	font-size: 11px;
+	color: var(--ink-faint);
+}
+.encargos-range {
+	font-size: 12px;
+	color: var(--ink-faint);
+	margin: -8px 0 14px;
+}
+@media (max-width: 640px) {
+	.encargos-tabs {
+		flex-direction: column;
+		align-items: stretch;
+	}
+	.encargos-tabs select {
+		width: 100%;
 	}
 }
 
