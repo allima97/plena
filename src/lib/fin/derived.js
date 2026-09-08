@@ -19,6 +19,24 @@ export function totals(transactions) {
 	return { receitas, despesas, saldo: receitas - despesas };
 }
 
+/**
+ * Saldo real de uma conta até uma data-limite (por padrão, hoje) -- inclui transferências (elas
+ * de fato movem dinheiro entre contas) mas NUNCA lançamentos com data futura, que já podem estar
+ * pré-gerados no sistema (parcelas e recorrências futuras) sem que o dinheiro tenha saído/entrado
+ * de verdade ainda. Use esta função em vez de somar `transactions` direto sempre que o objetivo
+ * for "quanto eu tenho HOJE nesta conta", para não misturar saldo real com saldo comprometido.
+ */
+export function saldoContaAte(transactions, acc, dataLimite = todayISO()) {
+	let saldo = acc.saldoInicial || 0;
+	for (const t of transactions) {
+		if (t.contaId !== acc.id) continue;
+		if (t.data > dataLimite) continue;
+		if (t.tipo === 'receita') saldo += Number(t.valor) || 0;
+		else saldo -= Number(t.valor) || 0;
+	}
+	return saldo;
+}
+
 /** Soma de parcelas/recorrências ativas com vencimento no mês informado. */
 export function committedThisMonth(transactions, mKey = currentMonthKey()) {
 	return monthTransactions(transactions, mKey)

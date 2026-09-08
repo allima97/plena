@@ -108,7 +108,7 @@ export function buildInsights({ transactions, accounts, goals, resources, resour
 	}
 	if (maiorAlta) {
 		insights.push({
-			type: 'comportamento',
+			tipo: 'comportamento',
 			title: `Gasto em alta: ${maiorAlta.cat.nome}`,
 			body: `Seus gastos com ${maiorAlta.cat.nome} aumentaram ${maiorAlta.pct}% em relação à média dos últimos 3 meses.`
 		});
@@ -119,7 +119,7 @@ export function buildInsights({ transactions, accounts, goals, resources, resour
 	const comprometidoMes = committedThisMonth(transactions, mKey);
 	if (receitaMedia3 > 0 && comprometidoMes / receitaMedia3 > 0.7) {
 		insights.push({
-			type: 'risco',
+			tipo: 'risco',
 			title: 'Compromissos pesando no orçamento',
 			body: `Seus compromissos deste mês representam ${Math.round((comprometidoMes / receitaMedia3) * 100)}% da sua receita média.`
 		});
@@ -130,7 +130,7 @@ export function buildInsights({ transactions, accounts, goals, resources, resour
 	if (mediaDespesas3 > 0 && t.despesas < mediaDespesas3 * 0.9) {
 		const economia = mediaDespesas3 - t.despesas;
 		insights.push({
-			type: 'oportunidade',
+			tipo: 'oportunidade',
 			title: 'Você gastou menos que o habitual',
 			body: `Você gastou ${fmtMoney(economia)} a menos que a média dos últimos meses. Esse valor poderia acelerar um dos seus objetivos.`
 		});
@@ -142,7 +142,7 @@ export function buildInsights({ transactions, accounts, goals, resources, resour
 		const faturaAnteriorAcc = faturaDoCartao(transactions, acc, shiftMonthKey(mKey, -1));
 		if (faturaAnteriorAcc > 0 && faturaAtualAcc > faturaAnteriorAcc * 1.2) {
 			insights.push({
-				type: 'cartao',
+				tipo: 'cartao',
 				title: `Cartão ${acc.nome} em alta`,
 				body: `A fatura está ${Math.round((faturaAtualAcc / faturaAnteriorAcc - 1) * 100)}% maior que a do mês passado.`
 			});
@@ -154,7 +154,7 @@ export function buildInsights({ transactions, accounts, goals, resources, resour
 		const m = computeMetrics(g, { resources, resourceMoves, goalCategories, installments, amortizations });
 		if (m.statusTone === 'good' && m.percent < 1) {
 			insights.push({
-				type: 'objetivo',
+				tipo: 'objetivo',
 				title: `Meta "${g.name}" adiantada`,
 				body: 'Mantendo o ritmo atual, essa meta deve ser concluída antes do previsto.'
 			});
@@ -164,9 +164,9 @@ export function buildInsights({ transactions, accounts, goals, resources, resour
 
 	if (!insights.length) {
 		if (t.saldo >= 0) {
-			insights.push({ type: 'comportamento', title: 'Mês positivo até aqui.', body: 'As entradas superam as saídas neste mês. Continue de olho nos vencimentos próximos.' });
+			insights.push({ tipo: 'comportamento', title: 'Mês positivo até aqui.', body: 'As entradas superam as saídas neste mês. Continue de olho nos vencimentos próximos.' });
 		} else {
-			insights.push({ type: 'risco', title: 'Fique de olho nos gastos.', body: 'As saídas superaram as entradas neste mês. Vale revisar as categorias com maior peso em Relatórios.' });
+			insights.push({ tipo: 'risco', title: 'Fique de olho nos gastos.', body: 'As saídas superaram as entradas neste mês. Vale revisar as categorias com maior peso em Relatórios.' });
 		}
 	}
 

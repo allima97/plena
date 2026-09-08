@@ -1,7 +1,7 @@
 <script>
 	import { appState, addAccount, updateAccount, removeAccount } from '$lib/fin/store.svelte.js';
-	import { currentMonthKey, faturaDoCartao, nextMonthKey } from '$lib/fin/derived.js';
-	import { fmtMoney } from '$lib/format.js';
+	import { currentMonthKey, faturaDoCartao, nextMonthKey, saldoContaAte } from '$lib/fin/derived.js';
+	import { fmtMoney, todayISO } from '$lib/format.js';
 	import Modal from '$lib/components/Modal.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import { Plus, Wallet, CreditCard, Landmark, MoreHorizontal } from 'lucide-svelte';
@@ -46,9 +46,9 @@
 	}
 
 	function saldoAtual(acc) {
-		const receitas = appState.transactions.filter((t) => t.contaId === acc.id && t.tipo === 'receita').reduce((s, t) => s + (Number(t.valor) || 0), 0);
-		const despesas = appState.transactions.filter((t) => t.contaId === acc.id && t.tipo === 'despesa').reduce((s, t) => s + (Number(t.valor) || 0), 0);
-		return (acc.saldoInicial || 0) + receitas - despesas;
+		// Saldo real de hoje: nunca inclui lançamento com data futura (parcela/recorrência já
+		// pré-gerada) -- ver saldoContaAte em derived.js.
+		return saldoContaAte(appState.transactions, acc, todayISO());
 	}
 
 	function faturaAtual(acc) {

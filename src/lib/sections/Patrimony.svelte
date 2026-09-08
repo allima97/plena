@@ -1,7 +1,7 @@
 <script>
 	import { appState, addPatrimonyItem, updatePatrimonyItem, removePatrimonyItem, upsertPatrimonySnapshot } from '$lib/fin/store.svelte.js';
-	import { currentMonthKey, faturaDoCartao } from '$lib/fin/derived.js';
-	import { fmtMoney } from '$lib/format.js';
+	import { currentMonthKey, faturaDoCartao, saldoContaAte } from '$lib/fin/derived.js';
+	import { fmtMoney, todayISO } from '$lib/format.js';
 	import Modal from '$lib/components/Modal.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import BarChart from '$lib/components/charts/BarChart.svelte';
@@ -42,9 +42,8 @@
 	}
 
 	function saldoConta(acc) {
-		const receitas = appState.transactions.filter((t) => t.contaId === acc.id && t.tipo === 'receita').reduce((s, t) => s + (Number(t.valor) || 0), 0);
-		const despesas = appState.transactions.filter((t) => t.contaId === acc.id && t.tipo === 'despesa').reduce((s, t) => s + (Number(t.valor) || 0), 0);
-		return (acc.saldoInicial || 0) + receitas - despesas;
+		// Saldo real de hoje: nunca inclui lançamento com data futura -- ver saldoContaAte em derived.js.
+		return saldoContaAte(appState.transactions, acc, todayISO());
 	}
 
 	const contas = $derived(appState.accounts.filter((a) => a.tipo === 'conta'));

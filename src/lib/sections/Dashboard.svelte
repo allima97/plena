@@ -1,6 +1,6 @@
 <script>
 	import { appState, setAlertThresholds } from '$lib/fin/store.svelte.js';
-	import { totals, monthTransactions, committedThisMonth, nextScheduleDate, currentMonthKey, daysUntil, faturaDoCartao } from '$lib/fin/derived.js';
+	import { totals, monthTransactions, committedThisMonth, nextScheduleDate, currentMonthKey, daysUntil, faturaDoCartao, saldoContaAte } from '$lib/fin/derived.js';
 	import { computeMetrics } from '$lib/goals/metrics.js';
 	import { buildAttentionItems } from '$lib/fin/attention.js';
 	import { computeFinancialScore, buildInsights } from '$lib/fin/intelligence.js';
@@ -39,14 +39,14 @@
 	const prevMesTx = $derived(monthTransactions(baseTx, prevMKey));
 	const t = $derived(totals(mesTx));
 	const prevT = $derived(totals(prevMesTx));
-	const geral = $derived(totals(appState.transactions));
 
+	// Saldo real (nunca inclui lançamento com data futura, mesmo que já esteja pré-gerado como
+	// parcela/recorrência futura) -- ver saldoContaAte em derived.js. Soma só contas líquidas
+	// (sem cartão, que é linha de crédito, não dinheiro guardado).
 	function saldoAte(dataLimite) {
-		return appState.transactions
-			.filter((tr) => tr.data <= dataLimite)
-			.reduce((s, tr) => s + (tr.tipo === 'receita' ? Number(tr.valor) || 0 : -(Number(tr.valor) || 0)), 0);
+		return contasLiquidas.reduce((s, acc) => s + saldoContaAte(appState.transactions, acc, dataLimite), 0);
 	}
-	const saldoAtualGeral = $derived(geral.saldo);
+	const saldoAtualGeral = $derived(saldoAte(todayISO()));
 
 	const sparkValues = $derived.by(() => {
 		const out = [];
@@ -131,9 +131,7 @@
 	const cartoesConta = $derived(appState.accounts.filter((a) => a.tipo === 'cartao'));
 
 	function saldoConta(acc) {
-		const receitas = appState.transactions.filter((tr) => tr.contaId === acc.id && tr.tipo === 'receita').reduce((s, tr) => s + (Number(tr.valor) || 0), 0);
-		const despesas = appState.transactions.filter((tr) => tr.contaId === acc.id && tr.tipo === 'despesa').reduce((s, tr) => s + (Number(tr.valor) || 0), 0);
-		return (acc.saldoInicial || 0) + receitas - despesas;
+		return saldoContaAte(appState.transactions, acc, todayISO());
 	}
 	function faturaConta(acc) {
 		return faturaDoCartao(appState.transactions, acc, mKey);
@@ -142,9 +140,12 @@
 	const saldoContasReal = $derived(contasLiquidas.reduce((s, acc) => s + saldoConta(acc), 0));
 	const faturaCartoesTotal = $derived(cartoesConta.reduce((s, acc) => s + faturaConta(acc), 0));
 
+	// Só despesas pendentes em contas líquidas (não-cartão): compras no cartão já entram na
+	// fatura via faturaCartoesTotal -- somar aqui de novo contaria o mesmo gasto duas vezes.
+	const cartaoIds = $derived(new Set(cartoesConta.map((a) => a.id)));
 	const committedNext30Value = $derived.by(() => {
 		return appState.transactions
-			.filter((tr) => tr.tipo === 'despesa' && tr.statusPagamento !== 'pago')
+			.filter((tr) => tr.tipo === 'despesa' && tr.statusPagamento !== 'pago' && !cartaoIds.has(tr.contaId))
 			.reduce((s, tr) => {
 				const dias = daysUntil(tr.data);
 				return dias >= 0 && dias <= 30 ? s + (Number(tr.valor) || 0) : s;
