@@ -208,7 +208,7 @@
 </div>
 
 <div class="goals-layout">
-	<aside class="goals-list">
+	<div class="goals-list" style="--goal-cols:{Math.max(Math.min(activeGoals.length, 6), 1)}">
 		{#each activeGoals as g (g.id)}
 			{@const m = computeMetrics(g, { resources: appState.resources, resourceMoves: appState.resourceMoves, goalCategories: appState.goalCategories, installments: appState.installments, amortizations: appState.amortizations })}
 			<button class="goal-list-item" class:active={g.id === selectedGoalId} onclick={() => (selectedGoalId = g.id)}>
@@ -227,20 +227,24 @@
 		{:else}
 			<p class="empty">Nenhum objetivo ainda.</p>
 		{/each}
+	</div>
 
-		{#if archivedGoals.length}
-			<button class="btn btn-ghost sm" style="margin-top:6px" onclick={() => (showArchived = !showArchived)}>
+	{#if archivedGoals.length}
+		<div class="goals-archived-row">
+			<button class="btn btn-ghost sm" onclick={() => (showArchived = !showArchived)}>
 				{showArchived ? 'Ocultar' : 'Mostrar'} arquivados ({archivedGoals.length})
 			</button>
 			{#if showArchived}
-				{#each archivedGoals as g (g.id)}
-					<button class="goal-list-item archived" class:active={g.id === selectedGoalId} onclick={() => (selectedGoalId = g.id)}>
-						<span class="goal-list-name">{g.name}</span>
-					</button>
-				{/each}
+				<div class="goals-list archived" style="--goal-cols:{Math.max(Math.min(archivedGoals.length, 6), 1)}">
+					{#each archivedGoals as g (g.id)}
+						<button class="goal-list-item archived" class:active={g.id === selectedGoalId} onclick={() => (selectedGoalId = g.id)}>
+							<span class="goal-list-name">{g.name}</span>
+						</button>
+					{/each}
+				</div>
 			{/if}
-		{/if}
-	</aside>
+		</div>
+	{/if}
 
 	<section class="goal-detail">
 		{#if selectedGoal && metrics}
