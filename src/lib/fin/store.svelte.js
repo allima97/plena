@@ -1,4 +1,4 @@
-import { loadLocal, saveLocal, fetchRemoteState, apiPut, apiRemove } from './persist.js';
+import { loadLocal, saveLocal, fetchRemoteState, apiPut, apiRemove, fetchMe } from './persist.js';
 import { seedCategories, uid } from './seed.js';
 import { todayISO } from '../format.js';
 
@@ -20,6 +20,7 @@ let amortizations = $state([]);
 
 let mode = $state(/** @type {'loading'|'api'|'local'} */ ('loading'));
 let ready = $state(false);
+let user = $state(/** @type {{email:string,name:string|null,logoutUrl:string|null}|null} */ (null));
 
 export const appState = {
 	get accounts() {
@@ -66,6 +67,9 @@ export const appState = {
 	},
 	get ready() {
 		return ready;
+	},
+	get user() {
+		return user;
 	}
 };
 
@@ -92,6 +96,7 @@ function persistLocalSnapshot() {
 }
 
 export async function boot() {
+	fetchMe().then((me) => (user = me));
 	const local = loadLocal();
 	if (local) {
 		accounts = local.finAccounts || [];

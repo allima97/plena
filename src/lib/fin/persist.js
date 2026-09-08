@@ -55,3 +55,17 @@ export async function apiRemove(collection, id) {
 		// see apiPut
 	}
 }
+
+/** Identidade da pessoa logada via Cloudflare Access, ou null (Access ainda
+ * não configurado, ou app rodando local/sem login). Nunca lança erro. */
+export async function fetchMe() {
+	try {
+		const res = await fetch('/api/me', { headers: { accept: 'application/json' } });
+		if (!res.ok) return null;
+		const data = await res.json();
+		if (!data || !data.email) return null;
+		return data;
+	} catch {
+		return null;
+	}
+}

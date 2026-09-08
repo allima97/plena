@@ -40,6 +40,17 @@
 
 	const alertCount = $derived(upcomingDue(appState.transactions, appState.alertThresholds).total);
 
+	const initials = $derived.by(() => {
+		const src = appState.user?.name || appState.user?.email || '';
+		const parts = src.split(/[\s.@]+/).filter(Boolean);
+		if (!parts.length) return 'AL';
+		return (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase();
+	});
+
+	function handleAvatarClick() {
+		if (appState.user?.logoutUrl) window.location.href = appState.user.logoutUrl;
+	}
+
 	function isActive(href) {
 		if (href === '/') return page.url.pathname === '/';
 		return page.url.pathname.startsWith(href);
@@ -118,7 +129,14 @@
 						<Bell size={17} />
 						{#if alertCount > 0}<span class="notif-dot"></span>{/if}
 					</button>
-					<span class="avatar-chip">AL</span>
+					<button
+						class="avatar-chip"
+						onclick={handleAvatarClick}
+						title={appState.user ? `${appState.user.email} · clique para sair` : 'Login não configurado'}
+						style="border:none;cursor:{appState.user ? 'pointer' : 'default'}"
+					>
+						{initials}
+					</button>
 				</div>
 			</header>
 

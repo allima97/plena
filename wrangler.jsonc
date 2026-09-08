@@ -17,5 +17,16 @@
 			"database_name": "plena-db",
 			"database_id": "0df2c54b-70ce-43ab-a04b-7816876d0d5b"
 		}
-	]
+	],
+	// Cloudflare Access (Zero Trust) -- login com Google na frente do site
+	// inteiro. Nenhum dos dois valores é secreto (POLICY_AUD é só o
+	// identificador público da Application no Access), por isso ficam aqui
+	// em "vars" e não como secret. TEAM_DOMAIN é o mesmo do nextgoals (mesma
+	// conta/team da Cloudflare); POLICY_AUD precisa vir da Application NOVA
+	// que você cria especificamente para o Plena -- veja o passo a passo no
+	// README.md, seção "Login com Google".
+	"vars": {
+		"TEAM_DOMAIN": "https://nxapps.cloudflareaccess.com",
+		"POLICY_AUD": "COLOQUE_AQUI_O_AUD_TAG_DA_APPLICATION_DO_PLENA"
+	}
 }
