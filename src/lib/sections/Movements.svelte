@@ -1,13 +1,14 @@
 <script>
-	import { appState, setPaymentStatus, manageSeries, removeTransaction } from '$lib/fin/store.svelte.js';
+	import { appState, setPaymentStatus, manageSeries, removeTransaction, restoreTransaction, transferPairOf } from '$lib/fin/store.svelte.js';
 	import { committedThisMonth, currentMonthKey, monthTransactions } from '$lib/fin/derived.js';
 	import { exportCSV, exportPDF } from '$lib/fin/export.js';
 	import { fmtMoney, monthKey, monthLabel } from '$lib/format.js';
 	import NewMovementModal from '$lib/components/NewMovementModal.svelte';
 	import ReportCenterModal from '$lib/components/ReportCenterModal.svelte';
-	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+import TransferModal from '$lib/components/TransferModal.svelte';
+	import { showToast } from '$lib/toast.svelte.js';
 	import MovementRow from '$lib/components/MovementRow.svelte';
-	import { Plus, FileBarChart, Search, Download, FileDown } from 'lucide-svelte';
+	import { Plus, FileBarChart, Search, Download, FileDown, ArrowLeftRight } from 'lucide-svelte';
 
 	let query = $state('');
 	let monthFilter = $state(currentMonthKey());
@@ -18,7 +19,28 @@
 
 	let modal = $state({ open: false, mode: 'create', transaction: null });
 	let showReport = $state(false);
-	let deleting = $state(null);
+	let showTransfer = $state(false);
+
+
+	function handleDelete(tx) {
+		if (tx.isTransferencia && tx.transferId) {
+			const pair = transferPairOf(tx.transferId).map((t) => ({ ...t }));
+			pair.forEach((t) => removeTransaction(t.id));
+			showToast({
+				message: 'Transferência excluída.',
+				actionLabel: 'DESFAZER',
+				onAction: () => pair.forEach((t) => restoreTransaction(t))
+			});
+			return;
+		}
+		const snapshot = { ...tx };
+		removeTransaction(tx.id);
+		showToast({
+			message: `Lançamento "${tx.descricao || 'sem descrição'}" excluído.`,
+			actionLabel: 'DESFAZER',
+			onAction: () => restoreTransaction(snapshot)
+		});
+	}
 
 	function openNew() {
 		modal = { open: true, mode: 'create', transaction: null };
@@ -99,6 +121,7 @@
 	<div class="actions-row">
 		<button class="btn" onclick={exportarPDFRapido}><FileDown size={16} /> Exportar PDF</button>
 		<button class="btn" onclick={exportarCSVRapido}><Download size={16} /> Exportar CSV</button>
+		<button class="btn" onclick={() => (showTransfer = true)}><ArrowLeftRight size={16} /> Transferência</button>
 		<button class="btn btn-primary" onclick={openNew}><Plus size={16} /> Novo lançamento</button>
 	</div>
 </div>
@@ -171,7 +194,7 @@
 				onEditOccurrence={openEditOccurrence}
 				onEditSeries={openEditSeries}
 				onManageSeries={manageSeries}
-				onDelete={(tx) => (deleting = tx)}
+				onDelete={handleDelete}
 			/>
 		{/each}
 	{/if}
@@ -179,14 +202,5 @@
 
 <NewMovementModal open={modal.open} mode={modal.mode} transaction={modal.transaction} onClose={closeModal} />
 <ReportCenterModal open={showReport} onClose={() => (showReport = false)} />
-<ConfirmDialog
-	open={deleting !== null}
-	title="Excluir lançamento?"
-	message={`"${deleting?.descricao || 'Este lançamento'}" será removido. Esta ação não pode ser desfeita.`}
-	confirmLabel="Excluir"
-	onCancel={() => (deleting = null)}
-	onConfirm={() => {
-		removeTransaction(deleting.id);
-		deleting = null;
-	}}
-/>
+<TransferModal open={showTransfer} onClose={() => (showTransfer = false)} />
+

@@ -35,24 +35,29 @@ export async function fetchRemoteState() {
 	}
 }
 
+/** @returns {Promise<boolean>} true se a API confirmou a escrita (2xx). */
 export async function apiPut(collection, id, data) {
 	try {
-		await fetch(`/api/${collection}/${id}`, {
+		const res = await fetch(`/api/${collection}/${id}`, {
 			method: 'PUT',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify(data)
 		});
+		return res.ok;
 	} catch {
 		// offline/unreachable -- the local copy already has the change,
 		// it just won't sync to other devices until the API is back
+		return false;
 	}
 }
 
+/** @returns {Promise<boolean>} true se a API confirmou a remoção (2xx). */
 export async function apiRemove(collection, id) {
 	try {
-		await fetch(`/api/${collection}/${id}`, { method: 'DELETE' });
+		const res = await fetch(`/api/${collection}/${id}`, { method: 'DELETE' });
+		return res.ok;
 	} catch {
-		// see apiPut
+		return false;
 	}
 }
 

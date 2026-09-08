@@ -1,6 +1,6 @@
 <script>
 	import { appState, addAccount, updateAccount, removeAccount } from '$lib/fin/store.svelte.js';
-	import { currentMonthKey } from '$lib/fin/derived.js';
+	import { currentMonthKey, faturaDoCartao, nextMonthKey } from '$lib/fin/derived.js';
 	import { fmtMoney } from '$lib/format.js';
 	import Modal from '$lib/components/Modal.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -14,7 +14,7 @@
 	let menuOpenId = $state(null);
 
 	function blank() {
-		return { nome: '', tipo: 'conta', banco: '', saldoInicial: 0, limite: 0 };
+		return { nome: '', tipo: 'conta', banco: '', saldoInicial: 0, limite: 0, fechamento: '' };
 	}
 	let form = $state(blank());
 
@@ -25,14 +25,19 @@
 	}
 	function openEdit(acc) {
 		editing = acc;
-		form = { nome: acc.nome, tipo: acc.tipo, banco: acc.banco || '', saldoInicial: acc.saldoInicial || 0, limite: acc.limite || 0 };
+		form = { nome: acc.nome, tipo: acc.tipo, banco: acc.banco || '', saldoInicial: acc.saldoInicial || 0, limite: acc.limite || 0, fechamento: acc.fechamento || '' };
 		showModal = true;
 		menuOpenId = null;
 	}
 	function submit(e) {
 		e.preventDefault();
 		if (!form.nome.trim()) return;
-		const data = { ...form, saldoInicial: Number(form.saldoInicial) || 0, limite: Number(form.limite) || 0 };
+		const data = {
+			...form,
+			saldoInicial: Number(form.saldoInicial) || 0,
+			limite: Number(form.limite) || 0,
+			fechamento: form.tipo === 'cartao' && form.fechamento ? Math.min(28, Math.max(1, Number(form.fechamento))) : null
+		};
 		if (editing) updateAccount(editing.id, data);
 		else addAccount(data);
 		showModal = false;
@@ -45,10 +50,11 @@
 	}
 
 	function faturaAtual(acc) {
-		const mKey = currentMonthKey();
-		return appState.transactions
-			.filter((t) => t.contaId === acc.id && t.tipo === 'despesa' && t.data?.slice(0, 7) === mKey)
-			.reduce((s, t) => s + (Number(t.valor) || 0), 0);
+		return faturaDoCartao(appState.transactions, acc);
+	}
+
+	function proximaFatura(acc) {
+		return faturaDoCartao(appState.transactions, acc, nextMonthKey(currentMonthKey()));
 	}
 
 	const cartoes = $derived(appState.accounts.filter((a) => a.tipo === 'cartao'));
@@ -103,6 +109,11 @@
 					Atualizado agora
 				{/if}
 			</p>
+			{#if acc.tipo === 'cartao'}
+				<p class="account-tile-next">
+					{acc.fechamento ? `Fecha dia ${acc.fechamento} · ` : ''}Próxima fatura <span class="privacy-value">{fmtMoney(proximaFatura(acc))}</span>
+				</p>
+			{/if}
 		</div>
 	{/each}
 
@@ -154,7 +165,13 @@
 			<label class="field"><span>Banco / bandeira</span><input class="field-input" bind:value={form.banco} /></label>
 		</div>
 		{#if form.tipo === 'cartao'}
-			<label class="field"><span>Limite</span><input class="field-input" type="number" step="0.01" bind:value={form.limite} /></label>
+			<div class="form-grid">
+				<label class="field"><span>Limite</span><input class="field-input" type="number" step="0.01" bind:value={form.limite} /></label>
+				<label class="field">
+					<span>Dia de fechamento</span>
+					<input class="field-input" type="number" min="1" max="28" placeholder="ex: 5" bind:value={form.fechamento} />
+				</label>
+			</div>
 		{:else}
 			<label class="field"><span>Saldo inicial</span><input class="field-input" type="number" step="0.01" bind:value={form.saldoInicial} /></label>
 		{/if}

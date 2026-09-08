@@ -19,6 +19,9 @@ let installments = $state([]);
 let amortizations = $state([]);
 
 let mode = $state(/** @type {'loading'|'api'|'local'} */ ('loading'));
+let syncStatus = $state(/** @type {'synced'|'saving'|'error'} */ ('synced'));
+let pendingWrites = 0;
+let lastFailedOp = /** @type {{collection:string,id:string,data?:any,remove?:boolean}|null} */ (null);
 let ready = $state(false);
 let user = $state(/** @type {{email:string,name:string|null,logoutUrl:string|null}|null} */ (null));
 
@@ -64,6 +67,9 @@ export const appState = {
 	},
 	get mode() {
 		return mode;
+	},
+	get syncStatus() {
+		return syncStatus;
 	},
 	get ready() {
 		return ready;
@@ -156,14 +162,37 @@ export async function boot() {
 	persistLocalSnapshot();
 }
 
+function afterSync(ok, opIfFailed) {
+	pendingWrites = Math.max(0, pendingWrites - 1);
+	if (!ok) lastFailedOp = opIfFailed;
+	syncStatus = pendingWrites > 0 ? 'saving' : lastFailedOp ? 'error' : 'synced';
+}
+
 function write(collection, id, data) {
 	persistLocalSnapshot();
-	if (mode === 'api') apiPut(collection, id, data);
+	if (mode !== 'api') return;
+	pendingWrites++;
+	syncStatus = 'saving';
+	apiPut(collection, id, data).then((ok) => afterSync(ok, { collection, id, data }));
 }
 
 function erase(collection, id) {
 	persistLocalSnapshot();
-	if (mode === 'api') apiRemove(collection, id);
+	if (mode !== 'api') return;
+	pendingWrites++;
+	syncStatus = 'saving';
+	apiRemove(collection, id).then((ok) => afterSync(ok, { collection, id, remove: true }));
+}
+
+/** Repete a última escrita/remoção que falhou (botão "Tentar novamente" do indicador de sincronização). */
+export function retrySync() {
+	if (!lastFailedOp) return;
+	const op = lastFailedOp;
+	lastFailedOp = null;
+	pendingWrites++;
+	syncStatus = 'saving';
+	const promise = op.remove ? apiRemove(op.collection, op.id) : apiPut(op.collection, op.id, op.data);
+	promise.then((ok) => afterSync(ok, op));
 }
 
 // ---- categorias (financeiras: receita/despesa) ---------------------------
@@ -311,6 +340,12 @@ export function removeTransaction(id) {
 	erase('finTransactions', id);
 }
 
+/** Reinsere um lançamento removido (mesmo id e dados), usado pelo "desfazer" do toast de exclusão. */
+export function restoreTransaction(tx) {
+	transactions = [...transactions, tx];
+	write('finTransactions', tx.id, tx);
+}
+
 export function setPaymentStatus(id, status) {
 	updateTransaction(id, { statusPagamento: status });
 }
@@ -332,6 +367,49 @@ export function editSeries(seriesId, data) {
 
 export function seriesOf(seriesId) {
 	return transactions.filter((t) => t.seriesId === seriesId).sort((a, b) => a.data.localeCompare(b.data));
+}
+
+// ---- transferências entre contas -----------------------------------------
+// Duas transações (despesa na origem, receita no destino) ligadas por
+// transferId e marcadas com isTransferencia, para não distorcer receitas e
+// despesas nos relatórios (ver totals()/byCategory() em derived.js), embora
+// cada perna continue afetando o saldo da sua própria conta normalmente.
+
+export function addTransfer({ contaOrigemId, contaDestinoId, valor, data, descricao }) {
+	const contaOrigem = accountById(contaOrigemId);
+	const contaDestino = accountById(contaDestinoId);
+	const transferId = uid();
+	const base = {
+		valor: Number(valor) || 0,
+		data,
+		categoriaId: '',
+		subcategoriaId: '',
+		formaPagamento: null,
+		statusPagamento: 'pago',
+		isTransferencia: true,
+		transferId
+	};
+	const saida = addTransaction({
+		...base,
+		tipo: 'despesa',
+		contaId: contaOrigemId,
+		descricao: descricao?.trim() || `Transferência para ${contaDestino?.nome || 'outra conta'}`
+	});
+	const entrada = addTransaction({
+		...base,
+		tipo: 'receita',
+		contaId: contaDestinoId,
+		descricao: descricao?.trim() || `Transferência de ${contaOrigem?.nome || 'outra conta'}`
+	});
+	return { saida, entrada };
+}
+
+export function transferPairOf(transferId) {
+	return transactions.filter((t) => t.transferId === transferId);
+}
+
+export function removeTransfer(transferId) {
+	transferPairOf(transferId).forEach((t) => removeTransaction(t.id));
 }
 
 // ---- relatórios: modelos, histórico e agendamento ------------------------

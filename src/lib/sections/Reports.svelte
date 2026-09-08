@@ -1,6 +1,6 @@
 <script>
 	import { appState } from '$lib/fin/store.svelte.js';
-	import { monthTransactions, totals, byCategory, currentMonthKey } from '$lib/fin/derived.js';
+	import { monthTransactions, totals, byCategory, currentMonthKey, faturaDoCartao } from '$lib/fin/derived.js';
 	import { fmtMoney, monthKey, monthLabel, yearKey, todayISO } from '$lib/format.js';
 	import ReportCenterModal from '$lib/components/ReportCenterModal.svelte';
 	import BarChart from '$lib/components/charts/BarChart.svelte';
@@ -69,10 +69,7 @@
 	const cartoes = $derived(appState.accounts.filter((a) => a.tipo === 'cartao'));
 	const usoCartoes = $derived.by(() => {
 		const limiteTotal = cartoes.reduce((s, a) => s + (Number(a.limite) || 0), 0);
-		const usoTotal = cartoes.reduce((s, a) => {
-			const fatura = mesAtualTx.filter((t) => t.contaId === a.id && t.tipo === 'despesa').reduce((sum, t) => sum + (Number(t.valor) || 0), 0);
-			return s + fatura;
-		}, 0);
+		const usoTotal = cartoes.reduce((s, a) => s + faturaDoCartao(appState.transactions, a, currentMonthKey()), 0);
 		return limiteTotal > 0 ? Math.round((usoTotal / limiteTotal) * 100) : null;
 	});
 	const maiorReceita = $derived(byCategory(mesAtualTx, appState.categories, 'receita')[0]);

@@ -41,7 +41,7 @@ export function toCSV(rows, categories, accounts) {
 		lines.push(
 			[
 				fmtDate(t.data),
-				t.tipo === 'receita' ? 'Receita' : 'Despesa',
+				t.isTransferencia ? 'Transferência' : t.tipo === 'receita' ? 'Receita' : 'Despesa',
 				cat?.nome || '',
 				sub?.nome || '',
 				acc?.nome || '',
@@ -98,8 +98,8 @@ export async function exportPDF(rows, categories, accounts, meta, filenamePrefix
 		y += 18;
 	}
 
-	const receitas = rows.filter((r) => r.tipo === 'receita').reduce((s, r) => s + (Number(r.valor) || 0), 0);
-	const despesas = rows.filter((r) => r.tipo === 'despesa').reduce((s, r) => s + (Number(r.valor) || 0), 0);
+	const receitas = rows.filter((r) => r.tipo === 'receita' && !r.isTransferencia).reduce((s, r) => s + (Number(r.valor) || 0), 0);
+	const despesas = rows.filter((r) => r.tipo === 'despesa' && !r.isTransferencia).reduce((s, r) => s + (Number(r.valor) || 0), 0);
 	doc.setTextColor(23, 33, 43);
 	doc.setFont('helvetica', 'bold');
 	doc.setFontSize(11);
@@ -132,7 +132,7 @@ export async function exportPDF(rows, categories, accounts, meta, filenamePrefix
 		const cat = categories.find((c) => c.id === t.categoriaId);
 		const acc = accounts.find((a) => a.id === t.contaId);
 		doc.text(fmtDate(t.data), colX.data, y);
-		doc.text(t.tipo === 'receita' ? 'Receita' : 'Despesa', colX.tipo, y);
+		doc.text(t.isTransferencia ? 'Transferência' : t.tipo === 'receita' ? 'Receita' : 'Despesa', colX.tipo, y);
 		doc.text((cat?.nome || '').slice(0, 20), colX.cat, y);
 		doc.text((t.descricao || '').slice(0, 28), colX.desc, y);
 		doc.text((acc?.nome || '').slice(0, 16), colX.conta, y);

@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import '../app.css';
-	import { appState, boot } from '$lib/fin/store.svelte.js';
+	import { appState, boot, retrySync } from '$lib/fin/store.svelte.js';
 	import {
 		LayoutDashboard,
 		ReceiptText,
@@ -15,11 +15,20 @@
 		Search,
 		Bell,
 		Eye,
-		EyeOff
+		EyeOff,
+		Plus
 	} from 'lucide-svelte';
 	import { upcomingDue } from '$lib/fin/derived.js';
+	import GlobalSearch from '$lib/components/GlobalSearch.svelte';
+	import NotificationsDrawer from '$lib/components/NotificationsDrawer.svelte';
+	import QuickAddModal from '$lib/components/QuickAddModal.svelte';
+	import ToastHost from '$lib/components/ToastHost.svelte';
 
 	let { children } = $props();
+
+	let searchOpen = $state(false);
+	let notifOpen = $state(false);
+	let showNewGlobal = $state(false);
 
 	const navItems = [
 		{ href: '/', label: 'Visão geral', icon: LayoutDashboard },
@@ -58,8 +67,25 @@
 
 	const activeLabel = $derived(navItems.find((n) => isActive(n.href))?.label ?? 'Plena');
 
+	const bottomNavItems = [
+		{ href: '/', label: 'Início', icon: LayoutDashboard },
+		{ href: '/movimentacoes', label: 'Mov.', icon: ReceiptText }
+	];
+	const bottomNavItemsEnd = [
+		{ href: '/objetivos', label: 'Objetivos', icon: Target }
+	];
+
+	function handleGlobalKeydown(e) {
+		if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+			e.preventDefault();
+			searchOpen = true;
+		}
+	}
+
 	onMount(() => {
 		boot();
+		window.addEventListener('keydown', handleGlobalKeydown);
+		return () => window.removeEventListener('keydown', handleGlobalKeydown);
 	});
 </script>
 
@@ -100,9 +126,22 @@
 					Use categorias secundárias para entender exatamente onde o dinheiro está indo.
 				</p>
 			</div>
-			<p class="mode-note">
-				{appState.mode === 'api' ? 'Salvo no banco de dados' : appState.mode === 'local' ? 'Salvo neste navegador' : 'Carregando…'}
-			</p>
+			<div class="sync-status" class:is-error={appState.mode === 'api' && appState.syncStatus === 'error'}>
+				{#if appState.mode === 'api'}
+					{#if appState.syncStatus === 'saving'}
+						<span class="sync-dot saving"></span> Salvando…
+					{:else if appState.syncStatus === 'error'}
+						<span class="sync-dot error"></span> Alteração não sincronizada
+						<button class="sync-retry" onclick={retrySync}>Tentar novamente</button>
+					{:else}
+						<span class="sync-dot ok"></span> Sincronizado
+					{/if}
+				{:else if appState.mode === 'local'}
+					Salvo neste navegador
+				{:else}
+					Carregando…
+				{/if}
+			</div>
 		</div>
 	</aside>
 
@@ -124,11 +163,14 @@
 					<button class="hide-values-btn" onclick={toggleHideValues}>
 						{#if hideValues}<EyeOff size={15} /> Mostrar valores{:else}<Eye size={15} /> Ocultar valores{/if}
 					</button>
-					<button class="icon-btn" aria-label="Buscar"><Search size={17} /></button>
-					<button class="icon-btn" aria-label="Notificações" style="position:relative">
-						<Bell size={17} />
-						{#if alertCount > 0}<span class="notif-dot"></span>{/if}
-					</button>
+					<button class="icon-btn" aria-label="Buscar" onclick={() => { searchOpen = true; notifOpen = false; }}><Search size={17} /></button>
+					<div class="notif-anchor">
+						<button class="icon-btn" aria-label="Notificações" style="position:relative" onclick={() => { notifOpen = !notifOpen; searchOpen = false; }}>
+							<Bell size={17} />
+							{#if alertCount > 0}<span class="notif-dot"></span>{/if}
+						</button>
+						<NotificationsDrawer open={notifOpen} onClose={() => (notifOpen = false)} />
+					</div>
 					<button
 						class="avatar-chip"
 						onclick={handleAvatarClick}
@@ -148,3 +190,29 @@
 		</div>
 	</main>
 </div>
+
+<GlobalSearch open={searchOpen} onClose={() => (searchOpen = false)} />
+<QuickAddModal open={showNewGlobal} onClose={() => (showNewGlobal = false)} />
+<ToastHost />
+
+<nav class="bottom-nav">
+	{#each bottomNavItems as item (item.href)}
+		<a href={item.href} class="bottom-nav-item" class:active={isActive(item.href)}>
+			<item.icon size={20} strokeWidth={isActive(item.href) ? 2.2 : 1.8} />
+			<span>{item.label}</span>
+		</a>
+	{/each}
+	<button class="bottom-nav-fab" onclick={() => (showNewGlobal = true)} aria-label="Novo lançamento">
+		<Plus size={22} />
+	</button>
+	{#each bottomNavItemsEnd as item (item.href)}
+		<a href={item.href} class="bottom-nav-item" class:active={isActive(item.href)}>
+			<item.icon size={20} strokeWidth={isActive(item.href) ? 2.2 : 1.8} />
+			<span>{item.label}</span>
+		</a>
+	{/each}
+	<button class="bottom-nav-item" onclick={() => (mobileNavOpen = true)} aria-label="Mais opções">
+		<Menu size={20} />
+		<span>Mais</span>
+	</button>
+</nav>

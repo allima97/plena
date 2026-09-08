@@ -1,18 +1,21 @@
 <script>
 	import { fmtMoney, fmtDate } from '$lib/format.js';
-	import { ArrowDownRight, ArrowUpRight, Repeat, Layers } from 'lucide-svelte';
+	import { ArrowDownRight, ArrowUpRight, ArrowLeftRight, Repeat, Layers } from 'lucide-svelte';
 
 	let { t, categoria, subcategoria, conta, onTogglePayment, onEditOccurrence, onEditSeries, onManageSeries, onDelete } = $props();
 </script>
 
 <div class="movement-row">
-	<span class="type-icon" class:income={t.tipo === 'receita'}>
-		{#if t.tipo === 'receita'}<ArrowUpRight size={16} />{:else}<ArrowDownRight size={16} />{/if}
+	<span class="type-icon" class:income={t.tipo === 'receita' && !t.isTransferencia} class:transfer={t.isTransferencia}>
+		{#if t.isTransferencia}<ArrowLeftRight size={16} />{:else if t.tipo === 'receita'}<ArrowUpRight size={16} />{:else}<ArrowDownRight size={16} />{/if}
 	</span>
 
 	<div class="movement-info">
 		<div class="movement-title-row">
 			<p class="movement-desc">{t.descricao || categoria?.nome || 'Lançamento'}</p>
+			{#if t.isTransferencia}
+				<span class="badge badge-purple">Transferência</span>
+			{/if}
 			{#if t.seriesId}
 				<span class="badge badge-blue">
 					{#if t.seriesKind === 'parcelado'}<Layers size={11} /> {t.parcelaAtual}/{t.parcelaTotal}
@@ -37,7 +40,13 @@
 				{t.statusPagamento === 'pago' ? 'Pago' : 'Pendente'}
 			</button>
 		</div>
-		<p class="movement-meta">{categoria?.nome || 'Sem categoria'}{subcategoria ? ` · ${subcategoria}` : ''} · {conta?.nome || 'Sem conta'}</p>
+		<p class="movement-meta">
+			{#if t.isTransferencia}
+				{conta?.nome || 'Sem conta'}
+			{:else}
+				{categoria?.nome || 'Sem categoria'}{subcategoria ? ` · ${subcategoria}` : ''} · {conta?.nome || 'Sem conta'}
+			{/if}
+		</p>
 	</div>
 
 	<div class="movement-amount">
@@ -48,7 +57,9 @@
 	</div>
 
 	<div class="movement-actions">
-		<button class="btn btn-ghost sm" onclick={() => onEditOccurrence(t)}>Editar</button>
+		{#if !t.isTransferencia}
+			<button class="btn btn-ghost sm" onclick={() => onEditOccurrence(t)}>Editar</button>
+		{/if}
 		{#if t.seriesId}
 			<button class="btn btn-ghost sm" onclick={() => onEditSeries(t)}>Editar série</button>
 			{#if t.seriesStatus === 'ativa'}

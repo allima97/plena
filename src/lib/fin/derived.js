@@ -12,6 +12,7 @@ export function totals(transactions) {
 	let receitas = 0;
 	let despesas = 0;
 	for (const t of transactions) {
+		if (t.isTransferencia) continue; // transferência entre contas não é receita nem despesa real
 		if (t.tipo === 'receita') receitas += Number(t.valor) || 0;
 		else despesas += Number(t.valor) || 0;
 	}
@@ -21,7 +22,7 @@ export function totals(transactions) {
 /** Soma de parcelas/recorrências ativas com vencimento no mês informado. */
 export function committedThisMonth(transactions, mKey = currentMonthKey()) {
 	return monthTransactions(transactions, mKey)
-		.filter((t) => t.seriesId && t.seriesStatus === 'ativa')
+		.filter((t) => t.seriesId && t.seriesStatus === 'ativa' && !t.isTransferencia)
 		.reduce((sum, t) => sum + (Number(t.valor) || 0), 0);
 }
 
@@ -67,11 +68,41 @@ export function nextScheduleDate(schedule) {
 	return next.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
 }
 
+/**
+ * Mês de fatura (YYYY-MM) de uma compra de cartão, considerando o dia de
+ * fechamento: compra até o fechamento cai na fatura do mês corrente, depois
+ * do fechamento cai na fatura do mês seguinte. Sem fechamento configurado
+ * (cartões antigos, ainda sem esse campo), mantém o comportamento anterior
+ * de agrupar pelo mês civil da compra.
+ */
+export function faturaMonthOf(dataISO, diaFechamento) {
+	if (!diaFechamento) return dataISO.slice(0, 7);
+	const [y, m, d] = dataISO.split('-').map(Number);
+	if (d <= diaFechamento) return `${y}-${String(m).padStart(2, '0')}`;
+	const next = new Date(y, m, 1);
+	return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Soma das despesas de um cartão que caem na fatura de um mês (default: mês atual). */
+export function faturaDoCartao(transactions, acc, mKey = currentMonthKey()) {
+	return transactions
+		.filter((t) => t.contaId === acc.id && t.tipo === 'despesa' && !t.isTransferencia)
+		.filter((t) => faturaMonthOf(t.data, acc.fechamento) === mKey)
+		.reduce((s, t) => s + (Number(t.valor) || 0), 0);
+}
+
+/** Mês (YYYY-MM) seguinte ao informado. */
+export function nextMonthKey(mKey) {
+	const [y, m] = mKey.split('-').map(Number);
+	const d = new Date(y, m, 1);
+	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
 /** Totais por categoria (para gráfico/relatório), só de um tipo. */
 export function byCategory(transactions, categories, tipo) {
 	const map = new Map();
 	for (const t of transactions) {
-		if (t.tipo !== tipo) continue;
+		if (t.tipo !== tipo || t.isTransferencia) continue;
 		const cat = categories.find((c) => c.id === t.categoriaId);
 		const nome = cat ? cat.nome : 'Sem categoria';
 		map.set(nome, (map.get(nome) || 0) + (Number(t.valor) || 0));
