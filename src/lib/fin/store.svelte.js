@@ -590,7 +590,19 @@ export function addInstallment(goalId, data) {
 	const i = { id: uid(), goalId, ...data };
 	installments = [...installments, i];
 	write('installments', i.id, i);
+	adjustRemainingTerm(goalId, -1);
 	return i;
+}
+
+/** Ajusta "parcelas restantes atualmente" do objetivo (quando o usuário rastreia esse número à
+ * mão, por causa de amortizações de prazo que fogem da conta simples parcelas pagas − prazo
+ * inicial) sempre que uma prestação é lançada (-1) ou removida (+1, sem passar do prazo inicial). */
+function adjustRemainingTerm(goalId, delta) {
+	const goal = goals.find((g) => g.id === goalId);
+	if (!goal || goal.remainingTermMonths == null) return;
+	const max = Number(goal.initialTermMonths) > 0 ? Number(goal.initialTermMonths) : Infinity;
+	const next = Math.min(max, Math.max(0, Number(goal.remainingTermMonths) + delta));
+	updateGoal(goalId, { remainingTermMonths: next });
 }
 
 export function updateInstallment(id, patch) {
@@ -602,8 +614,10 @@ export function updateInstallment(id, patch) {
 }
 
 export function removeInstallment(id) {
+	const goalId = installments.find((i) => i.id === id)?.goalId;
 	installments = installments.filter((i) => i.id !== id);
 	erase('installments', id);
+	if (goalId) adjustRemainingTerm(goalId, 1);
 }
 
 // ---- amortizações extras (fora do financiamento) --------------------------

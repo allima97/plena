@@ -78,11 +78,11 @@
 		{#if form.type === 'financiamento'}
 			<div class="form-grid">
 				<label class="field">
-					<span>Prazo inicial do contrato (nº de parcelas)</span>
+					<span style="min-height:32px">Prazo inicial do contrato (nº de parcelas)</span>
 					<input class="field-input" type="number" min="1" step="1" placeholder="ex: 313" bind:value={form.initialTermMonths} />
 				</label>
 				<label class="field">
-					<span>Parcelas restantes atualmente</span>
+					<span style="min-height:32px">Parcelas restantes atualmente</span>
 					<input class="field-input" type="number" min="0" step="1" placeholder="ex: 267" bind:value={form.remainingTermMonths} />
 				</label>
 			</div>
