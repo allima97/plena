@@ -7,6 +7,7 @@
 	import { Plus, Wallet, CreditCard, Landmark, MoreHorizontal } from 'lucide-svelte';
 
 	const PALETTE = ['grad-red', 'grad-purple', 'grad-blue', 'grad-dark', 'grad-orange', 'grad-green'];
+	const PALETTE_LABELS = { 'grad-red': 'Vermelho', 'grad-purple': 'Roxo', 'grad-blue': 'Azul', 'grad-dark': 'Escuro', 'grad-orange': 'Laranja', 'grad-green': 'Verde' };
 
 	let showModal = $state(false);
 	let editing = $state(null);
@@ -14,18 +15,18 @@
 	let menuOpenId = $state(null);
 
 	function blank() {
-		return { nome: '', tipo: 'conta', banco: '', saldoInicial: 0, limite: 0, fechamento: '' };
+		return { nome: '', tipo: 'conta', banco: '', saldoInicial: 0, limite: 0, fechamento: '', cor: '' };
 	}
 	let form = $state(blank());
 
 	function openNew() {
 		editing = null;
-		form = blank();
+		form = { ...blank(), cor: PALETTE[appState.accounts.length % PALETTE.length] };
 		showModal = true;
 	}
 	function openEdit(acc) {
 		editing = acc;
-		form = { nome: acc.nome, tipo: acc.tipo, banco: acc.banco || '', saldoInicial: acc.saldoInicial || 0, limite: acc.limite || 0, fechamento: acc.fechamento || '' };
+		form = { nome: acc.nome, tipo: acc.tipo, banco: acc.banco || '', saldoInicial: acc.saldoInicial || 0, limite: acc.limite || 0, fechamento: acc.fechamento || '', cor: acc.cor || PALETTE[appState.accounts.indexOf(acc) % PALETTE.length] };
 		showModal = true;
 		menuOpenId = null;
 	}
@@ -36,7 +37,8 @@
 			...form,
 			saldoInicial: Number(form.saldoInicial) || 0,
 			limite: Number(form.limite) || 0,
-			fechamento: form.tipo === 'cartao' && form.fechamento ? Math.min(28, Math.max(1, Number(form.fechamento))) : null
+			fechamento: form.tipo === 'cartao' && form.fechamento ? Math.min(28, Math.max(1, Number(form.fechamento))) : null,
+			cor: form.cor || null
 		};
 		if (editing) updateAccount(editing.id, data);
 		else addAccount(data);
@@ -71,10 +73,12 @@
 
 <div class="account-grid">
 	{#each appState.accounts as acc, i (acc.id)}
-		{@const grad = PALETTE[i % PALETTE.length]}
+		{@const grad = acc.cor || PALETTE[i % PALETTE.length]}
 		<div class="account-tile {grad}">
-			<div class="tile-decor d1"></div>
-			<div class="tile-decor d2"></div>
+			<div class="tile-decor-wrap">
+				<div class="tile-decor d1"></div>
+				<div class="tile-decor d2"></div>
+			</div>
 			<div class="account-tile-head">
 				<div class="account-tile-bank">
 					<span class="account-icon">{#if acc.tipo === 'cartao'}<CreditCard size={17} />{:else}<Landmark size={17} />{/if}</span>
@@ -136,7 +140,7 @@
 		</div>
 		<div class="card-usage-list">
 			{#each cartoes as acc, i (acc.id)}
-				{@const grad = PALETTE[(appState.accounts.indexOf(acc)) % PALETTE.length]}
+				{@const grad = acc.cor || PALETTE[(appState.accounts.indexOf(acc)) % PALETTE.length]}
 				{@const pct = acc.limite ? Math.min(100, Math.round((faturaAtual(acc) / acc.limite) * 100)) : 0}
 				<div class="card-usage-item">
 					<div class="card-usage-top">
@@ -175,6 +179,21 @@
 		{:else}
 			<label class="field"><span>Saldo inicial</span><input class="field-input" type="number" step="0.01" bind:value={form.saldoInicial} /></label>
 		{/if}
+		<label class="field">
+			<span>Cor</span>
+			<div class="color-swatch-row">
+				{#each PALETTE as opt (opt)}
+					<button
+						type="button"
+						class="color-swatch {opt}"
+						class:selected={form.cor === opt}
+						onclick={() => (form.cor = opt)}
+						aria-label={PALETTE_LABELS[opt]}
+						title={PALETTE_LABELS[opt]}
+					></button>
+				{/each}
+			</div>
+		</label>
 		<div class="modal-footer">
 			<button type="submit" class="btn btn-primary">Salvar</button>
 			<button type="button" class="btn btn-ghost" onclick={() => (showModal = false)}>Cancelar</button>
