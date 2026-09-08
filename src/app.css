@@ -581,8 +581,7 @@ table.list .num {
 	}
 }
 .main-inner {
-	max-width: 1400px;
-	margin: 0 auto;
+	width: 100%;
 	padding: 16px 16px 48px;
 }
 @media (min-width: 640px) {
