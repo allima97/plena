@@ -55,7 +55,7 @@
 <div class="app-shell" class:nav-open={mobileNavOpen}>
 	<aside class="sidebar">
 		<div class="brand">
-			<img src="/logo.jpg" alt="Plena" class="brand-mark" />
+			<img src="/icons/icon-192.png" alt="Plena" class="brand-mark" />
 			<div>
 				<p class="font-display brand-name">Plena</p>
 				<p class="brand-tag">controle leve</p>
