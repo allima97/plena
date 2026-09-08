@@ -18,6 +18,12 @@
 			"binding": "DB",
 			"database_name": "plena-db",
 			"database_id": "COLE_AQUI_O_DATABASE_ID_DEPOIS_DO_WRANGLER_D1_CREATE"
+		},
+		{
+			"binding": "plena_db",
+			"database_name": "plena-db",
+			"database_id": "0df2c54b-70ce-43ab-a04b-7816876d0d5b",
+			"remote": true
 		}
 	]
 }
