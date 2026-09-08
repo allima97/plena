@@ -141,17 +141,17 @@ export function computeGoalAchievedDate(resources, resourceMoves, target) {
  * Resumo de encargos (juros + correção monetária + seguros + taxas) e do
  * abatimento total de um subconjunto de prestações (installmentRows, já
  * com delta/extraAmortizacao calculados por installmentsWithDelta) --
- * portado 1:1 do nextgoals. period: '''currentYear''' | '''last12''' | '''year''' | '''all'''.
+ * portado 1:1 do nextgoals. period: 'currentYear' | 'last12' | 'year' | 'all'.
  */
 export function encargosAbatimentoSummary(all, period, year) {
 	let subset;
-	if (period === '''last12''') {
+	if (period === 'last12') {
 		subset = all.slice(-12);
-	} else if (period === '''currentYear''') {
+	} else if (period === 'currentYear') {
 		const cy = new Date().getFullYear();
-		subset = all.filter((it) => new Date(it.date + '''T12:00:00''').getFullYear() === cy);
-	} else if (period === '''year''') {
-		subset = all.filter((it) => new Date(it.date + '''T12:00:00''').getFullYear() === year);
+		subset = all.filter((it) => new Date(it.date + 'T12:00:00').getFullYear() === cy);
+	} else if (period === 'year') {
+		subset = all.filter((it) => new Date(it.date + 'T12:00:00').getFullYear() === year);
 	} else {
 		subset = all;
 	}
@@ -170,7 +170,7 @@ export function encargosAbatimentoSummary(all, period, year) {
 
 /** Anos (mais recentes primeiro, limitado a 5) presentes numa lista de prestações. */
 export function installmentYearsOf(installments) {
-	const years = Array.from(new Set(installments.map((i) => new Date(i.date + '''T12:00:00''').getFullYear())));
+	const years = Array.from(new Set(installments.map((i) => new Date(i.date + 'T12:00:00').getFullYear())));
 	years.sort((a, b) => b - a);
 	return years.slice(0, 5);
 }
