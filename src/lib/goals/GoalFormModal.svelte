@@ -6,7 +6,7 @@
 	let { open, editing = null, onClose, onSaved } = $props();
 
 	function blank() {
-		return { type: 'outro', name: '', currency: 'BRL', targetDate: '', contractNumber: '', linkToBalance: false, targetAmount: '', notes: '' };
+		return { type: 'outro', name: '', currency: 'BRL', targetDate: '', contractNumber: '', initialTermMonths: '', remainingTermMonths: '', linkToBalance: false, targetAmount: '', notes: '' };
 	}
 	let form = $state(blank());
 
@@ -19,6 +19,8 @@
 					currency: editing.currency || 'BRL',
 					targetDate: editing.targetDate || '',
 					contractNumber: editing.contractNumber || '',
+					initialTermMonths: editing.initialTermMonths || '',
+					remainingTermMonths: editing.remainingTermMonths || '',
 					linkToBalance: !!editing.linkToBalance,
 					targetAmount: editing.targetAmount,
 					notes: editing.notes || ''
@@ -35,6 +37,8 @@
 			currency: (form.currency || 'BRL').trim() || 'BRL',
 			targetDate: form.targetDate || '',
 			contractNumber: form.type === 'financiamento' ? form.contractNumber || '' : '',
+			initialTermMonths: form.type === 'financiamento' && form.initialTermMonths ? Number(form.initialTermMonths) || null : null,
+			remainingTermMonths: form.type === 'financiamento' && form.remainingTermMonths ? Number(form.remainingTermMonths) || null : null,
 			linkToBalance: form.type === 'financiamento' ? !!form.linkToBalance : false,
 			targetAmount: Number(form.targetAmount) || 0,
 			notes: (form.notes || '').trim()
@@ -72,6 +76,19 @@
 		</div>
 
 		{#if form.type === 'financiamento'}
+			<div class="form-grid">
+				<label class="field">
+					<span>Prazo inicial do contrato (nº de parcelas)</span>
+					<input class="field-input" type="number" min="1" step="1" placeholder="ex: 313" bind:value={form.initialTermMonths} />
+				</label>
+				<label class="field">
+					<span>Parcelas restantes atualmente</span>
+					<input class="field-input" type="number" min="0" step="1" placeholder="ex: 267" bind:value={form.remainingTermMonths} />
+				</label>
+			</div>
+			<p class="movement-meta" style="margin:-6px 0 0">
+				Use estes dois campos quando o prazo restante não bater com "parcelas pagas − prazo inicial" por causa de amortizações extras que reduziram o prazo.
+			</p>
 			<div class="form-grid">
 				<label class="field"><span>Número do contrato</span><input class="field-input" bind:value={form.contractNumber} /></label>
 				<label class="field checkbox-field">

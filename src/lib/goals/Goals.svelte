@@ -453,6 +453,13 @@
 									E se você amortizasse um valor extra agora? Estimativa pela Tabela Price a partir do saldo devedor e da parcela mais recentes — não substitui a simulação oficial do banco.
 								</p>
 							</div>
+							{#if selectedGoal.remainingTermMonths || selectedGoal.initialTermMonths}
+								<span class="sim-prazo-chip">
+									{#if selectedGoal.remainingTermMonths}{selectedGoal.remainingTermMonths}{:else}?{/if}
+									{#if selectedGoal.initialTermMonths}&nbsp;de {selectedGoal.initialTermMonths}{/if}
+									&nbsp;parcelas restantes
+								</span>
+							{/if}
 						</div>
 						<label class="field" style="max-width:280px">
 							<span>Valor do aporte extra</span>

@@ -3817,3 +3817,15 @@ table.list .num {
 .color-swatch.selected {
 	border-color: var(--ink);
 }
+
+.sim-prazo-chip {
+	flex-shrink: 0;
+	font-size: 12px;
+	font-weight: 700;
+	color: var(--ink-soft);
+	background: var(--surface-2);
+	border-radius: 999px;
+	padding: 6px 12px;
+	white-space: nowrap;
+	align-self: flex-start;
+}
