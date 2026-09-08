@@ -86,7 +86,12 @@ export function resourceBalance(moves, resourceId) {
 
 /** Prestações anotadas com o abatimento (amortização - correção monetária + amortizações extras do mês). */
 export function installmentsWithDelta(installments, amortizations) {
-	const list = [...installments].sort((a, b) => a.number - b.number);
+	// Protege contra prestações duplicadas com o mesmo número (ex.: um envio duplicado no
+	// formulário, ou uma importação que rodou mais de uma vez) -- mantém só a última gravada
+	// para cada número, do contrário os totais de Encargos e Abatimentos saem inflados.
+	const byNumber = new Map();
+	for (const it of installments) byNumber.set(it.number, it);
+	const list = [...byNumber.values()].sort((a, b) => a.number - b.number);
 	let prevSaldo = null;
 	return list.map((it) => {
 		const month = (it.date || '').slice(0, 7);

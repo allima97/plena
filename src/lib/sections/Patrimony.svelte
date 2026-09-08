@@ -61,7 +61,11 @@
 		return appState.goals
 			.filter((g) => g.type === 'financiamento' && !g.archived)
 			.map((g) => {
-				const inst = appState.installments.filter((i) => i.goalId === g.id).sort((a, b) => a.number - b.number);
+				// Deduplica por número (guarda contra prestações duplicadas por um envio repetido
+				// no formulário) antes de pegar a mais recente, mesma proteção de installmentsWithDelta.
+				const byNumber = new Map();
+				for (const i of appState.installments) if (i.goalId === g.id) byNumber.set(i.number, i);
+				const inst = [...byNumber.values()].sort((a, b) => a.number - b.number);
 				const latest = inst.length ? inst[inst.length - 1] : null;
 				return { goal: g, saldoDevedor: latest ? latest.saldoDevedor : 0 };
 			})
