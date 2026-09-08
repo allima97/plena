@@ -5,11 +5,19 @@ import { todayISO } from '../format.js';
 let accounts = $state([]);
 let categories = $state([]);
 let transactions = $state([]);
-let goals = $state([]);
 let reportTemplates = $state([]);
 let reportHistory = $state([]);
 let reportSchedule = $state({ ativo: false, templateId: null, dia: 5, hora: '08:00' });
 let alertThresholds = $state({ um: 1, tres: 3, sete: 7 });
+
+// ---- objetivos (mesmo modelo de dados do Rumo Financeiro / nextgoals) ----
+let goals = $state([]);
+let resources = $state([]);
+let resourceMoves = $state([]);
+let goalCategories = $state([]);
+let installments = $state([]);
+let amortizations = $state([]);
+
 let mode = $state(/** @type {'loading'|'api'|'local'} */ ('loading'));
 let ready = $state(false);
 
@@ -23,9 +31,6 @@ export const appState = {
 	get transactions() {
 		return transactions;
 	},
-	get goals() {
-		return goals;
-	},
 	get reportTemplates() {
 		return reportTemplates;
 	},
@@ -37,6 +42,24 @@ export const appState = {
 	},
 	get alertThresholds() {
 		return alertThresholds;
+	},
+	get goals() {
+		return goals;
+	},
+	get resources() {
+		return resources;
+	},
+	get resourceMoves() {
+		return resourceMoves;
+	},
+	get goalCategories() {
+		return goalCategories;
+	},
+	get installments() {
+		return installments;
+	},
+	get amortizations() {
+		return amortizations;
 	},
 	get mode() {
 		return mode;
@@ -51,11 +74,16 @@ function snapshot() {
 		finAccounts: accounts,
 		finCategories: categories,
 		finTransactions: transactions,
-		goals,
 		reportTemplates,
 		reportHistory,
 		reportSchedule,
-		alertThresholds
+		alertThresholds,
+		goals,
+		resources,
+		resourceMoves,
+		goalCategories,
+		installments,
+		amortizations
 	};
 }
 
@@ -69,11 +97,16 @@ export async function boot() {
 		accounts = local.finAccounts || [];
 		categories = local.finCategories || [];
 		transactions = local.finTransactions || [];
-		goals = local.goals || [];
 		reportTemplates = local.reportTemplates || [];
 		reportHistory = local.reportHistory || [];
 		reportSchedule = local.reportSchedule || { ativo: false, templateId: null, dia: 5, hora: '08:00' };
 		alertThresholds = local.alertThresholds || { um: 1, tres: 3, sete: 7 };
+		goals = local.goals || [];
+		resources = local.resources || [];
+		resourceMoves = local.resourceMoves || [];
+		goalCategories = local.goalCategories || [];
+		installments = local.installments || [];
+		amortizations = local.amortizations || [];
 	}
 	ready = true;
 
@@ -103,12 +136,17 @@ export async function boot() {
 		accounts = remote.finAccounts || [];
 		categories = remote.finCategories || [];
 		transactions = remote.finTransactions || [];
-		goals = remote.goals || goals;
-		reportTemplates = remote.reportTemplates || reportTemplates;
-		reportHistory = remote.reportHistory || reportHistory;
-		reportSchedule = remote.reportSchedule || reportSchedule;
-		alertThresholds = remote.alertThresholds || alertThresholds;
 	}
+	reportTemplates = remote.reportTemplates || reportTemplates;
+	reportHistory = remote.reportHistory || reportHistory;
+	reportSchedule = remote.reportSchedule || reportSchedule;
+	alertThresholds = remote.alertThresholds || alertThresholds;
+	goals = remote.goals || goals;
+	resources = remote.resources || resources;
+	resourceMoves = remote.resourceMoves || resourceMoves;
+	goalCategories = remote.goalCategories || goalCategories;
+	installments = remote.installments || installments;
+	amortizations = remote.amortizations || amortizations;
 	mode = 'api';
 	persistLocalSnapshot();
 }
@@ -123,7 +161,7 @@ function erase(collection, id) {
 	if (mode === 'api') apiRemove(collection, id);
 }
 
-// ---- categorias --------------------------------------------------------
+// ---- categorias (financeiras: receita/despesa) ---------------------------
 
 export function addCategory(tipo, nome) {
 	const cat = { id: uid(), tipo, nome: nome.trim(), secundarios: [] };
@@ -214,8 +252,6 @@ function addMonthsISO(iso, months) {
 	const [y, m, d] = iso.split('-').map(Number);
 	const date = new Date(y, m - 1 + months, d);
 	const pad = (n) => String(n).padStart(2, '0');
-	// Guard against month-length overflow (e.g. dia 31 + 1 mês em mês de 30 dias):
-	// Date() já rola para o mês seguinte sozinho, o que é o comportamento aceitável aqui.
 	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
@@ -235,13 +271,6 @@ export function addTransaction(data) {
 	return tx;
 }
 
-/**
- * Cria um lançamento único, um parcelamento (N parcelas mensais) ou uma
- * série recorrente (N meses), gerando desde já todas as ocorrências futuras.
- * @param {object} base dados comuns (tipo, valor, data, descricao, categoriaId, subcategoriaId, contaId, formaPagamento)
- * @param {'unica'|'parcelado'|'recorrente'} schedule
- * @param {number} count parcelas (parcelado) ou meses a gerar (recorrente)
- */
 export function addTransactionSeries(base, schedule, count) {
 	if (schedule === 'unica') {
 		return [addTransaction(base)];
@@ -281,7 +310,6 @@ export function setPaymentStatus(id, status) {
 	updateTransaction(id, { statusPagamento: status });
 }
 
-/** @param {string} seriesId @param {'pausar'|'retomar'|'cancelar'} action */
 export function manageSeries(seriesId, action) {
 	const novoStatus = action === 'pausar' ? 'pausada' : action === 'retomar' ? 'ativa' : 'cancelada';
 	transactions = transactions.map((t) =>
@@ -290,7 +318,6 @@ export function manageSeries(seriesId, action) {
 	transactions.filter((t) => t.seriesId === seriesId).forEach((t) => write('finTransactions', t.id, t));
 }
 
-/** Edita todas as ocorrências futuras (não pagas) de uma série de uma vez, sem tocar no histórico já pago. */
 export function editSeries(seriesId, data) {
 	transactions = transactions.map((t) =>
 		t.seriesId === seriesId && t.statusPagamento !== 'pago' ? { ...t, ...data, id: t.id, seriesId: t.seriesId } : t
@@ -300,45 +327,6 @@ export function editSeries(seriesId, data) {
 
 export function seriesOf(seriesId) {
 	return transactions.filter((t) => t.seriesId === seriesId).sort((a, b) => a.data.localeCompare(b.data));
-}
-
-// ---- objetivos (metas) — mesma ideia do Rumo Financeiro (nextgoals) ------
-
-export function addGoal(data) {
-	const goal = { id: uid(), valorAtual: 0, aportes: [], ...data };
-	goals = [...goals, goal];
-	write('goals', goal.id, goal);
-	return goal;
-}
-
-export function updateGoal(id, data) {
-	const idx = goals.findIndex((g) => g.id === id);
-	if (idx === -1) return;
-	const updated = { ...goals[idx], ...data, id };
-	goals = goals.map((g, i) => (i === idx ? updated : g));
-	write('goals', id, updated);
-}
-
-export function removeGoal(id) {
-	goals = goals.filter((g) => g.id !== id);
-	erase('goals', id);
-}
-
-export function addAporte(goalId, valor, data = todayISO()) {
-	const goal = goals.find((g) => g.id === goalId);
-	if (!goal) return;
-	const aporte = { id: uid(), valor: Number(valor) || 0, data };
-	const updated = {
-		...goal,
-		aportes: [...(goal.aportes || []), aporte],
-		valorAtual: (goal.valorAtual || 0) + aporte.valor
-	};
-	goals = goals.map((g) => (g.id === goalId ? updated : g));
-	write('goals', goalId, updated);
-}
-
-export function goalById(id) {
-	return goals.find((g) => g.id === id) || null;
 }
 
 // ---- relatórios: modelos, histórico e agendamento ------------------------
@@ -381,4 +369,162 @@ export function setAlertThresholds(thresholds) {
 	alertThresholds = { ...alertThresholds, ...thresholds };
 	persistLocalSnapshot();
 	if (mode === 'api') apiPut('alertThresholds', 'singleton', alertThresholds);
+}
+
+// ============================================================================
+// ---- objetivos (Rumo Financeiro / nextgoals, portado por completo) --------
+// ============================================================================
+
+export function addGoal(data) {
+	const g = { id: uid(), createdAt: new Date().toISOString(), archived: false, ...data };
+	goals = [...goals, g];
+	write('goals', g.id, g);
+	return g;
+}
+
+export function updateGoal(id, patch) {
+	const idx = goals.findIndex((g) => g.id === id);
+	if (idx === -1) return;
+	const updated = { ...goals[idx], ...patch, id };
+	goals = goals.map((g, i) => (i === idx ? updated : g));
+	write('goals', id, updated);
+}
+
+/** Apaga o objetivo e tudo que pertence a ele: recursos, movimentações, prestações e amortizações. */
+export function removeGoal(id) {
+	const resIds = resources.filter((r) => r.goalId === id).map((r) => r.id);
+	const moveIds = resourceMoves.filter((m) => resIds.includes(m.resourceId)).map((m) => m.id);
+	const instIds = installments.filter((i) => i.goalId === id).map((i) => i.id);
+	const amortIds = amortizations.filter((a) => a.goalId === id).map((a) => a.id);
+
+	goals = goals.filter((g) => g.id !== id);
+	resources = resources.filter((r) => r.goalId !== id);
+	resourceMoves = resourceMoves.filter((m) => !resIds.includes(m.resourceId));
+	installments = installments.filter((i) => i.goalId !== id);
+	amortizations = amortizations.filter((a) => a.goalId !== id);
+
+	erase('goals', id);
+	resIds.forEach((rid) => erase('resources', rid));
+	moveIds.forEach((mid) => erase('resourceMoves', mid));
+	instIds.forEach((iid) => erase('installments', iid));
+	amortIds.forEach((aid) => erase('amortizations', aid));
+}
+
+export function goalById(id) {
+	return goals.find((g) => g.id === id) || null;
+}
+
+// ---- recursos (potes de dinheiro dentro de um objetivo) -------------------
+
+export function addResource(goalId, data, initialBalance = 0) {
+	const r = { id: uid(), goalId, createdAt: new Date().toISOString(), name: data.name, group: data.group || 'outros' };
+	resources = [...resources, r];
+	write('resources', r.id, r);
+	const initial = Number(initialBalance) || 0;
+	if (initial !== 0) {
+		addResourceMove(r.id, goalId, { date: todayISO(), description: 'Saldo inicial', amount: initial });
+	}
+	return r;
+}
+
+export function updateResource(id, patch) {
+	const idx = resources.findIndex((r) => r.id === id);
+	if (idx === -1) return;
+	const updated = { ...resources[idx], ...patch, id };
+	resources = resources.map((r, i) => (i === idx ? updated : r));
+	write('resources', id, updated);
+}
+
+export function removeResource(id) {
+	const moveIds = resourceMoves.filter((m) => m.resourceId === id).map((m) => m.id);
+	resources = resources.filter((r) => r.id !== id);
+	resourceMoves = resourceMoves.filter((m) => m.resourceId !== id);
+	erase('resources', id);
+	moveIds.forEach((mid) => erase('resourceMoves', mid));
+}
+
+export function addResourceMove(resourceId, goalId, data) {
+	const m = { id: uid(), resourceId, goalId, categoryId: null, ...data };
+	resourceMoves = [...resourceMoves, m];
+	write('resourceMoves', m.id, m);
+	return m;
+}
+
+export function updateResourceMove(id, patch) {
+	const idx = resourceMoves.findIndex((m) => m.id === id);
+	if (idx === -1) return;
+	const updated = { ...resourceMoves[idx], ...patch, id };
+	resourceMoves = resourceMoves.map((m, i) => (i === idx ? updated : m));
+	write('resourceMoves', id, updated);
+}
+
+export function removeResourceMove(id) {
+	resourceMoves = resourceMoves.filter((m) => m.id !== id);
+	erase('resourceMoves', id);
+}
+
+// ---- categorias de movimentações de objetivo (separado das categorias financeiras) ----
+
+export function addGoalCategory(name, countsInPace = true) {
+	const c = { id: uid(), name, countsInPace: countsInPace !== false };
+	goalCategories = [...goalCategories, c];
+	write('goalCategories', c.id, c);
+	return c;
+}
+
+/** Resolve um nome digitado para o id de uma categoria já existente (case-insensitive), criando se necessário. */
+export function resolveGoalCategoryId(name) {
+	const trimmed = (name || '').trim();
+	if (!trimmed) return null;
+	const existing = goalCategories.find((c) => c.name.toLowerCase() === trimmed.toLowerCase());
+	return existing ? existing.id : addGoalCategory(trimmed, true).id;
+}
+
+export function goalCategoryName(id) {
+	const c = goalCategories.find((x) => x.id === id);
+	return c ? c.name : '';
+}
+
+// ---- prestações (financiamento) -------------------------------------------
+
+export function addInstallment(goalId, data) {
+	const i = { id: uid(), goalId, ...data };
+	installments = [...installments, i];
+	write('installments', i.id, i);
+	return i;
+}
+
+export function updateInstallment(id, patch) {
+	const idx = installments.findIndex((i) => i.id === id);
+	if (idx === -1) return;
+	const updated = { ...installments[idx], ...patch, id };
+	installments = installments.map((i, k) => (k === idx ? updated : i));
+	write('installments', id, updated);
+}
+
+export function removeInstallment(id) {
+	installments = installments.filter((i) => i.id !== id);
+	erase('installments', id);
+}
+
+// ---- amortizações extras (fora do financiamento) --------------------------
+
+export function addAmortization(goalId, data) {
+	const a = { id: uid(), goalId, ...data };
+	amortizations = [...amortizations, a];
+	write('amortizations', a.id, a);
+	return a;
+}
+
+export function updateAmortization(id, patch) {
+	const idx = amortizations.findIndex((a) => a.id === id);
+	if (idx === -1) return;
+	const updated = { ...amortizations[idx], ...patch, id };
+	amortizations = amortizations.map((a, i) => (i === idx ? updated : a));
+	write('amortizations', id, updated);
+}
+
+export function removeAmortization(id) {
+	amortizations = amortizations.filter((a) => a.id !== id);
+	erase('amortizations', id);
 }

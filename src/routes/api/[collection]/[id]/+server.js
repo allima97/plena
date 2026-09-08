@@ -6,11 +6,16 @@ const KNOWN_COLLECTIONS = [
 	'finAccounts',
 	'finCategories',
 	'finTransactions',
-	'goals',
 	'reportTemplates',
 	'reportHistory',
 	'reportSchedule',
-	'alertThresholds'
+	'alertThresholds',
+	'goals',
+	'resources',
+	'resourceMoves',
+	'goalCategories',
+	'installments',
+	'amortizations'
 ];
 
 function checkCollection(collection) {

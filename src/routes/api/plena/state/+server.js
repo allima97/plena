@@ -6,9 +6,14 @@ const ARRAY_COLLECTIONS = [
 	'finAccounts',
 	'finCategories',
 	'finTransactions',
-	'goals',
 	'reportTemplates',
-	'reportHistory'
+	'reportHistory',
+	'goals',
+	'resources',
+	'resourceMoves',
+	'goalCategories',
+	'installments',
+	'amortizations'
 ];
 const SINGLETON_COLLECTIONS = ['reportSchedule', 'alertThresholds'];
 
@@ -26,11 +31,16 @@ export async function GET({ platform }) {
 		finAccounts: [],
 		finCategories: [],
 		finTransactions: [],
-		goals: [],
 		reportTemplates: [],
 		reportHistory: [],
 		reportSchedule: null,
-		alertThresholds: null
+		alertThresholds: null,
+		goals: [],
+		resources: [],
+		resourceMoves: [],
+		goalCategories: [],
+		installments: [],
+		amortizations: []
 	};
 
 	for (const row of results) {

@@ -1,133 +1,281 @@
 <script>
-	import { appState, addGoal, updateGoal, removeGoal, addAporte } from '$lib/fin/store.svelte.js';
-	import { fmtMoney, fmtDate, todayISO } from '$lib/format.js';
-	import Modal from '$lib/components/Modal.svelte';
+	import { appState, removeGoal, updateGoal, removeResource, removeResourceMove, removeInstallment, removeAmortization } from '$lib/fin/store.svelte.js';
+	import { computeMetrics, progressColor } from './metrics.js';
+	import { GOAL_TYPES } from './constants.js';
+	import { fmtMoney, fmtDate } from '$lib/format.js';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
-	import { Plus, Target } from 'lucide-svelte';
+	import GoalFormModal from './GoalFormModal.svelte';
+	import ResourceFormModal from './ResourceFormModal.svelte';
+	import MoveFormModal from './MoveFormModal.svelte';
+	import InstallmentFormModal from './InstallmentFormModal.svelte';
+	import AmortizationFormModal from './AmortizationFormModal.svelte';
+	import { Plus, Archive, ArchiveRestore, Pencil, Trash2, ChevronDown, ChevronUp, Wallet } from 'lucide-svelte';
 
-	let showModal = $state(false);
-	let editing = $state(null);
-	let deleting = $state(null);
-	let aportando = $state(null);
-	let valorAporte = $state('');
+	let selectedGoalId = $state(null);
+	let showArchived = $state(false);
+	let expandedResource = $state({});
 
-	function blank() {
-		return { nome: '', valorAlvo: '', prazo: '', observacao: '' };
-	}
-	let form = $state(blank());
+	const activeGoals = $derived(appState.goals.filter((g) => !g.archived));
+	const archivedGoals = $derived(appState.goals.filter((g) => g.archived));
 
-	function openNew() {
-		editing = null;
-		form = blank();
-		showModal = true;
-	}
-	function openEdit(goal) {
-		editing = goal;
-		form = { nome: goal.nome, valorAlvo: goal.valorAlvo, prazo: goal.prazo || '', observacao: goal.observacao || '' };
-		showModal = true;
-	}
-	function submit(e) {
-		e.preventDefault();
-		if (!form.nome.trim() || !form.valorAlvo) return;
-		const data = { nome: form.nome.trim(), valorAlvo: Number(form.valorAlvo), prazo: form.prazo || null, observacao: form.observacao };
-		if (editing) updateGoal(editing.id, data);
-		else addGoal(data);
-		showModal = false;
-	}
+	$effect(() => {
+		if (selectedGoalId && appState.goals.some((g) => g.id === selectedGoalId)) return;
+		selectedGoalId = activeGoals[0]?.id || appState.goals[0]?.id || null;
+	});
 
-	function mesesRestantes(prazo) {
-		if (!prazo) return null;
-		const hoje = new Date(todayISO());
-		const alvo = new Date(prazo);
-		const meses = (alvo.getFullYear() - hoje.getFullYear()) * 12 + (alvo.getMonth() - hoje.getMonth());
-		return Math.max(1, meses);
-	}
+	const selectedGoal = $derived(appState.goals.find((g) => g.id === selectedGoalId) || null);
+	const metrics = $derived(
+		selectedGoal
+			? computeMetrics(selectedGoal, {
+					resources: appState.resources,
+					resourceMoves: appState.resourceMoves,
+					goalCategories: appState.goalCategories,
+					installments: appState.installments,
+					amortizations: appState.amortizations
+				})
+			: null
+	);
 
-	function sugestaoMensal(goal) {
-		const restante = (goal.valorAlvo || 0) - (goal.valorAtual || 0);
-		const meses = mesesRestantes(goal.prazo);
-		if (!meses || restante <= 0) return null;
-		return restante / meses;
+	// modais
+	let goalModal = $state({ open: false, editing: null });
+	let resourceModal = $state({ open: false, goalId: null, editing: null });
+	let moveModal = $state({ open: false, resourceId: null, goalId: null, editing: null });
+	let installmentModal = $state({ open: false, goalId: null, editing: null });
+	let amortModal = $state({ open: false, goalId: null, editing: null });
+	let deleting = $state(null); // { kind, id, label, warn }
+
+	function movesOf(resourceId) {
+		return appState.resourceMoves.filter((m) => m.resourceId === resourceId).sort((a, b) => (a.date < b.date ? 1 : -1));
+	}
+	function resourceBalanceOf(resourceId) {
+		return movesOf(resourceId).reduce((s, m) => s + (m.amount || 0), 0);
 	}
 
-	function confirmarAporte() {
-		if (!valorAporte || Number(valorAporte) <= 0) return;
-		addAporte(aportando.id, Number(valorAporte));
-		aportando = null;
-		valorAporte = '';
+	function confirmDelete() {
+		if (!deleting) return;
+		const { kind, id } = deleting;
+		if (kind === 'goal') removeGoal(id);
+		else if (kind === 'resource') removeResource(id);
+		else if (kind === 'move') removeResourceMove(id);
+		else if (kind === 'installment') removeInstallment(id);
+		else if (kind === 'amortization') removeAmortization(id);
+		deleting = null;
 	}
 </script>
 
 <div class="page-head">
 	<div>
 		<h1 class="font-display page-title">Objetivos</h1>
-		<p class="page-sub">A mesma ideia do Rumo Financeiro (nextgoals), agora dentro do Plena.</p>
+		<p class="page-sub">A mesma ideia do Rumo Financeiro (nextgoals), agora no design do Plena.</p>
 	</div>
-	<button class="btn btn-primary" onclick={openNew}><Plus size={16} /> Novo objetivo</button>
+	<button class="btn btn-primary" onclick={() => (goalModal = { open: true, editing: null })}><Plus size={16} /> Novo objetivo</button>
 </div>
 
-<div class="grid-cards">
-	{#each appState.goals as goal (goal.id)}
-		{@const pct = Math.min(100, Math.round(((goal.valorAtual || 0) / (goal.valorAlvo || 1)) * 100))}
-		{@const sugestao = sugestaoMensal(goal)}
-		<div class="card goal-card">
-			<div style="display:flex;align-items:center;gap:10px">
-				<span class="type-icon income"><Target size={16} /></span>
-				<div style="flex:1;min-width:0">
-					<p class="stat-label" style="margin:0">{goal.nome}</p>
-					{#if goal.prazo}<p class="movement-meta" style="margin:2px 0 0">até {fmtDate(goal.prazo)}</p>{/if}
+<div class="goals-layout">
+	<aside class="goals-list">
+		{#each activeGoals as g (g.id)}
+			{@const m = computeMetrics(g, { resources: appState.resources, resourceMoves: appState.resourceMoves, goalCategories: appState.goalCategories, installments: appState.installments, amortizations: appState.amortizations })}
+			<button class="goal-list-item" class:active={g.id === selectedGoalId} onclick={() => (selectedGoalId = g.id)}>
+				<div class="goal-list-top">
+					<span class="goal-list-name">{g.name}</span>
+					<span class="badge" class:badge-green={m.statusTone === 'good'} class:badge-red={m.statusTone === 'danger'} class:badge-orange={m.statusTone === 'warn'} class:badge-gray={m.statusTone === 'neutral'}>
+						{m.statusLabel}
+					</span>
+				</div>
+				<p class="goal-list-type">{GOAL_TYPES[g.type]?.label || 'Outro objetivo'}</p>
+				<div class="goal-progress-track" style="margin-top:8px">
+					<div class="goal-progress-fill" style="width:{m.percent * 100}%;background:{progressColor(m.percent)}"></div>
+				</div>
+				<p class="goal-list-values">{fmtMoney(m.totalAccumulated)} de {fmtMoney(m.effectiveTarget)}</p>
+			</button>
+		{:else}
+			<p class="empty">Nenhum objetivo ainda.</p>
+		{/each}
+
+		{#if archivedGoals.length}
+			<button class="btn btn-ghost sm" style="margin-top:6px" onclick={() => (showArchived = !showArchived)}>
+				{showArchived ? 'Ocultar' : 'Mostrar'} arquivados ({archivedGoals.length})
+			</button>
+			{#if showArchived}
+				{#each archivedGoals as g (g.id)}
+					<button class="goal-list-item archived" class:active={g.id === selectedGoalId} onclick={() => (selectedGoalId = g.id)}>
+						<span class="goal-list-name">{g.name}</span>
+					</button>
+				{/each}
+			{/if}
+		{/if}
+	</aside>
+
+	<section class="goal-detail">
+		{#if selectedGoal && metrics}
+			<div class="card">
+				<div class="goal-detail-head">
+					<div>
+						<p class="stat-label">{GOAL_TYPES[selectedGoal.type]?.label || 'Outro objetivo'}</p>
+						<h2 class="font-display" style="margin:4px 0 0;font-size:22px">{selectedGoal.name}</h2>
+						{#if selectedGoal.notes}<p class="movement-meta" style="margin-top:6px">{selectedGoal.notes}</p>{/if}
+					</div>
+					<div class="actions-row">
+						<button class="btn btn-ghost sm" onclick={() => (goalModal = { open: true, editing: selectedGoal })}><Pencil size={14} /> Editar</button>
+						<button class="btn btn-ghost sm" onclick={() => updateGoal(selectedGoal.id, { archived: !selectedGoal.archived })}>
+							{#if selectedGoal.archived}<ArchiveRestore size={14} /> Reativar{:else}<Archive size={14} /> Arquivar{/if}
+						</button>
+						<button class="btn btn-danger sm" onclick={() => (deleting = { kind: 'goal', id: selectedGoal.id, label: `"${selectedGoal.name}"`, warn: 'Todos os recursos, movimentações e prestações desse objetivo serão apagados.' })}>
+							<Trash2 size={14} /> Excluir
+						</button>
+					</div>
+				</div>
+
+				<div class="goal-progress-track" style="margin-top:18px;height:12px">
+					<div class="goal-progress-fill" style="width:{metrics.percent * 100}%;background:{progressColor(metrics.percent)}"></div>
+				</div>
+				<p class="stat-sub" style="margin-top:8px">{Math.round(metrics.percent * 100)}% concluído</p>
+
+				<div class="grid-cards" style="margin-top:18px">
+					<div class="stat-card">
+						<p class="stat-label">Acumulado</p>
+						<p class="font-display stat-value">{fmtMoney(metrics.totalAccumulated)}</p>
+						<p class="stat-sub">de {fmtMoney(metrics.effectiveTarget)}</p>
+					</div>
+					<div class="stat-card">
+						<p class="stat-label">Ritmo médio mensal</p>
+						<p class="font-display stat-value">{fmtMoney(metrics.generalAveragePace)}</p>
+						{#if metrics.recommendedMonthly && metrics.monthsLeft}<p class="stat-sub">recomendado: {fmtMoney(metrics.recommendedMonthly)}/mês</p>{/if}
+					</div>
+					<div class="stat-card">
+						<p class="stat-label">Previsão de conclusão</p>
+						<p class="font-display stat-value" style="font-size:18px">
+							{metrics.status === 'concluido' ? (metrics.achievedDate ? fmtDate(metrics.achievedDate) : 'Concluído') : metrics.projectedDate ? metrics.projectedDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : '—'}
+						</p>
+						{#if selectedGoal.targetDate}<p class="stat-sub">meta: {fmtDate(selectedGoal.targetDate)}</p>{/if}
+					</div>
 				</div>
 			</div>
-			<p class="font-display stat-value" style="margin-top:14px">{fmtMoney(goal.valorAtual || 0)}</p>
-			<p class="stat-sub">de {fmtMoney(goal.valorAlvo)}</p>
-			<div class="goal-progress-track">
-				<div class="goal-progress-fill" style="width:{pct}%"></div>
+
+			<div class="card" style="margin-top:16px">
+				<div class="page-head" style="margin-bottom:14px">
+					<p class="stat-label" style="margin:0">Recursos</p>
+					<button class="btn sm" onclick={() => (resourceModal = { open: true, goalId: selectedGoal.id, editing: null })}><Plus size={14} /> Novo recurso</button>
+				</div>
+				{#each metrics.resources as r (r.id)}
+					<div class="resource-block">
+						<button class="resource-head" onclick={() => (expandedResource = { ...expandedResource, [r.id]: !expandedResource[r.id] })}>
+							<span class="type-icon income"><Wallet size={15} /></span>
+							<span class="resource-name">{r.name}</span>
+							<span class="font-display resource-balance">{fmtMoney(resourceBalanceOf(r.id))}</span>
+							{#if expandedResource[r.id]}<ChevronUp size={16} />{:else}<ChevronDown size={16} />{/if}
+						</button>
+						{#if expandedResource[r.id]}
+							<div class="resource-body">
+								<div class="actions-row" style="margin-bottom:10px">
+									<button class="btn btn-ghost sm" onclick={() => (moveModal = { open: true, resourceId: r.id, goalId: selectedGoal.id, editing: null })}><Plus size={13} /> Lançamento</button>
+									<button class="btn btn-ghost sm" onclick={() => (resourceModal = { open: true, goalId: selectedGoal.id, editing: r })}>Editar recurso</button>
+									<button class="btn btn-danger sm" onclick={() => (deleting = { kind: 'resource', id: r.id, label: `"${r.name}"`, warn: 'O histórico de movimentações desse recurso será apagado.' })}>Excluir recurso</button>
+								</div>
+								{#each movesOf(r.id) as mv (mv.id)}
+									<div class="movement-row" style="padding:10px 0">
+										<div class="movement-info">
+											<p class="movement-desc">{mv.description}</p>
+											<p class="movement-meta">{fmtDate(mv.date)}</p>
+										</div>
+										<div class="movement-amount">
+											<p class="font-display" class:money-in={mv.amount >= 0} class:money-out={mv.amount < 0}>{fmtMoney(mv.amount)}</p>
+										</div>
+										<div class="movement-actions">
+											<button class="btn btn-ghost sm" onclick={() => (moveModal = { open: true, resourceId: r.id, goalId: selectedGoal.id, editing: mv })}>Editar</button>
+											<button class="btn btn-danger sm" onclick={() => (deleting = { kind: 'move', id: mv.id, label: `"${mv.description}"`, warn: '' })}>Excluir</button>
+										</div>
+									</div>
+								{:else}
+									<p class="empty">Nenhuma movimentação ainda.</p>
+								{/each}
+							</div>
+						{/if}
+					</div>
+				{:else}
+					<p class="empty">Nenhum recurso ainda — crie um para começar a registrar aportes.</p>
+				{/each}
 			</div>
-			<p class="stat-sub">{pct}% concluído{sugestao ? ` · sugestão: ${fmtMoney(sugestao)}/mês` : ''}</p>
-			<div class="actions-row" style="margin-top:14px">
-				<button class="btn sm" onclick={() => { aportando = goal; valorAporte = ''; }}>Registrar aporte</button>
-				<button class="btn btn-ghost sm" onclick={() => openEdit(goal)}>Editar</button>
-				<button class="btn btn-danger sm" onclick={() => (deleting = goal)}>Excluir</button>
-			</div>
-		</div>
-	{:else}
-		<p class="empty">Nenhum objetivo cadastrado ainda.</p>
-	{/each}
+
+			{#if selectedGoal.type === 'financiamento'}
+				<div class="card" style="margin-top:16px">
+					<div class="page-head" style="margin-bottom:14px">
+						<p class="stat-label" style="margin:0">Prestações</p>
+						<button class="btn sm" onclick={() => (installmentModal = { open: true, goalId: selectedGoal.id, editing: null })}><Plus size={14} /> Registrar prestação</button>
+					</div>
+					{#if metrics.installmentRows.length}
+						<div class="table-wrap">
+							<table class="list">
+								<thead>
+									<tr>
+										<th>Nº</th><th>Data</th><th class="num">Valor</th><th class="num">Amortização</th><th class="num">Juros</th><th class="num">Saldo devedor</th><th class="num">Abatimento</th><th></th>
+									</tr>
+								</thead>
+								<tbody>
+									{#each [...metrics.installmentRows].reverse() as it (it.id)}
+										<tr>
+											<td>{it.number}</td>
+											<td>{fmtDate(it.date)}</td>
+											<td class="num">{fmtMoney(it.valorPrestacao)}</td>
+											<td class="num">{fmtMoney(it.amortizacao)}</td>
+											<td class="num">{fmtMoney(it.juros)}</td>
+											<td class="num">{fmtMoney(it.saldoDevedor)}</td>
+											<td class="num" class:money-in={it.delta > 0} class:money-out={it.delta < 0}>{fmtMoney(it.delta)}</td>
+											<td>
+												<div class="actions-row" style="justify-content:flex-end">
+													<button class="btn btn-ghost sm" onclick={() => (installmentModal = { open: true, goalId: selectedGoal.id, editing: it })}>Editar</button>
+													<button class="btn btn-danger sm" onclick={() => (deleting = { kind: 'installment', id: it.id, label: `prestação nº ${it.number}`, warn: '' })}>Excluir</button>
+												</div>
+											</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+					{:else}
+						<p class="empty">Nenhuma prestação registrada ainda.</p>
+					{/if}
+				</div>
+
+				<div class="card" style="margin-top:16px">
+					<div class="page-head" style="margin-bottom:14px">
+						<p class="stat-label" style="margin:0">Amortizações extras</p>
+						<button class="btn sm" onclick={() => (amortModal = { open: true, goalId: selectedGoal.id, editing: null })}><Plus size={14} /> Nova amortização</button>
+					</div>
+					{#each metrics.amortizations as a (a.id)}
+						<div class="movement-row">
+							<div class="movement-info">
+								<p class="movement-desc">{a.tipo}</p>
+								<p class="movement-meta">{fmtDate(a.date)}</p>
+							</div>
+							<div class="movement-amount"><p class="font-display">{fmtMoney(a.amount)}</p></div>
+							<div class="movement-actions">
+								<button class="btn btn-ghost sm" onclick={() => (amortModal = { open: true, goalId: selectedGoal.id, editing: a })}>Editar</button>
+								<button class="btn btn-danger sm" onclick={() => (deleting = { kind: 'amortization', id: a.id, label: 'esta amortização', warn: '' })}>Excluir</button>
+							</div>
+						</div>
+					{:else}
+						<p class="empty">Nenhuma amortização extra registrada.</p>
+					{/each}
+				</div>
+			{/if}
+		{:else}
+			<p class="empty">Crie um objetivo para começar.</p>
+		{/if}
+	</section>
 </div>
 
-<Modal open={showModal} onClose={() => (showModal = false)} title={editing ? 'Editar objetivo' : 'Novo objetivo'} maxWidth="480px">
-	<form onsubmit={submit} class="movement-form">
-		<label class="field"><span>Nome do objetivo</span><input class="field-input" required placeholder="Ex.: Viagem, carro, reserva de emergência" bind:value={form.nome} /></label>
-		<div class="form-grid">
-			<label class="field"><span>Valor alvo (R$)</span><input class="field-input" type="number" step="0.01" required bind:value={form.valorAlvo} /></label>
-			<label class="field"><span>Prazo (opcional)</span><input class="field-input" type="date" bind:value={form.prazo} /></label>
-		</div>
-		<label class="field"><span>Observação</span><textarea class="field-input" rows="2" bind:value={form.observacao}></textarea></label>
-		<div class="modal-footer">
-			<button type="submit" class="btn btn-primary">Salvar</button>
-			<button type="button" class="btn btn-ghost" onclick={() => (showModal = false)}>Cancelar</button>
-		</div>
-	</form>
-</Modal>
-
-<Modal open={aportando !== null} onClose={() => (aportando = null)} title="Registrar aporte" subtitle={aportando?.nome} maxWidth="380px">
-	<div class="movement-form">
-		<label class="field"><span>Valor (R$)</span><input class="field-input" type="number" step="0.01" bind:value={valorAporte} /></label>
-		<div class="modal-footer">
-			<button class="btn btn-primary" onclick={confirmarAporte}>Registrar</button>
-			<button class="btn btn-ghost" onclick={() => (aportando = null)}>Cancelar</button>
-		</div>
-	</div>
-</Modal>
+<GoalFormModal open={goalModal.open} editing={goalModal.editing} onClose={() => (goalModal = { ...goalModal, open: false })} onSaved={(g) => (selectedGoalId = g.id)} />
+<ResourceFormModal open={resourceModal.open} goalId={resourceModal.goalId} editing={resourceModal.editing} onClose={() => (resourceModal = { ...resourceModal, open: false })} />
+<MoveFormModal open={moveModal.open} resourceId={moveModal.resourceId} goalId={moveModal.goalId} editing={moveModal.editing} onClose={() => (moveModal = { ...moveModal, open: false })} />
+<InstallmentFormModal open={installmentModal.open} goalId={installmentModal.goalId} editing={installmentModal.editing} onClose={() => (installmentModal = { ...installmentModal, open: false })} />
+<AmortizationFormModal open={amortModal.open} goalId={amortModal.goalId} editing={amortModal.editing} onClose={() => (amortModal = { ...amortModal, open: false })} />
 
 <ConfirmDialog
 	open={deleting !== null}
-	title="Excluir objetivo?"
-	message={`"${deleting?.nome}" e seu histórico de aportes serão removidos.`}
+	title={`Excluir ${deleting?.label || ''}?`}
+	message={deleting?.warn || 'Esta ação não pode ser desfeita.'}
 	confirmLabel="Excluir"
 	onCancel={() => (deleting = null)}
-	onConfirm={() => {
-		removeGoal(deleting.id);
-		deleting = null;
-	}}
+	onConfirm={confirmDelete}
 />

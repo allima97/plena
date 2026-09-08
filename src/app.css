@@ -1316,3 +1316,174 @@ table.list .num {
 	border-radius: 999px;
 	background: var(--income-bar-hover);
 }
+
+/* ---------- objetivos: layout ---------- */
+
+.goals-layout {
+	display: grid;
+	grid-template-columns: 300px 1fr;
+	gap: 20px;
+	align-items: start;
+}
+@media (max-width: 900px) {
+	.goals-layout {
+		grid-template-columns: 1fr;
+	}
+}
+
+.goals-list {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.goal-list-item {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	text-align: left;
+	gap: 2px;
+	padding: 14px 16px;
+	border-radius: var(--radius-lg);
+	border: 1px solid var(--border);
+	background: var(--surface);
+	cursor: pointer;
+	font: inherit;
+	color: inherit;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.goal-list-item:hover {
+	border-color: var(--accent);
+}
+.goal-list-item.active {
+	border-color: var(--accent);
+	box-shadow: 0 0 0 1px var(--accent);
+	background: var(--surface-2);
+}
+.goal-list-item.archived {
+	opacity: 0.65;
+}
+
+.goal-list-top {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.goal-list-name {
+	font-weight: 600;
+	font-size: 14.5px;
+}
+
+.goal-list-type {
+	margin: 2px 0 0;
+	font-size: 12.5px;
+	color: var(--ink-muted);
+}
+
+.goal-list-values {
+	margin: 6px 0 0;
+	font-size: 12.5px;
+	color: var(--ink-muted);
+}
+
+.goal-detail {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.goal-detail-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 16px;
+	flex-wrap: wrap;
+}
+
+/* ---------- objetivos: tipo de meta (form) ---------- */
+
+.goal-type-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+	gap: 8px;
+}
+
+.goal-type-btn {
+	padding: 10px 12px;
+	border-radius: var(--radius-md);
+	border: 1px solid var(--border);
+	background: var(--surface);
+	color: inherit;
+	font: inherit;
+	font-size: 13px;
+	cursor: pointer;
+	text-align: center;
+	transition: border-color 0.15s ease, background 0.15s ease;
+}
+.goal-type-btn:hover {
+	border-color: var(--accent);
+}
+.goal-type-btn.active {
+	border-color: var(--accent);
+	background: var(--accent);
+	color: var(--accent-fg);
+}
+
+.checkbox-field {
+	justify-content: flex-end;
+}
+.checkbox-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 13.5px;
+	padding: 10px 0 0;
+	cursor: pointer;
+}
+.checkbox-row input[type='checkbox'] {
+	width: 16px;
+	height: 16px;
+	accent-color: var(--accent);
+}
+
+/* ---------- objetivos: recursos ---------- */
+
+.resource-block {
+	border: 1px solid var(--border);
+	border-radius: var(--radius-md);
+	overflow: hidden;
+	margin-bottom: 10px;
+}
+.resource-block:last-child {
+	margin-bottom: 0;
+}
+
+.resource-head {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	padding: 12px 14px;
+	background: var(--surface-2);
+	border: none;
+	cursor: pointer;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+}
+
+.resource-name {
+	flex: 1;
+	font-weight: 600;
+	font-size: 14px;
+}
+
+.resource-balance {
+	font-size: 14px;
+}
+
+.resource-body {
+	padding: 10px 14px 14px;
+}
