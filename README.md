@@ -129,6 +129,28 @@ src/
 
 ## Objetivos
 
-Seção própria com o mesmo modelo de dados do Rumo Financeiro (nome, valor
-alvo, valor atual por aportes, prazo), progresso visual e sugestão de
-aporte mensal para bater a meta no prazo.
+Seção própria com o motor completo do Rumo Financeiro (nextgoals), portado
+para o design do Plena e sincronizado no mesmo banco D1:
+
+- 7 tipos de objetivo (financiamento, imóvel, viagem, carro, casamento,
+  estudos, outro), cada um com nome, valor alvo, prazo e observações.
+- Recursos (potes) por objetivo — o saldo de cada recurso é sempre
+  calculado a partir do extrato de lançamentos, nunca guardado direto.
+- Lançamentos (aportes/retiradas) por recurso, com categoria própria de
+  objetivos; categorias marcadas para o ritmo entram no cálculo do ritmo
+  médio mensal geral.
+- Objetivos do tipo financiamento ganham uma aba de prestações (valor,
+  amortização, juros, seguros, taxas, saldo devedor etc., com atalho que
+  pré-preenche a partir da última prestação lançada) e de amortizações
+  extras (redução de prazo, redução da prestação, quitação do saldo
+  devedor).
+- Métricas: acumulado, ritmo médio mensal, mês/valor recomendado, projeção
+  de conclusão (ou data de conclusão, se já atingido), status e barra de
+  progresso colorida (verde/amarelo/vermelho conforme o ritmo).
+- Criar, editar, arquivar/reativar e excluir objetivos, recursos,
+  lançamentos, prestações e amortizações, todos com confirmação antes de
+  excluir.
+
+Fora desta primeira leva: os gráficos de composição de prestação, a tabela
+mês a mês de encargos/abatimentos e o tour guiado do nextgoals ainda não
+foram portados.
