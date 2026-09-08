@@ -3,6 +3,7 @@
 	import { totals, monthTransactions, committedThisMonth, nextScheduleDate, currentMonthKey, daysUntil, faturaDoCartao } from '$lib/fin/derived.js';
 	import { computeMetrics } from '$lib/goals/metrics.js';
 	import { buildAttentionItems } from '$lib/fin/attention.js';
+	import { computeFinancialScore, buildInsights } from '$lib/fin/intelligence.js';
 	import { fmtMoney, fmtDate, monthLabel, monthKey, todayISO } from '$lib/format.js';
 	import NewMovementModal from '$lib/components/NewMovementModal.svelte';
 	import BarChart from '$lib/components/charts/BarChart.svelte';
@@ -95,21 +96,26 @@
 
 	const recentes = $derived([...baseTx].sort((a, b) => b.data.localeCompare(a.data)).slice(0, 5));
 
-	const mediaDespesas3Meses = $derived.by(() => {
-		let soma = 0;
-		for (let i = 1; i <= 3; i++) soma += totals(monthTransactions(appState.transactions, shiftMonthKey(mKey, -i))).despesas;
-		return soma / 3;
-	});
-	const insight = $derived.by(() => {
-		if (t.despesas > 0 && mediaDespesas3Meses > 0 && t.despesas < mediaDespesas3Meses) {
-			const pct = Math.round((1 - t.despesas / mediaDespesas3Meses) * 100);
-			return { title: 'Você está no caminho certo.', body: `Suas despesas este mês estão ${pct}% abaixo da média dos últimos 3 meses. Se mantiver esse ritmo, o saldo tende a crescer.` };
-		}
-		if (t.saldo >= 0) {
-			return { title: 'Mês positivo até aqui.', body: 'As entradas superam as saídas neste mês. Continue de olho nos vencimentos próximos para manter o ritmo.' };
-		}
-		return { title: 'Fique de olho nos gastos.', body: 'As saídas superaram as entradas neste mês. Vale revisar as categorias com maior peso em Relatórios.' };
-	});
+	const intelligenceInput = $derived.by(() => ({
+		transactions: appState.transactions,
+		accounts: appState.accounts,
+		goals: appState.goals,
+		resources: appState.resources,
+		resourceMoves: appState.resourceMoves,
+		goalCategories: appState.goalCategories,
+		installments: appState.installments,
+		amortizations: appState.amortizations,
+		categories: appState.categories
+	}));
+	const financialScore = $derived(computeFinancialScore(intelligenceInput));
+	const insights = $derived(buildInsights(intelligenceInput, 3));
+	const INSIGHT_LABELS = { comportamento: 'Comportamento', oportunidade: 'Oportunidade', risco: 'Risco', objetivo: 'Objetivo', cartao: 'Cartão' };
+	function scoreColor(v) {
+		if (v >= 75) return 'var(--income)';
+		if (v >= 55) return 'var(--accent-fg)';
+		if (v >= 35) return 'var(--kpi-amber, #a67c1e)';
+		return 'var(--expense)';
+	}
 
 	// ---- centro de controle: saldo real, projecao, prioridades, proximo passo ----
 
@@ -403,6 +409,32 @@
 	</div>
 </div>
 
+<div class="score-row">
+	<div class="card score-card">
+		<div class="score-card-head">
+			<div>
+				<p class="stat-label" style="margin:0">Score financeiro</p>
+				<p class="score-tone" style={`color:${scoreColor(financialScore.overall)}`}>{financialScore.label}</p>
+			</div>
+			<div class="score-value-wrap">
+				<span class="score-value" style={`color:${scoreColor(financialScore.overall)}`}>{financialScore.overall}</span>
+				<span class="score-max">/100</span>
+			</div>
+		</div>
+		<div class="score-components">
+			{#each financialScore.components as comp (comp.key)}
+				<div class="score-component-row">
+					<span class="score-component-label">{comp.label}</span>
+					<div class="score-component-track">
+						<div class="score-component-fill" style={`width:${comp.value}%; background:${scoreColor(comp.value)}`}></div>
+					</div>
+					<span class="score-component-value">{comp.value}</span>
+				</div>
+			{/each}
+		</div>
+	</div>
+</div>
+
 <div class="feed-row">
 	<div class="card">
 		<div class="feed-list-head">
@@ -433,11 +465,23 @@
 		{/if}
 	</div>
 	<div class="insight-card">
-		<Sparkles size={20} color="var(--accent-fg)" />
-		<p class="insight-eyebrow" style="margin-top:14px">Insight do mês</p>
-		<h3 class="insight-title">{insight.title}</h3>
-		<p class="insight-body">{insight.body}</p>
-		<a class="insight-link" href="/relatorios">Explorar relatório ↗</a>
+		<div class="feed-list-head">
+			<p class="stat-label" style="margin:0"><Sparkles size={16} color="var(--accent-fg)" style="vertical-align:-3px; margin-right:6px" />Insights</p>
+			<a class="link-more" href="/relatorios">Ver relatório ↗</a>
+		</div>
+		{#if insights.length}
+			<div class="insight-list">
+				{#each insights as ins, i (i)}
+					<div class="insight-item">
+						<span class="insight-item-tag" data-tipo={ins.tipo}>{INSIGHT_LABELS[ins.tipo] || 'Insight'}</span>
+						<p class="insight-item-title">{ins.title}</p>
+						<p class="insight-item-body">{ins.body}</p>
+					</div>
+				{/each}
+			</div>
+		{:else}
+			<p class="empty">Sem insights por enquanto.</p>
+		{/if}
 	</div>
 </div>
 

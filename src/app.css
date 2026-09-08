@@ -3309,6 +3309,130 @@ table.list .num {
 	cursor: pointer;
 	padding: 0;
 }
+.insight-list {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	margin-top: 10px;
+}
+.insight-item {
+	background: rgba(255, 255, 255, 0.55);
+	border-radius: var(--radius-md, 12px);
+	padding: 12px 14px;
+}
+.insight-item-tag {
+	display: inline-block;
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	font-weight: 800;
+	color: var(--accent-fg);
+	background: rgba(255, 255, 255, 0.6);
+	border-radius: 999px;
+	padding: 3px 9px;
+	margin-bottom: 6px;
+}
+.insight-item-tag[data-tipo='risco'] {
+	color: var(--expense);
+}
+.insight-item-tag[data-tipo='oportunidade'] {
+	color: var(--income);
+}
+.insight-item-tag[data-tipo='objetivo'] {
+	color: #8b78db;
+}
+.insight-item-tag[data-tipo='cartao'] {
+	color: #e0a23f;
+}
+.insight-item-title {
+	font-size: 14px;
+	font-weight: 700;
+	margin: 0 0 4px;
+	color: var(--ink);
+	font-family: var(--font-display);
+	letter-spacing: -0.02em;
+}
+.insight-item-body {
+	font-size: 12.5px;
+	color: var(--ink-soft);
+	line-height: 1.55;
+	margin: 0;
+}
+.score-row {
+	margin-bottom: 16px;
+}
+.score-card {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+.score-card-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+}
+.score-tone {
+	font-size: 13px;
+	font-weight: 700;
+	margin: 4px 0 0;
+}
+.score-value-wrap {
+	display: flex;
+	align-items: baseline;
+	gap: 4px;
+}
+.score-value {
+	font-size: 34px;
+	font-weight: 800;
+	font-family: var(--font-display);
+	letter-spacing: -0.03em;
+	line-height: 1;
+}
+.score-max {
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--ink-soft);
+}
+.score-components {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 12px 20px;
+}
+@media (max-width: 900px) {
+	.score-components {
+		grid-template-columns: 1fr;
+	}
+}
+.score-component-row {
+	display: grid;
+	grid-template-columns: 100px 1fr 30px;
+	align-items: center;
+	gap: 8px;
+}
+.score-component-label {
+	font-size: 12px;
+	color: var(--ink-soft);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.score-component-track {
+	height: 6px;
+	border-radius: 999px;
+	background: var(--surface-2, #eef0f4);
+	overflow: hidden;
+}
+.score-component-fill {
+	height: 100%;
+	border-radius: 999px;
+}
+.score-component-value {
+	font-size: 12px;
+	font-weight: 700;
+	text-align: right;
+	color: var(--ink);
+}
 .feed-list-head {
 	display: flex;
 	align-items: center;
@@ -3483,4 +3607,184 @@ table.list .num {
 	background: transparent;
 	border: none;
 	cursor: default;
+}
+
+/* ---- Patrimônio (Fase 4) ---- */
+.patrimony-hero-row {
+	display: grid;
+	grid-template-columns: 1.7fr 1fr;
+	gap: 16px;
+	margin-bottom: 16px;
+}
+@media (max-width: 900px) {
+	.patrimony-hero-row {
+		grid-template-columns: 1fr;
+	}
+}
+.patrimony-hero-card {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.patrimony-hero-value {
+	font-size: 40px;
+	font-weight: 800;
+	font-family: var(--font-display);
+	letter-spacing: -0.03em;
+	color: var(--income);
+	margin: 4px 0 10px;
+}
+.patrimony-hero-value.negative {
+	color: var(--expense);
+}
+.patrimony-hero-split {
+	display: flex;
+	gap: 10px;
+	flex-wrap: wrap;
+	margin-bottom: 18px;
+}
+.patrimony-hero-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12.5px;
+	font-weight: 600;
+	color: var(--ink-soft);
+	background: var(--surface-2);
+	border-radius: 999px;
+	padding: 6px 12px;
+}
+.patrimony-hero-chip b {
+	font-weight: 800;
+	color: var(--ink);
+}
+.patrimony-hero-chip.good svg {
+	color: var(--income);
+}
+.patrimony-hero-chip.bad svg {
+	color: var(--expense);
+}
+.patrimony-evolution {
+	margin-top: auto;
+	padding-top: 10px;
+	border-top: 1px solid var(--border);
+}
+.patrimony-donut-card {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 14px;
+}
+.patrimony-donut-legend {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	width: 100%;
+}
+.patrimony-legend-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 12.5px;
+	color: var(--ink-soft);
+}
+.patrimony-legend-dot {
+	width: 9px;
+	height: 9px;
+	border-radius: 50%;
+	flex-shrink: 0;
+}
+.patrimony-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 16px;
+}
+@media (max-width: 1100px) {
+	.patrimony-grid {
+		grid-template-columns: 1fr;
+	}
+}
+.patrimony-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	padding: 11px 0;
+	border-bottom: 1px solid var(--border);
+}
+.patrimony-row:last-child {
+	border-bottom: none;
+}
+.patrimony-row-name {
+	font-size: 13.5px;
+	font-weight: 600;
+	color: var(--ink);
+}
+.patrimony-row-value {
+	font-size: 13.5px;
+	font-weight: 700;
+	color: var(--ink);
+	white-space: nowrap;
+}
+.patrimony-row-value.negative {
+	color: var(--expense);
+}
+.patrimony-row-tag {
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	font-weight: 700;
+	color: var(--ink-faint);
+	background: var(--surface-2);
+	border-radius: 999px;
+	padding: 2px 7px;
+	margin-left: 6px;
+}
+.patrimony-row-actions {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+/* ---- Simulador de amortização (Fase 5) ---- */
+.sim-scenarios {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 14px;
+	margin-top: 16px;
+}
+@media (max-width: 700px) {
+	.sim-scenarios {
+		grid-template-columns: 1fr;
+	}
+}
+.sim-scenario {
+	background: var(--surface-2);
+	border-radius: var(--radius-md, 16px);
+	padding: 16px;
+}
+.sim-scenario-title {
+	font-size: 13px;
+	font-weight: 800;
+	color: var(--ink);
+	margin: 0 0 4px;
+}
+.sim-scenario-sub {
+	font-size: 12px;
+	color: var(--ink-soft);
+	margin: 0 0 10px;
+}
+.sim-scenario-value {
+	font-size: 21px;
+	font-weight: 800;
+	font-family: var(--font-display);
+	letter-spacing: -0.02em;
+	color: var(--income);
+	margin: 0 0 4px;
+}
+.sim-scenario-detail {
+	font-size: 12px;
+	color: var(--ink-soft);
+	margin: 0;
 }

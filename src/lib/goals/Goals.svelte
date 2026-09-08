@@ -8,7 +8,7 @@
 		removeInstallment,
 		removeAmortization
 	} from '$lib/fin/store.svelte.js';
-	import { computeMetrics, progressColor, encargosAbatimentoSummary, installmentYearsOf } from './metrics.js';
+	import { computeMetrics, progressColor, encargosAbatimentoSummary, installmentYearsOf, estimateMonthlyRate, simulateAmortizationScenario } from './metrics.js';
 	import { GOAL_TYPES } from './constants.js';
 	import { fmtMoney, fmtDate } from '$lib/format.js';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -37,6 +37,8 @@
 	let encargosPeriod = $state('currentYear'); // 'currentYear' | 'last12' | 'all' | 'year' | 'installment'
 	let encargosYear = $state(null); // ano escolhido no seletor "Em <ano>" de Encargos e Abatimentos
 	let compositionInstallmentId = $state(null); // prestacao escolhida (icone de olho / seletor / Anterior-Proxima)
+
+	let simAporte = $state(''); // Fase 5: simulador de amortizacao extra -- valor hipotetico digitado pelo usuario
 
 	const ENCARGOS_MAIN_PERIODS = [
 		{ key: 'currentYear', label: 'Ano atual' },
@@ -74,6 +76,23 @@
 				})
 			: null
 	);
+
+	// ---------- Fase 5: simulador de amortização extra ("e se eu pagasse R$X a mais agora?") ----------
+	$effect(() => {
+		selectedGoalId;
+		simAporte = '';
+	});
+	const simTaxaMensal = $derived(metrics ? estimateMonthlyRate(metrics.installmentRows) : null);
+	const simBase = $derived.by(() => {
+		if (!metrics || !metrics.installmentRows.length || !simTaxaMensal) return null;
+		const last = metrics.installmentRows[metrics.installmentRows.length - 1];
+		if (!(last.saldoDevedor > 0) || !(last.valorPrestacao > 0)) return null;
+		return { saldo: last.saldoDevedor, taxaMensal: simTaxaMensal, parcela: last.valorPrestacao };
+	});
+	const simResult = $derived.by(() => {
+		if (!simBase) return { valido: false };
+		return simulateAmortizationScenario({ ...simBase, aporte: Number(simAporte) || 0 });
+	});
 
 	// ---------- Prestações do financiamento: anos disponíveis (5 mais recentes) ----------
 	const installmentYears = $derived(metrics ? installmentYearsOf(metrics.installments) : []);
@@ -423,6 +442,42 @@
 						</div>
 					{/if}
 				</div>
+
+				{#if simBase}
+					<!-- Simulador de amortização (Fase 5): "e se eu pagasse R$X a mais agora?" -->
+					<div class="card sim-card" style="margin-top:16px">
+						<div class="page-head" style="margin-bottom:6px">
+							<div>
+								<p class="stat-label" style="margin:0">Simulador de amortização</p>
+								<p class="movement-meta" style="margin:4px 0 0">
+									E se você amortizasse um valor extra agora? Estimativa pela Tabela Price a partir do saldo devedor e da parcela mais recentes — não substitui a simulação oficial do banco.
+								</p>
+							</div>
+						</div>
+						<label class="field" style="max-width:280px">
+							<span>Valor do aporte extra</span>
+							<input class="field-input" type="number" step="0.01" min="0" max={simBase.saldo} placeholder="R$ 0,00" bind:value={simAporte} />
+						</label>
+						{#if simResult.valido && simResult.aporte > 0}
+							<div class="sim-scenarios">
+								<div class="sim-scenario">
+									<p class="sim-scenario-title">Reduzindo o prazo</p>
+									<p class="sim-scenario-sub">Mantém a parcela de <span class="privacy-value">{fmtMoney(simBase.parcela)}</span></p>
+									<p class="sim-scenario-value privacy-value">{Math.round(simResult.prazoReduzido.mesesEconomizados)} meses a menos</p>
+									<p class="sim-scenario-detail">Economia de juros: <span class="privacy-value">{fmtMoney(simResult.prazoReduzido.jurosEconomizados)}</span></p>
+								</div>
+								<div class="sim-scenario">
+									<p class="sim-scenario-title">Reduzindo a parcela</p>
+									<p class="sim-scenario-sub">Mantém o prazo em ~{Math.ceil(simResult.mesesAtual)} meses</p>
+									<p class="sim-scenario-value privacy-value">-{fmtMoney(simResult.parcelaReduzida.economiaParcela)}/mês</p>
+									<p class="sim-scenario-detail">Economia de juros: <span class="privacy-value">{fmtMoney(simResult.parcelaReduzida.jurosEconomizados)}</span></p>
+								</div>
+							</div>
+						{:else if simResult.valido}
+							<p class="empty">Informe um valor de aporte para ver os cenários.</p>
+						{/if}
+					</div>
+				{/if}
 
 				{#if metrics.installmentRows.length}
 					<!-- Encargos e Abatimentos: resumo por período, antes do detalhe mês a mês. -->

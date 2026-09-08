@@ -13,7 +13,9 @@ const ARRAY_COLLECTIONS = [
 	'resourceMoves',
 	'goalCategories',
 	'installments',
-	'amortizations'
+	'amortizations',
+	'patrimonyItems',
+	'patrimonySnapshots'
 ];
 const SINGLETON_COLLECTIONS = ['reportSchedule', 'alertThresholds'];
 
@@ -40,7 +42,9 @@ export async function GET({ platform }) {
 		resourceMoves: [],
 		goalCategories: [],
 		installments: [],
-		amortizations: []
+		amortizations: [],
+		patrimonyItems: [],
+		patrimonySnapshots: []
 	};
 
 	for (const row of results) {

@@ -52,6 +52,28 @@
 	const categoriasDoTipo = $derived(appState.categories.filter((c) => c.tipo === form.tipo));
 	const categoriaSelecionada = $derived(appState.categories.find((c) => c.id === form.categoriaId));
 
+	function norm(s) {
+		return (s || '').toString().trim().toLowerCase();
+	}
+
+	// Categorização por regra local: reaproveita conta/categoria/forma de pagamento da última vez
+	// que essa descrição foi usada. Só atua em lançamentos novos e quando o usuário ainda não escolheu categoria.
+	function handleDescricaoBlur() {
+		if (mode !== 'create' || form.categoriaId || !form.descricao.trim()) return;
+		const key = norm(form.descricao);
+		const match = [...appState.transactions].sort((a, b) => b.data.localeCompare(a.data)).find((tr) => norm(tr.descricao) === key);
+		if (match) {
+			form = {
+				...form,
+				tipo: match.tipo,
+				categoriaId: match.categoriaId || '',
+				subcategoriaId: match.subcategoriaId || '',
+				contaId: match.contaId || form.contaId,
+				formaPagamento: match.formaPagamento || form.formaPagamento
+			};
+		}
+	}
+
 	const title = $derived(
 		mode === 'edit-occurrence'
 			? 'Editar lançamento'
@@ -119,7 +141,7 @@
 
 		<label class="field">
 			<span>Descrição</span>
-			<input class="field-input" type="text" placeholder="Ex.: Mercado do mês" bind:value={form.descricao} />
+			<input class="field-input" type="text" placeholder="Ex.: Mercado do mês" bind:value={form.descricao} onblur={handleDescricaoBlur} />
 		</label>
 
 		<div class="form-grid">

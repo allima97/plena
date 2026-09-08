@@ -277,3 +277,85 @@ export function computeMetrics(goal, { resources, resourceMoves, goalCategories,
 		achievedMonthsDiff
 	};
 }
+
+/**
+ * Estima a taxa de juros mensal (Tabela Price) de um financiamento a partir das duas últimas
+ * prestações já lançadas: taxa = juros da última prestação / saldo devedor anterior a ela.
+ * Retorna null quando não há prestações suficientes ou o resultado não é uma taxa plausível.
+ */
+export function estimateMonthlyRate(installmentRows) {
+	if (!installmentRows || installmentRows.length < 2) return null;
+	const last = installmentRows[installmentRows.length - 1];
+	const prev = installmentRows[installmentRows.length - 2];
+	if (!prev.saldoDevedor || prev.saldoDevedor <= 0) return null;
+	const rate = (last.juros || 0) / prev.saldoDevedor;
+	if (!Number.isFinite(rate) || rate <= 0 || rate > 0.2) return null;
+	return rate;
+}
+
+/** Meses para quitar `saldo` pagando `parcela` por mês a uma taxa mensal `taxaMensal` (Tabela Price). */
+function mesesParaQuitar(saldo, taxaMensal, parcela) {
+	if (saldo <= 0) return 0;
+	if (!(parcela > 0)) return Infinity;
+	if (taxaMensal <= 0) return saldo / parcela;
+	const jurosMensal = saldo * taxaMensal;
+	if (parcela <= jurosMensal) return Infinity; // parcela não cobre nem os juros -- nunca quita
+	return Math.log(parcela / (parcela - jurosMensal)) / Math.log(1 + taxaMensal);
+}
+
+/** Parcela necessária para quitar `saldo` em `meses` parcelas a uma taxa mensal `taxaMensal` (Tabela Price). */
+function parcelaParaPrazo(saldo, taxaMensal, meses) {
+	if (saldo <= 0 || meses <= 0) return 0;
+	if (taxaMensal <= 0) return saldo / meses;
+	const fator = Math.pow(1 + taxaMensal, -meses);
+	return (saldo * taxaMensal) / (1 - fator);
+}
+
+/**
+ * Simulador de amortização extra (Fase 5): "se eu aportar R$X agora, o que muda?" -- projeta os
+ * dois cenários clássicos de amortização extraordinária (reduzir prazo mantendo a parcela, ou
+ * reduzir a parcela mantendo o prazo), reaproveitando apenas dados já rastreados nas prestações
+ * (saldo devedor, parcela e taxa implícita), sem inventar novo cadastro. Cálculo aproximado via
+ * Tabela Price -- não substitui a simulação oficial do banco/financeira.
+ */
+export function simulateAmortizationScenario({ saldo, taxaMensal, parcela, aporte }) {
+	if (!(saldo > 0) || !(taxaMensal > 0) || !(parcela > 0)) {
+		return { valido: false };
+	}
+	const mesesAtual = mesesParaQuitar(saldo, taxaMensal, parcela);
+	if (!Number.isFinite(mesesAtual)) return { valido: false };
+	const jurosAtual = mesesAtual * parcela - saldo;
+
+	const aporteValido = Math.max(0, Math.min(Number(aporte) || 0, saldo - 0.01));
+	const novoSaldo = Math.max(saldo - aporteValido, 0);
+
+	// Cenário 1: reduz o prazo, mantendo a parcela atual.
+	const mesesComPrazoReduzido = mesesParaQuitar(novoSaldo, taxaMensal, parcela);
+	const jurosComPrazoReduzido = Number.isFinite(mesesComPrazoReduzido) ? mesesComPrazoReduzido * parcela - novoSaldo : 0;
+
+	// Cenário 2: reduz a parcela, mantendo o prazo atual (arredondado pra cima).
+	const prazoOriginal = Math.ceil(mesesAtual);
+	const novaParcela = parcelaParaPrazo(novoSaldo, taxaMensal, prazoOriginal);
+	const jurosComParcelaReduzida = novaParcela * prazoOriginal - novoSaldo;
+
+	return {
+		valido: true,
+		saldo,
+		novoSaldo,
+		aporte: aporteValido,
+		mesesAtual,
+		jurosAtual,
+		prazoReduzido: {
+			meses: mesesComPrazoReduzido,
+			mesesEconomizados: Math.max(mesesAtual - mesesComPrazoReduzido, 0),
+			juros: jurosComPrazoReduzido,
+			jurosEconomizados: Math.max(jurosAtual - jurosComPrazoReduzido, 0)
+		},
+		parcelaReduzida: {
+			parcela: novaParcela,
+			economiaParcela: Math.max(parcela - novaParcela, 0),
+			juros: jurosComParcelaReduzida,
+			jurosEconomizados: Math.max(jurosAtual - jurosComParcelaReduzida, 0)
+		}
+	};
+}

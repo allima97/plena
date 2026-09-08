@@ -15,7 +15,9 @@ const KNOWN_COLLECTIONS = [
 	'resourceMoves',
 	'goalCategories',
 	'installments',
-	'amortizations'
+	'amortizations',
+	'patrimonyItems',
+	'patrimonySnapshots'
 ];
 
 function checkCollection(collection) {

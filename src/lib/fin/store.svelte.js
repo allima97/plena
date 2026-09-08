@@ -18,6 +18,10 @@ let goalCategories = $state([]);
 let installments = $state([]);
 let amortizations = $state([]);
 
+// ---- patrimonio (fase 4: investimentos manuais + historico mensal de patrimonio liquido) ----
+let patrimonyItems = $state([]);
+let patrimonySnapshots = $state([]);
+
 let mode = $state(/** @type {'loading'|'api'|'local'} */ ('loading'));
 let syncStatus = $state(/** @type {'synced'|'saving'|'error'} */ ('synced'));
 let pendingWrites = 0;
@@ -65,6 +69,12 @@ export const appState = {
 	get amortizations() {
 		return amortizations;
 	},
+	get patrimonyItems() {
+		return patrimonyItems;
+	},
+	get patrimonySnapshots() {
+		return patrimonySnapshots;
+	},
 	get mode() {
 		return mode;
 	},
@@ -93,7 +103,9 @@ function snapshot() {
 		resourceMoves,
 		goalCategories,
 		installments,
-		amortizations
+		amortizations,
+		patrimonyItems,
+		patrimonySnapshots
 	};
 }
 
@@ -118,6 +130,8 @@ export async function boot() {
 		goalCategories = local.goalCategories || [];
 		installments = local.installments || [];
 		amortizations = local.amortizations || [];
+		patrimonyItems = local.patrimonyItems || [];
+		patrimonySnapshots = local.patrimonySnapshots || [];
 	}
 	ready = true;
 
@@ -158,6 +172,8 @@ export async function boot() {
 	goalCategories = remote.goalCategories || goalCategories;
 	installments = remote.installments || installments;
 	amortizations = remote.amortizations || amortizations;
+	patrimonyItems = remote.patrimonyItems || patrimonyItems;
+	patrimonySnapshots = remote.patrimonySnapshots || patrimonySnapshots;
 	mode = 'api';
 	persistLocalSnapshot();
 }
@@ -610,4 +626,40 @@ export function updateAmortization(id, patch) {
 export function removeAmortization(id) {
 	amortizations = amortizations.filter((a) => a.id !== id);
 	erase('amortizations', id);
+}
+
+// ---- patrimonio (fase 4: ativos rastreados manualmente + historico mensal) ----
+
+export function addPatrimonyItem(data) {
+	const p = { id: uid(), createdAt: new Date().toISOString(), ...data };
+	patrimonyItems = [...patrimonyItems, p];
+	write('patrimonyItems', p.id, p);
+	return p;
+}
+
+export function updatePatrimonyItem(id, patch) {
+	const idx = patrimonyItems.findIndex((p) => p.id === id);
+	if (idx === -1) return;
+	const updated = { ...patrimonyItems[idx], ...patch, id };
+	patrimonyItems = patrimonyItems.map((p, i) => (i === idx ? updated : p));
+	write('patrimonyItems', id, updated);
+}
+
+export function removePatrimonyItem(id) {
+	patrimonyItems = patrimonyItems.filter((p) => p.id !== id);
+	erase('patrimonyItems', id);
+}
+
+/** Grava (ou substitui) o retrato do patrimônio líquido do mês `mKey` -- id determinístico
+ * para nunca duplicar snapshot do mesmo mês, só atualizar o mais recente conforme o usuário usa o app. */
+export function upsertPatrimonySnapshot(mKey, data) {
+	const idx = patrimonySnapshots.findIndex((s) => s.id === mKey);
+	const updated = { id: mKey, mKey, ...data };
+	if (idx === -1) {
+		patrimonySnapshots = [...patrimonySnapshots, updated];
+	} else {
+		if (JSON.stringify(patrimonySnapshots[idx]) === JSON.stringify(updated)) return;
+		patrimonySnapshots = patrimonySnapshots.map((s, i) => (i === idx ? updated : s));
+	}
+	write('patrimonySnapshots', mKey, updated);
 }

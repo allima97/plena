@@ -10,6 +10,7 @@
 		Tags,
 		BarChart3,
 		Target,
+		Landmark,
 		Menu,
 		X,
 		Search,
@@ -36,7 +37,8 @@
 		{ href: '/contas', label: 'Contas e cartões', icon: WalletCards },
 		{ href: '/categorias', label: 'Categorias', icon: Tags },
 		{ href: '/relatorios', label: 'Relatórios', icon: BarChart3 },
-		{ href: '/objetivos', label: 'Objetivos', icon: Target }
+		{ href: '/objetivos', label: 'Objetivos', icon: Target },
+		{ href: '/patrimonio', label: 'Patrimônio', icon: Landmark }
 	];
 
 	let mobileNavOpen = $state(false);
