@@ -1,13 +1,17 @@
 <script>
 	import { appState, addAccount, updateAccount, removeAccount } from '$lib/fin/store.svelte.js';
+	import { currentMonthKey } from '$lib/fin/derived.js';
 	import { fmtMoney } from '$lib/format.js';
 	import Modal from '$lib/components/Modal.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
-	import { Plus, Wallet, CreditCard } from 'lucide-svelte';
+	import { Plus, Wallet, CreditCard, Landmark, MoreHorizontal } from 'lucide-svelte';
+
+	const PALETTE = ['grad-red', 'grad-purple', 'grad-blue', 'grad-dark', 'grad-orange', 'grad-green'];
 
 	let showModal = $state(false);
 	let editing = $state(null);
 	let deleting = $state(null);
+	let menuOpenId = $state(null);
 
 	function blank() {
 		return { nome: '', tipo: 'conta', banco: '', saldoInicial: 0, limite: 0 };
@@ -23,6 +27,7 @@
 		editing = acc;
 		form = { nome: acc.nome, tipo: acc.tipo, banco: acc.banco || '', saldoInicial: acc.saldoInicial || 0, limite: acc.limite || 0 };
 		showModal = true;
+		menuOpenId = null;
 	}
 	function submit(e) {
 		e.preventDefault();
@@ -38,37 +43,102 @@
 		const despesas = appState.transactions.filter((t) => t.contaId === acc.id && t.tipo === 'despesa').reduce((s, t) => s + (Number(t.valor) || 0), 0);
 		return (acc.saldoInicial || 0) + receitas - despesas;
 	}
+
+	function faturaAtual(acc) {
+		const mKey = currentMonthKey();
+		return appState.transactions
+			.filter((t) => t.contaId === acc.id && t.tipo === 'despesa' && t.data?.slice(0, 7) === mKey)
+			.reduce((s, t) => s + (Number(t.valor) || 0), 0);
+	}
+
+	const cartoes = $derived(appState.accounts.filter((a) => a.tipo === 'cartao'));
 </script>
 
 <div class="page-head">
 	<div>
-		<h1 class="font-display page-title">Contas e cartões</h1>
-		<p class="page-sub">{appState.accounts.length} conta(s) cadastrada(s)</p>
+		<p class="page-eyebrow">Gestão de contas</p>
+		<h1 class="font-display page-title">Seu dinheiro, organizado.</h1>
+		<p class="page-sub">Contas correntes, cartões e limites em um único lugar para você ter clareza do todo.</p>
 	</div>
 	<button class="btn btn-primary" onclick={openNew}><Plus size={16} /> Nova conta</button>
 </div>
 
-<div class="grid-cards">
-	{#each appState.accounts as acc (acc.id)}
-		<div class="stat-card">
-			<div style="display:flex;align-items:center;gap:10px">
-				<span class="type-icon income">{#if acc.tipo === 'cartao'}<CreditCard size={16} />{:else}<Wallet size={16} />{/if}</span>
-				<div>
-					<p class="stat-label" style="margin:0">{acc.nome}</p>
-					<p class="movement-meta" style="margin:2px 0 0">{acc.banco || (acc.tipo === 'cartao' ? 'Cartão de crédito' : 'Conta')}</p>
+<div class="account-grid">
+	{#each appState.accounts as acc, i (acc.id)}
+		{@const grad = PALETTE[i % PALETTE.length]}
+		<div class="account-tile {grad}">
+			<div class="tile-decor d1"></div>
+			<div class="tile-decor d2"></div>
+			<div class="account-tile-head">
+				<div class="account-tile-bank">
+					<span class="account-icon">{#if acc.tipo === 'cartao'}<CreditCard size={17} />{:else}<Landmark size={17} />{/if}</span>
+					<div style="min-width:0">
+						<p class="account-tile-name">{acc.nome}</p>
+						<p class="account-tile-type">{acc.tipo === 'cartao' ? 'Cartão de crédito' : 'Conta corrente'}</p>
+					</div>
+				</div>
+				<div class="account-menu-wrap">
+					<button class="account-menu-btn" onclick={() => (menuOpenId = menuOpenId === acc.id ? null : acc.id)} aria-label="Mais opções">
+						<MoreHorizontal size={18} />
+					</button>
+					{#if menuOpenId === acc.id}
+						<div class="menu-backdrop" onclick={() => (menuOpenId = null)} role="presentation"></div>
+						<div class="account-menu">
+							<button onclick={() => openEdit(acc)}>Editar</button>
+							<button class="danger" onclick={() => { deleting = acc; menuOpenId = null; }}>Excluir</button>
+						</div>
+					{/if}
 				</div>
 			</div>
-			<p class="font-display stat-value">{fmtMoney(acc.tipo === 'cartao' ? acc.limite : saldoAtual(acc))}</p>
-			<p class="stat-sub">{acc.tipo === 'cartao' ? 'Limite' : 'Saldo atual'}</p>
-			<div class="actions-row" style="margin-top:14px">
-				<button class="btn btn-ghost sm" onclick={() => openEdit(acc)}>Editar</button>
-				<button class="btn btn-danger sm" onclick={() => (deleting = acc)}>Excluir</button>
+			<div class="account-tile-body">
+				<p class="account-tile-label">{acc.tipo === 'cartao' ? 'Fatura atual' : 'Saldo disponível'}</p>
+				<p class="account-tile-value">{fmtMoney(acc.tipo === 'cartao' ? faturaAtual(acc) : saldoAtual(acc))}</p>
+			</div>
+			<p class="account-tile-foot">
+				{#if acc.tipo === 'cartao'}
+					Limite {fmtMoney(acc.limite)} · {acc.limite ? Math.round((faturaAtual(acc) / acc.limite) * 100) : 0}% utilizado
+				{:else if i === 0}
+					Principal
+				{:else}
+					Atualizado agora
+				{/if}
+			</p>
+		</div>
+	{/each}
+
+	<button type="button" class="account-tile add-tile" onclick={openNew}>
+		<div>
+			<div class="add-tile-icon"><Plus size={20} /></div>
+			<p class="add-tile-title">Adicionar outra conta</p>
+			<p class="add-tile-sub">Banco ou cartão de crédito</p>
+		</div>
+	</button>
+</div>
+
+{#if cartoes.length}
+	<div class="card">
+		<div class="page-head" style="margin-bottom:16px">
+			<div>
+				<p class="page-eyebrow" style="margin-bottom:2px">Resumo dos cartões</p>
+				<p class="font-display" style="margin:0;font-size:18px">Limite utilizado</p>
 			</div>
 		</div>
-	{:else}
-		<p class="empty">Nenhuma conta cadastrada ainda.</p>
-	{/each}
-</div>
+		<div class="card-usage-list">
+			{#each cartoes as acc, i (acc.id)}
+				{@const grad = PALETTE[(appState.accounts.indexOf(acc)) % PALETTE.length]}
+				{@const pct = acc.limite ? Math.min(100, Math.round((faturaAtual(acc) / acc.limite) * 100)) : 0}
+				<div class="card-usage-item">
+					<div class="card-usage-top">
+						<span style="display:flex;align-items:center"><span class="card-usage-dot {grad}"></span>{acc.nome}</span>
+					</div>
+					<p class="card-usage-value">{fmtMoney(faturaAtual(acc))}</p>
+					<p class="card-usage-sub">de {fmtMoney(acc.limite)}</p>
+					<div class="usage-track"><div class="usage-fill {grad}" style="width:{pct}%"></div></div>
+				</div>
+			{/each}
+		</div>
+	</div>
+{/if}
 
 <Modal open={showModal} onClose={() => (showModal = false)} title={editing ? 'Editar conta' : 'Nova conta'} maxWidth="480px">
 	<form onsubmit={submit} class="movement-form">

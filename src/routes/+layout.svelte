@@ -13,8 +13,11 @@
 		Menu,
 		X,
 		Search,
-		Bell
+		Bell,
+		Eye,
+		EyeOff
 	} from 'lucide-svelte';
+	import { upcomingDue } from '$lib/fin/derived.js';
 
 	let { children } = $props();
 
@@ -28,6 +31,14 @@
 	];
 
 	let mobileNavOpen = $state(false);
+	let hideValues = $state(false);
+
+	function toggleHideValues() {
+		hideValues = !hideValues;
+		if (typeof document !== 'undefined') document.body.classList.toggle('values-hidden', hideValues);
+	}
+
+	const alertCount = $derived(upcomingDue(appState.transactions, appState.alertThresholds).total);
 
 	function isActive(href) {
 		if (href === '/') return page.url.pathname === '/';
@@ -99,10 +110,15 @@
 					<p class="section-label">{activeLabel}</p>
 				</div>
 				<div class="topbar-right">
+					<button class="hide-values-btn" onclick={toggleHideValues}>
+						{#if hideValues}<EyeOff size={15} /> Mostrar valores{:else}<Eye size={15} /> Ocultar valores{/if}
+					</button>
 					<button class="icon-btn" aria-label="Buscar"><Search size={17} /></button>
 					<button class="icon-btn" aria-label="Notificações" style="position:relative">
 						<Bell size={17} />
+						{#if alertCount > 0}<span class="notif-dot"></span>{/if}
 					</button>
+					<span class="avatar-chip">AL</span>
 				</div>
 			</header>
 
