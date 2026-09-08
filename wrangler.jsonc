@@ -21,12 +21,11 @@
 	// Cloudflare Access (Zero Trust) -- login com Google na frente do site
 	// inteiro. Nenhum dos dois valores é secreto (POLICY_AUD é só o
 	// identificador público da Application no Access), por isso ficam aqui
-	// em "vars" e não como secret. TEAM_DOMAIN é o mesmo do nextgoals (mesma
-	// conta/team da Cloudflare); POLICY_AUD precisa vir da Application NOVA
-	// que você cria especificamente para o Plena -- veja o passo a passo no
-	// README.md, seção "Login com Google".
+	// em "vars" e não como secret. Mesmos valores do nextgoals -- a mesma
+	// Application do Access cobre os dois domínios (veja README.md, seção
+	// "Login com Google", se precisar recriar isso do zero um dia).
 	"vars": {
 		"TEAM_DOMAIN": "https://nxapps.cloudflareaccess.com",
-		"POLICY_AUD": "COLOQUE_AQUI_O_AUD_TAG_DA_APPLICATION_DO_PLENA"
+		"POLICY_AUD": "43f80517f57450906c918145b91b19cb560e194fca1c3b6abf2071f1f8eb2968"
 	}
 }
