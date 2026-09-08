@@ -83,7 +83,7 @@
 							<span class="tag" class:receita={cat.tipo === 'receita'} class:despesa={cat.tipo === 'despesa'}>{cat.tipo}</span>
 						</div>
 						<div style="text-align:right">
-							<p class="cat-row-value" class:money-in={cat.tipo === 'receita'} class:money-out={cat.tipo === 'despesa'}>{fmtMoney(valorDoMes(cat))}</p>
+							<p class="cat-row-value privacy-value" class:money-in={cat.tipo === 'receita'} class:money-out={cat.tipo === 'despesa'}>{fmtMoney(valorDoMes(cat))}</p>
 							<p class="cat-row-sub">{cat.secundarios?.length || 0} subitem{(cat.secundarios?.length || 0) === 1 ? '' : 'ns'} cadastrado{(cat.secundarios?.length || 0) === 1 ? '' : 's'}</p>
 						</div>
 					</div>

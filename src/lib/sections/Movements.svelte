@@ -106,17 +106,17 @@
 <div class="move-summary-grid">
 	<div class="move-summary-card dark">
 		<p class="move-summary-label">Comprometido em {monthLabel(resumoMesKey)}</p>
-		<p class="move-summary-value">{fmtMoney(comprometido)}</p>
+		<p class="move-summary-value privacy-value">{fmtMoney(comprometido)}</p>
 		<p class="move-summary-sub">parcelas + recorrências</p>
 	</div>
 	<div class="move-summary-card tint-blue">
 		<p class="move-summary-label" style="color:var(--accent-fg)">Parcelamentos</p>
-		<p class="move-summary-value" style="color:var(--ink)">{fmtMoney(parcelamentosMes)}</p>
+		<p class="move-summary-value privacy-value" style="color:var(--ink)">{fmtMoney(parcelamentosMes)}</p>
 		<p class="move-summary-sub" style="color:var(--ink-muted)">vencendo neste mês</p>
 	</div>
 	<div class="move-summary-card tint-green">
 		<p class="move-summary-label" style="color:var(--income)">Recorrências</p>
-		<p class="move-summary-value" style="color:var(--ink)">{fmtMoney(recorrenciasMes)}</p>
+		<p class="move-summary-value privacy-value" style="color:var(--ink)">{fmtMoney(recorrenciasMes)}</p>
 		<p class="move-summary-sub" style="color:var(--ink-muted)">vencendo neste mês</p>
 	</div>
 </div>

@@ -41,7 +41,7 @@
 	</div>
 
 	<div class="movement-amount">
-		<p class="font-display" class:money-in={t.tipo === 'receita'} class:money-out={t.tipo === 'despesa'}>
+		<p class="font-display privacy-value" class:money-in={t.tipo === 'receita'} class:money-out={t.tipo === 'despesa'}>
 			{t.tipo === 'receita' ? '+' : '−'} {fmtMoney(t.valor)}
 		</p>
 		<p class="movement-date">{fmtDate(t.data)}</p>

@@ -92,11 +92,11 @@
 			</div>
 			<div class="account-tile-body">
 				<p class="account-tile-label">{acc.tipo === 'cartao' ? 'Fatura atual' : 'Saldo disponível'}</p>
-				<p class="account-tile-value">{fmtMoney(acc.tipo === 'cartao' ? faturaAtual(acc) : saldoAtual(acc))}</p>
+				<p class="account-tile-value privacy-value">{fmtMoney(acc.tipo === 'cartao' ? faturaAtual(acc) : saldoAtual(acc))}</p>
 			</div>
 			<p class="account-tile-foot">
 				{#if acc.tipo === 'cartao'}
-					Limite {fmtMoney(acc.limite)} · {acc.limite ? Math.round((faturaAtual(acc) / acc.limite) * 100) : 0}% utilizado
+					Limite <span class="privacy-value">{fmtMoney(acc.limite)}</span> · {acc.limite ? Math.round((faturaAtual(acc) / acc.limite) * 100) : 0}% utilizado
 				{:else if i === 0}
 					Principal
 				{:else}
@@ -131,8 +131,8 @@
 					<div class="card-usage-top">
 						<span style="display:flex;align-items:center"><span class="card-usage-dot {grad}"></span>{acc.nome}</span>
 					</div>
-					<p class="card-usage-value">{fmtMoney(faturaAtual(acc))}</p>
-					<p class="card-usage-sub">de {fmtMoney(acc.limite)}</p>
+					<p class="card-usage-value privacy-value">{fmtMoney(faturaAtual(acc))}</p>
+					<p class="card-usage-sub">de <span class="privacy-value">{fmtMoney(acc.limite)}</span></p>
 					<div class="usage-track"><div class="usage-fill {grad}" style="width:{pct}%"></div></div>
 				</div>
 			{/each}

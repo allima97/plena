@@ -38,6 +38,6 @@
 	</svg>
 	<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 8px">
 		<span style="font-size:9.5px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;font-weight:800">{centerLabel}</span>
-		<span class="font-display" style="font-size:14px;font-weight:700;margin-top:3px">{centerValue}</span>
+		<span class="font-display privacy-value" style="font-size:14px;font-weight:700;margin-top:3px">{centerValue}</span>
 	</div>
 </div>

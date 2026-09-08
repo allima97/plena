@@ -152,7 +152,7 @@
 					<span class="insight-row-icon"><CheckCircle2 size={16} /></span>
 					<div>
 						<p class="insight-row-title">Maior origem de receita</p>
-						<p class="insight-row-desc">{fmtMoney(maiorReceita.total)} vieram de {maiorReceita.nome}.</p>
+						<p class="insight-row-desc"><span class="privacy-value">{fmtMoney(maiorReceita.total)}</span> vieram de {maiorReceita.nome}.</p>
 					</div>
 				</div>
 			{/if}
@@ -163,15 +163,15 @@
 <div class="grid-cards">
 	<div class="stat-card">
 		<p class="stat-label">Total de entradas</p>
-		<p class="font-display stat-value money-in">{fmtMoney(totaisPeriodo.receitas)}</p>
+		<p class="font-display stat-value money-in privacy-value">{fmtMoney(totaisPeriodo.receitas)}</p>
 	</div>
 	<div class="stat-card">
 		<p class="stat-label">Total de saídas</p>
-		<p class="font-display stat-value money-out">{fmtMoney(totaisPeriodo.despesas)}</p>
+		<p class="font-display stat-value money-out privacy-value">{fmtMoney(totaisPeriodo.despesas)}</p>
 	</div>
 	<div class="stat-card">
 		<p class="stat-label">Saldo acumulado</p>
-		<p class="font-display stat-value">{fmtMoney(totaisPeriodo.receitas - totaisPeriodo.despesas)}</p>
+		<p class="font-display stat-value privacy-value">{fmtMoney(totaisPeriodo.receitas - totaisPeriodo.despesas)}</p>
 	</div>
 </div>
 
@@ -194,7 +194,7 @@
 					<div class="bar-row">
 						<span class="bar-label">{c.nome}</span>
 						<div class="bar-track"><div class="bar-fill" style="width:{(c.total / maxDespesa) * 100}%"></div></div>
-						<span class="bar-value">{fmtMoney(c.total)}</span>
+						<span class="bar-value privacy-value">{fmtMoney(c.total)}</span>
 					</div>
 				{/each}
 			</div>
@@ -210,7 +210,7 @@
 					<div class="bar-row">
 						<span class="bar-label">{c.nome}</span>
 						<div class="bar-track"><div class="bar-fill" style="width:{(c.total / maxReceita) * 100}%;background:var(--income-bar-hover)"></div></div>
-						<span class="bar-value">{fmtMoney(c.total)}</span>
+						<span class="bar-value privacy-value">{fmtMoney(c.total)}</span>
 					</div>
 				{/each}
 			</div>

@@ -205,7 +205,7 @@
 <div class="hero-row">
 	<div class="balance-hero">
 		<div class="balance-hero-label"><span>Saldo disponível</span><TrendingUp size={16} /></div>
-		<p class="balance-hero-value">{fmtMoney(saldoAtualGeral)}</p>
+		<p class="balance-hero-value privacy-value">{fmtMoney(saldoAtualGeral)}</p>
 		<div class="balance-hero-foot">
 			<span class="balance-hero-delta" class:down={saldoDeltaPct < 0}>
 				{saldoDeltaPct >= 0 ? '↗' : '↘'} {Math.abs(saldoDeltaPct).toFixed(1)}% vs. mês anterior
@@ -215,17 +215,17 @@
 	</div>
 	<div class="mini-stat">
 		<div class="mini-stat-top"><span class="stat-label">Entradas no mês</span><span class="mini-stat-dot" style="background:var(--income)"></span></div>
-		<p class="mini-stat-value money-in font-display">{fmtMoney(t.receitas)}</p>
+		<p class="mini-stat-value money-in font-display privacy-value">{fmtMoney(t.receitas)}</p>
 		{#if entradasDeltaPct !== null}<p class="mini-stat-delta">{entradasDeltaPct >= 0 ? '↑' : '↓'} {Math.abs(entradasDeltaPct).toFixed(1)}% vs. {monthLabel(prevMKey)}</p>{/if}
 	</div>
 	<div class="mini-stat">
 		<div class="mini-stat-top"><span class="stat-label">Saídas no mês</span><span class="mini-stat-dot" style="background:var(--expense)"></span></div>
-		<p class="mini-stat-value money-out font-display">{fmtMoney(t.despesas)}</p>
+		<p class="mini-stat-value money-out font-display privacy-value">{fmtMoney(t.despesas)}</p>
 		{#if saidasDeltaPct !== null}<p class="mini-stat-delta">{saidasDeltaPct >= 0 ? '↑' : '↓'} {Math.abs(saidasDeltaPct).toFixed(1)}% vs. {monthLabel(prevMKey)}</p>{/if}
 	</div>
 	<div class="mini-stat">
 		<div class="mini-stat-top"><span class="stat-label">Comprometido</span><span class="mini-stat-dot" style="background:var(--purple)"></span></div>
-		<p class="mini-stat-value font-display">{fmtMoney(comprometido)}</p>
+		<p class="mini-stat-value font-display privacy-value">{fmtMoney(comprometido)}</p>
 		<p class="mini-stat-delta">{comprometidoPct}% das despesas do mês</p>
 		<div class="mini-progress-track"><div class="mini-progress-fill" style="width:{comprometidoPct}%;background:var(--purple)"></div></div>
 	</div>
@@ -236,7 +236,7 @@
 		<div class="chart-card-head">
 			<div>
 				<p class="stat-label" style="margin:0">Fluxo de caixa</p>
-				<p class="font-display" style="margin:6px 0 0;font-size:20px">{fmtMoney(t.receitas)}</p>
+				<p class="font-display privacy-value" style="margin:6px 0 0;font-size:20px">{fmtMoney(t.receitas)}</p>
 			</div>
 			<div class="chart-legend">
 				<span><span class="legend-dot" style="background:#4dcc8c"></span>Entradas</span>
@@ -308,7 +308,7 @@
 						<p class="feed-row-meta">{appState.categories.find((c) => c.id === tr.categoriaId)?.nome || 'Sem categoria'} · {conta?.nome || 'Sem conta'}</p>
 					</div>
 					<div class="feed-row-amount">
-						<p class:money-in={tr.tipo === 'receita'} class:money-out={tr.tipo === 'despesa'}>{tr.tipo === 'receita' ? '+' : '−'} {fmtMoney(tr.valor)}</p>
+						<p class="privacy-value" class:money-in={tr.tipo === 'receita'} class:money-out={tr.tipo === 'despesa'}>{tr.tipo === 'receita' ? '+' : '−'} {fmtMoney(tr.valor)}</p>
 						<p class="feed-row-date">{fmtDate(tr.data)}</p>
 					</div>
 				</div>

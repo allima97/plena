@@ -86,7 +86,7 @@
 				<div class="goal-progress-track" style="margin-top:8px">
 					<div class="goal-progress-fill" style="width:{m.percent * 100}%;background:{progressColor(m.percent)}"></div>
 				</div>
-				<p class="goal-list-values">{fmtMoney(m.totalAccumulated)} de {fmtMoney(m.effectiveTarget)}</p>
+				<p class="goal-list-values"><span class="privacy-value">{fmtMoney(m.totalAccumulated)}</span> de <span class="privacy-value">{fmtMoney(m.effectiveTarget)}</span></p>
 			</button>
 		{:else}
 			<p class="empty">Nenhum objetivo ainda.</p>
@@ -134,13 +134,13 @@
 				<div class="grid-cards" style="margin-top:18px">
 					<div class="stat-card">
 						<p class="stat-label">Acumulado</p>
-						<p class="font-display stat-value">{fmtMoney(metrics.totalAccumulated)}</p>
-						<p class="stat-sub">de {fmtMoney(metrics.effectiveTarget)}</p>
+						<p class="font-display stat-value privacy-value">{fmtMoney(metrics.totalAccumulated)}</p>
+						<p class="stat-sub">de <span class="privacy-value">{fmtMoney(metrics.effectiveTarget)}</span></p>
 					</div>
 					<div class="stat-card">
 						<p class="stat-label">Ritmo médio mensal</p>
-						<p class="font-display stat-value">{fmtMoney(metrics.generalAveragePace)}</p>
-						{#if metrics.recommendedMonthly && metrics.monthsLeft}<p class="stat-sub">recomendado: {fmtMoney(metrics.recommendedMonthly)}/mês</p>{/if}
+						<p class="font-display stat-value privacy-value">{fmtMoney(metrics.generalAveragePace)}</p>
+						{#if metrics.recommendedMonthly && metrics.monthsLeft}<p class="stat-sub">recomendado: <span class="privacy-value">{fmtMoney(metrics.recommendedMonthly)}</span>/mês</p>{/if}
 					</div>
 					<div class="stat-card">
 						<p class="stat-label">Previsão de conclusão</p>
@@ -162,7 +162,7 @@
 						<button class="resource-head" onclick={() => (expandedResource = { ...expandedResource, [r.id]: !expandedResource[r.id] })}>
 							<span class="type-icon income"><Wallet size={15} /></span>
 							<span class="resource-name">{r.name}</span>
-							<span class="font-display resource-balance">{fmtMoney(resourceBalanceOf(r.id))}</span>
+							<span class="font-display resource-balance privacy-value">{fmtMoney(resourceBalanceOf(r.id))}</span>
 							{#if expandedResource[r.id]}<ChevronUp size={16} />{:else}<ChevronDown size={16} />{/if}
 						</button>
 						{#if expandedResource[r.id]}
@@ -179,7 +179,7 @@
 											<p class="movement-meta">{fmtDate(mv.date)}</p>
 										</div>
 										<div class="movement-amount">
-											<p class="font-display" class:money-in={mv.amount >= 0} class:money-out={mv.amount < 0}>{fmtMoney(mv.amount)}</p>
+											<p class="font-display privacy-value" class:money-in={mv.amount >= 0} class:money-out={mv.amount < 0}>{fmtMoney(mv.amount)}</p>
 										</div>
 										<div class="movement-actions">
 											<button class="btn btn-ghost sm" onclick={() => (moveModal = { open: true, resourceId: r.id, goalId: selectedGoal.id, editing: mv })}>Editar</button>
@@ -216,11 +216,11 @@
 										<tr>
 											<td>{it.number}</td>
 											<td>{fmtDate(it.date)}</td>
-											<td class="num">{fmtMoney(it.valorPrestacao)}</td>
-											<td class="num">{fmtMoney(it.amortizacao)}</td>
-											<td class="num">{fmtMoney(it.juros)}</td>
-											<td class="num">{fmtMoney(it.saldoDevedor)}</td>
-											<td class="num" class:money-in={it.delta > 0} class:money-out={it.delta < 0}>{fmtMoney(it.delta)}</td>
+											<td class="num privacy-value">{fmtMoney(it.valorPrestacao)}</td>
+											<td class="num privacy-value">{fmtMoney(it.amortizacao)}</td>
+											<td class="num privacy-value">{fmtMoney(it.juros)}</td>
+											<td class="num privacy-value">{fmtMoney(it.saldoDevedor)}</td>
+											<td class="num privacy-value" class:money-in={it.delta > 0} class:money-out={it.delta < 0}>{fmtMoney(it.delta)}</td>
 											<td>
 												<div class="actions-row" style="justify-content:flex-end">
 													<button class="btn btn-ghost sm" onclick={() => (installmentModal = { open: true, goalId: selectedGoal.id, editing: it })}>Editar</button>
@@ -248,7 +248,7 @@
 								<p class="movement-desc">{a.tipo}</p>
 								<p class="movement-meta">{fmtDate(a.date)}</p>
 							</div>
-							<div class="movement-amount"><p class="font-display">{fmtMoney(a.amount)}</p></div>
+							<div class="movement-amount"><p class="font-display privacy-value">{fmtMoney(a.amount)}</p></div>
 							<div class="movement-actions">
 								<button class="btn btn-ghost sm" onclick={() => (amortModal = { open: true, goalId: selectedGoal.id, editing: a })}>Editar</button>
 								<button class="btn btn-danger sm" onclick={() => (deleting = { kind: 'amortization', id: a.id, label: 'esta amortização', warn: '' })}>Excluir</button>
