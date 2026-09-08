@@ -379,6 +379,64 @@ table.list .num {
 .table-wrap {
 	overflow-x: auto;
 }
+@media (max-width: 760px) {
+	.table-wrap {
+		overflow-x: visible;
+	}
+	table.list {
+		min-width: 0;
+		display: block;
+	}
+	table.list thead {
+		display: none;
+	}
+	table.list tbody {
+		display: block;
+	}
+	table.list tr {
+		display: block;
+		margin-bottom: 12px;
+		padding: 4px 14px;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		background: var(--card);
+	}
+	table.list tr:last-child {
+		margin-bottom: 0;
+	}
+	table.list td {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		padding: 10px 0;
+		border-bottom: 1px solid var(--border-soft);
+		text-align: right;
+	}
+	table.list td:last-child {
+		border-bottom: none;
+	}
+	table.list td::before {
+		content: attr(data-label);
+		font-size: 10px;
+		font-weight: 800;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--ink-faint);
+		text-align: left;
+		margin-right: auto;
+	}
+	table.list td.actions-cell {
+		display: block;
+		padding-top: 6px;
+	}
+	table.list td.actions-cell::before {
+		display: none;
+	}
+	table.list td.actions-cell .actions-row {
+		justify-content: flex-end;
+	}
+}
 
 /* Section entrance animation */
 @keyframes section-in {
@@ -1345,7 +1403,7 @@ table.list .num {
 	padding: 14px 16px;
 	border-radius: var(--radius-lg);
 	border: 1px solid var(--border);
-	background: var(--surface);
+	background: var(--card);
 	cursor: pointer;
 	font: inherit;
 	color: inherit;
@@ -1369,8 +1427,15 @@ table.list .num {
 	justify-content: space-between;
 	gap: 8px;
 }
+.goal-list-top .badge {
+	flex-shrink: 0;
+}
 
 .goal-list-name {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 	font-weight: 600;
 	font-size: 14.5px;
 }
@@ -1413,7 +1478,7 @@ table.list .num {
 	padding: 10px 12px;
 	border-radius: var(--radius-md);
 	border: 1px solid var(--border);
-	background: var(--surface);
+	background: var(--card);
 	color: inherit;
 	font: inherit;
 	font-size: 13px;
@@ -1475,16 +1540,35 @@ table.list .num {
 
 .resource-name {
 	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 	font-weight: 600;
 	font-size: 14px;
 }
 
 .resource-balance {
 	font-size: 14px;
+	flex-shrink: 0;
+	white-space: nowrap;
 }
 
 .resource-body {
 	padding: 10px 14px 14px;
+}
+
+@media (max-width: 480px) {
+	.goal-list-item {
+		padding: 12px 14px;
+	}
+	.resource-head {
+		padding: 10px 12px;
+		gap: 8px;
+	}
+	.resource-body {
+		padding: 8px 12px 12px;
+	}
 }
 
 /* ================= visual pass: match reference dashboard mock ================= */

@@ -208,20 +208,20 @@
 							<table class="list">
 								<thead>
 									<tr>
-										<th>Nº</th><th>Data</th><th class="num">Valor</th><th class="num">Amortização</th><th class="num">Juros</th><th class="num">Saldo devedor</th><th class="num">Abatimento</th><th></th>
+										<th>Nº</th><th>Data</th><th class="num">Valor</th><th class="num">Amortização</th><th class="num">Juros</th><th class="num">Saldo devedor</th><th class="num">Abatimento</th><th class="actions-cell"></th>
 									</tr>
 								</thead>
 								<tbody>
 									{#each [...metrics.installmentRows].reverse() as it (it.id)}
 										<tr>
-											<td>{it.number}</td>
-											<td>{fmtDate(it.date)}</td>
-											<td class="num privacy-value">{fmtMoney(it.valorPrestacao)}</td>
-											<td class="num privacy-value">{fmtMoney(it.amortizacao)}</td>
-											<td class="num privacy-value">{fmtMoney(it.juros)}</td>
-											<td class="num privacy-value">{fmtMoney(it.saldoDevedor)}</td>
-											<td class="num privacy-value" class:money-in={it.delta > 0} class:money-out={it.delta < 0}>{fmtMoney(it.delta)}</td>
-											<td>
+											<td data-label="Nº">{it.number}</td>
+											<td data-label="Data">{fmtDate(it.date)}</td>
+											<td class="num privacy-value" data-label="Valor">{fmtMoney(it.valorPrestacao)}</td>
+											<td class="num privacy-value" data-label="Amortização">{fmtMoney(it.amortizacao)}</td>
+											<td class="num privacy-value" data-label="Juros">{fmtMoney(it.juros)}</td>
+											<td class="num privacy-value" data-label="Saldo devedor">{fmtMoney(it.saldoDevedor)}</td>
+											<td class="num privacy-value" data-label="Abatimento" class:money-in={it.delta > 0} class:money-out={it.delta < 0}>{fmtMoney(it.delta)}</td>
+											<td class="actions-cell">
 												<div class="actions-row" style="justify-content:flex-end">
 													<button class="btn btn-ghost sm" onclick={() => (installmentModal = { open: true, goalId: selectedGoal.id, editing: it })}>Editar</button>
 													<button class="btn btn-danger sm" onclick={() => (deleting = { kind: 'installment', id: it.id, label: `prestação nº ${it.number}`, warn: '' })}>Excluir</button>

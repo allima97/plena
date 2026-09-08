@@ -113,7 +113,7 @@
 	{/if}
 </div>
 
-<div class="charts-row" style="grid-template-columns:1.6fr 1fr">
+<div class="charts-row">
 	<div class="card">
 		<div class="chart-card-head">
 			<div>
@@ -185,7 +185,7 @@
 	</select>
 </div>
 
-<div class="grid-cards" style="grid-template-columns:1fr 1fr">
+<div class="grid-cards">
 	<div class="card">
 		<p class="stat-label" style="margin-bottom:16px">Despesas por categoria</p>
 		{#if despesasPorCategoria.length}
