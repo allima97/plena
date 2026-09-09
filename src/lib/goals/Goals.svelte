@@ -661,7 +661,7 @@
 							</select>
 							{#if installmentYears.length >= 5}<span class="field-hint" style="align-self:center">mostrando os 5 anos mais recentes</span>{/if}
 						</div>
-						<div class="table-wrap">
+						<div class="table-wrap installments-table-wrap">
 							<table class="list">
 								<thead>
 									<tr><th>Mês</th><th class="num">Saldo devedor</th><th class="num">Abatimento</th></tr>
@@ -771,3 +771,52 @@
 	onCancel={() => (deleting = null)}
 	onConfirm={confirmDelete}
 />
+
+<style>
+	/* Prestações do Financiamento — tabela "Mês / Saldo devedor / Abatimento":
+	   mesma apresentação (caixa arredondada com borda, cabeçalho com fundo
+	   sombreado, sem forçar a tabela a ficar larga) do app nextgoals.
+	   Não mexe em fonte — só em fundo, borda e largura, com as próprias
+	   variáveis de cor do Plena. Escopado a esta tabela (.installments-table-wrap)
+	   para não alterar as outras tabelas ("list") do app. */
+	.installments-table-wrap :global(table.list) {
+		min-width: 0;
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		overflow: hidden;
+	}
+	.installments-table-wrap :global(table.list th) {
+		background: var(--surface-2);
+	}
+	@media (max-width: 760px) {
+		.installments-table-wrap :global(table.list) {
+			display: table;
+		}
+		.installments-table-wrap :global(table.list thead) {
+			display: table-header-group;
+		}
+		.installments-table-wrap :global(table.list tbody) {
+			display: table-row-group;
+		}
+		.installments-table-wrap :global(table.list tr) {
+			display: table-row;
+			margin: 0;
+			padding: 0;
+			border: none;
+			background: none;
+			border-radius: 0;
+		}
+		.installments-table-wrap :global(table.list td) {
+			display: table-cell;
+			text-align: right;
+			padding: 9px 12px;
+			border-bottom: 1px solid var(--border-soft);
+		}
+		.installments-table-wrap :global(table.list td:first-child) {
+			text-align: left;
+		}
+		.installments-table-wrap :global(table.list td::before) {
+			content: none;
+		}
+	}
+</style>
