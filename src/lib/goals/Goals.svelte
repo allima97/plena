@@ -650,7 +650,7 @@
 				<div class="card" style="margin-top:16px">
 					<div class="page-head" style="margin-bottom:14px">
 						<p class="stat-label" style="margin:0">Prestações do financiamento</p>
-						<button class="btn sm" onclick={() => (installmentModal = { open: true, goalId: selectedGoal.id, editing: null })}><Plus size={14} /> Nova prestação</button>
+						<button class="btn sm" class:installments-add-btn--desktop={installmentYears.length > 0} onclick={() => (installmentModal = { open: true, goalId: selectedGoal.id, editing: null })}><Plus size={14} /> Nova prestação</button>
 					</div>
 					{#if installmentYears.length}
 						<div class="filters-bar" style="margin-bottom:14px">
@@ -660,6 +660,7 @@
 								{/each}
 							</select>
 							{#if installmentYears.length >= 5}<span class="field-hint" style="align-self:center">mostrando os 5 anos mais recentes</span>{/if}
+							<button class="btn sm installments-add-btn--mobile" onclick={() => (installmentModal = { open: true, goalId: selectedGoal.id, editing: null })}><Plus size={14} /> Nova prestação</button>
 						</div>
 						<div class="table-wrap installments-table-wrap">
 							<table class="list">
@@ -817,6 +818,22 @@
 		}
 		.installments-table-wrap :global(table.list td::before) {
 			content: none;
+		}
+	}
+
+	/* No mobile, "Nova prestação" fica ao lado do seletor de ano (ano
+	   primeiro à esquerda, botão por último à direita) em vez de empilhado
+	   abaixo do título. No desktop continua junto do título, como antes. */
+	.installments-add-btn--mobile {
+		display: none;
+	}
+	@media (max-width: 760px) {
+		.installments-add-btn--desktop {
+			display: none;
+		}
+		.installments-add-btn--mobile {
+			display: inline-flex;
+			margin-left: auto;
 		}
 	}
 </style>
