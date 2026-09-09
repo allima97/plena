@@ -166,10 +166,10 @@
 					<p class="section-label">{activeLabel}</p>
 				</div>
 				<div class="topbar-right">
-					<button class="hide-values-btn" onclick={toggleHideValues}>
-						{#if hideValues}<EyeOff size={15} /> Mostrar valores{:else}<Eye size={15} /> Ocultar valores{/if}
-					</button>
 					<button class="icon-btn" aria-label="Buscar" onclick={() => { searchOpen = true; notifOpen = false; }}><Search size={17} /></button>
+					<button class="icon-btn" aria-label={hideValues ? 'Exibir valores' : 'Ocultar valores'} title={hideValues ? 'Exibir valores' : 'Ocultar valores'} onclick={toggleHideValues}>
+						{#if hideValues}<EyeOff size={17} />{:else}<Eye size={17} />{/if}
+					</button>
 					<div class="notif-anchor">
 						<button class="icon-btn" aria-label="Notificações" style="position:relative" onclick={() => { notifOpen = !notifOpen; searchOpen = false; }}>
 							<Bell size={17} />
