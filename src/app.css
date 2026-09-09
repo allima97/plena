@@ -3382,10 +3382,28 @@ table.list .num {
 	font-weight: 700;
 	margin: 4px 0 0;
 }
+.score-value-wrap-col {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 4px;
+}
 .score-value-wrap {
 	display: flex;
 	align-items: baseline;
 	gap: 4px;
+}
+.score-delta {
+	font-size: 12px;
+	font-weight: 700;
+	margin: 2px 0 0;
+	color: var(--ink-soft);
+}
+.score-delta.up {
+	color: var(--income);
+}
+.score-delta.down {
+	color: var(--expense);
 }
 .score-value {
 	font-size: 34px;
@@ -3437,6 +3455,35 @@ table.list .num {
 	font-weight: 700;
 	text-align: right;
 	color: var(--ink);
+}
+.score-tip-toggle {
+	align-self: flex-start;
+	background: none;
+	border: none;
+	padding: 0;
+	font-size: 12px;
+	font-weight: 700;
+	color: var(--accent-fg);
+	cursor: pointer;
+}
+.score-tip-toggle:hover {
+	text-decoration: underline;
+}
+.score-tip {
+	background: var(--surface-2, #eef0f4);
+	border-radius: 12px;
+	padding: 12px 14px;
+}
+.score-tip-head {
+	font-size: 12px;
+	color: var(--ink-soft);
+	margin: 0 0 4px;
+}
+.score-tip-body {
+	font-size: 13px;
+	color: var(--ink);
+	margin: 0;
+	line-height: 1.5;
 }
 .feed-list-head {
 	display: flex;

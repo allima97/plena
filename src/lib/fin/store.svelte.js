@@ -22,6 +22,9 @@ let amortizations = $state([]);
 let patrimonyItems = $state([]);
 let patrimonySnapshots = $state([]);
 
+// ---- score financeiro: historico mensal (fase P2.6) ----
+let scoreSnapshots = $state([]);
+
 let mode = $state(/** @type {'loading'|'api'|'local'} */ ('loading'));
 let syncStatus = $state(/** @type {'synced'|'saving'|'error'} */ ('synced'));
 let pendingWrites = 0;
@@ -75,6 +78,9 @@ export const appState = {
 	get patrimonySnapshots() {
 		return patrimonySnapshots;
 	},
+	get scoreSnapshots() {
+		return scoreSnapshots;
+	},
 	get mode() {
 		return mode;
 	},
@@ -105,7 +111,8 @@ function snapshot() {
 		installments,
 		amortizations,
 		patrimonyItems,
-		patrimonySnapshots
+		patrimonySnapshots,
+		scoreSnapshots
 	};
 }
 
@@ -132,6 +139,7 @@ export async function boot() {
 		amortizations = local.amortizations || [];
 		patrimonyItems = local.patrimonyItems || [];
 		patrimonySnapshots = local.patrimonySnapshots || [];
+		scoreSnapshots = local.scoreSnapshots || [];
 	}
 	ready = true;
 
@@ -174,6 +182,7 @@ export async function boot() {
 	amortizations = remote.amortizations || amortizations;
 	patrimonyItems = remote.patrimonyItems || patrimonyItems;
 	patrimonySnapshots = remote.patrimonySnapshots || patrimonySnapshots;
+	scoreSnapshots = remote.scoreSnapshots || scoreSnapshots;
 	mode = 'api';
 	persistLocalSnapshot();
 }
@@ -676,4 +685,18 @@ export function upsertPatrimonySnapshot(mKey, data) {
 		patrimonySnapshots = patrimonySnapshots.map((s, i) => (i === idx ? updated : s));
 	}
 	write('patrimonySnapshots', mKey, updated);
+}
+
+/** Grava (ou substitui) o retrato do score financeiro do mês `mKey` -- mesmo padrão
+ * determinístico de upsertPatrimonySnapshot, para construir o histórico organicamente. */
+export function upsertScoreSnapshot(mKey, data) {
+	const idx = scoreSnapshots.findIndex((s) => s.id === mKey);
+	const updated = { id: mKey, mKey, ...data };
+	if (idx === -1) {
+		scoreSnapshots = [...scoreSnapshots, updated];
+	} else {
+		if (JSON.stringify(scoreSnapshots[idx]) === JSON.stringify(updated)) return;
+		scoreSnapshots = scoreSnapshots.map((s, i) => (i === idx ? updated : s));
+	}
+	write('scoreSnapshots', mKey, updated);
 }

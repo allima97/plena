@@ -16,30 +16,26 @@ export function buildAttentionItems(
 	const alertas = upcomingDue(transactions, alertThresholds);
 	const pausadas = pausedSeries(transactions);
 
+	// Vencimento com um único lançamento pendente vira ação direta ("Pagar agora");
+	// com vários, mantém a navegação para a lista (não há um único alvo para agir).
+	function vencimentoItem(grupo, tone, dias, weight) {
+		const um = grupo.length === 1;
+		return {
+			tone,
+			text: `${grupo.length} vencimento${grupo.length > 1 ? 's' : ''} em até ${dias} dia(s)${um && grupo[0]?.descricao ? ' — ' + grupo[0].descricao : ''}`,
+			actionLabel: um ? 'Pagar agora' : 'Ver lançamentos',
+			href: '/movimentacoes',
+			action: um ? { kind: 'pay', transactionId: grupo[0].id } : null,
+			weight
+		};
+	}
+
 	if (alertas.um.length) {
-		list.push({
-			tone: 'red',
-			text: `${alertas.um.length} vencimento${alertas.um.length > 1 ? 's' : ''} em até ${alertThresholds.um} dia(s)${alertas.um[0]?.descricao ? ' — ' + alertas.um[0].descricao : ''}`,
-			actionLabel: 'Ver lançamentos',
-			href: '/movimentacoes',
-			weight: 100
-		});
+		list.push(vencimentoItem(alertas.um, 'red', alertThresholds.um, 100));
 	} else if (alertas.tres.length) {
-		list.push({
-			tone: 'orange',
-			text: `${alertas.tres.length} vencimento${alertas.tres.length > 1 ? 's' : ''} em até ${alertThresholds.tres} dias`,
-			actionLabel: 'Ver lançamentos',
-			href: '/movimentacoes',
-			weight: 80
-		});
+		list.push(vencimentoItem(alertas.tres, 'orange', alertThresholds.tres, 80));
 	} else if (alertas.sete.length) {
-		list.push({
-			tone: 'yellow',
-			text: `${alertas.sete.length} vencimento${alertas.sete.length > 1 ? 's' : ''} em até ${alertThresholds.sete} dias`,
-			actionLabel: 'Ver lançamentos',
-			href: '/movimentacoes',
-			weight: 50
-		});
+		list.push(vencimentoItem(alertas.sete, 'yellow', alertThresholds.sete, 50));
 	}
 
 	for (const acc of accounts.filter((a) => a.tipo === 'cartao')) {
@@ -49,7 +45,7 @@ export function buildAttentionItems(
 			list.push({
 				tone: pct >= 90 ? 'red' : 'orange',
 				text: `Cartão ${acc.nome} chega a ${Math.round(pct)}% do limite`,
-				actionLabel: 'Ver conta',
+				actionLabel: 'Ver fatura',
 				href: '/contas',
 				weight: pct
 			});
@@ -59,7 +55,15 @@ export function buildAttentionItems(
 	for (const g of goals.filter((gl) => !gl.archived)) {
 		const m = computeMetrics(g, { resources, resourceMoves, goalCategories, installments, amortizations });
 		if (m.statusTone === 'danger') {
-			list.push({ tone: 'orange', text: `Meta "${g.name}" está abaixo do ritmo`, actionLabel: 'Ver objetivo', href: '/objetivos', weight: 60 });
+			const resource = resources.find((r) => r.goalId === g.id);
+			list.push({
+				tone: 'orange',
+				text: `Meta "${g.name}" está abaixo do ritmo`,
+				actionLabel: resource && m.recommendedMonthly > 0 ? 'Ajustar aporte' : 'Ver objetivo',
+				href: '/objetivos',
+				action: resource && m.recommendedMonthly > 0 ? { kind: 'aporte', goalId: g.id, resourceId: resource.id, valor: m.recommendedMonthly } : null,
+				weight: 60
+			});
 		} else if (m.statusTone === 'good' && m.percent < 1) {
 			list.push({ tone: 'green', text: `Meta "${g.name}" está acima do ritmo`, actionLabel: 'Ver objetivo', href: '/objetivos', weight: 5 });
 		}

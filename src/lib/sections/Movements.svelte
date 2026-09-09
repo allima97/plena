@@ -2,7 +2,7 @@
 	import { appState, setPaymentStatus, manageSeries, removeTransaction, restoreTransaction, transferPairOf } from '$lib/fin/store.svelte.js';
 	import { committedThisMonth, currentMonthKey, monthTransactions } from '$lib/fin/derived.js';
 	import { exportCSV, exportPDF } from '$lib/fin/export.js';
-	import { fmtMoney, monthKey, monthLabel } from '$lib/format.js';
+	import { fmtMoney, monthKey, monthLabel, todayISO } from '$lib/format.js';
 	import NewMovementModal from '$lib/components/NewMovementModal.svelte';
 	import ReportCenterModal from '$lib/components/ReportCenterModal.svelte';
 import TransferModal from '$lib/components/TransferModal.svelte';
@@ -50,6 +50,22 @@ import TransferModal from '$lib/components/TransferModal.svelte';
 	}
 	function openEditSeries(t) {
 		modal = { open: true, mode: 'edit-series', transaction: t };
+	}
+	function duplicateTransaction(t) {
+		modal = {
+			open: true,
+			mode: 'create',
+			transaction: {
+				tipo: t.tipo,
+				valor: t.valor,
+				data: todayISO(),
+				descricao: t.descricao,
+				categoriaId: t.categoriaId,
+				subcategoriaId: t.subcategoriaId,
+				contaId: t.contaId,
+				formaPagamento: t.formaPagamento
+			}
+		};
 	}
 	function closeModal() {
 		modal = { ...modal, open: false };
@@ -194,6 +210,7 @@ import TransferModal from '$lib/components/TransferModal.svelte';
 				onEditOccurrence={openEditOccurrence}
 				onEditSeries={openEditSeries}
 				onManageSeries={manageSeries}
+				onDuplicate={duplicateTransaction}
 				onDelete={handleDelete}
 			/>
 		{/each}

@@ -1,11 +1,13 @@
 <script>
-	import { appState, setAlertThresholds } from '$lib/fin/store.svelte.js';
+	import { appState, setAlertThresholds, setPaymentStatus, upsertScoreSnapshot } from '$lib/fin/store.svelte.js';
 	import { totals, monthTransactions, committedThisMonth, nextScheduleDate, currentMonthKey, daysUntil, faturaDoCartao, saldoContaAte } from '$lib/fin/derived.js';
 	import { computeMetrics } from '$lib/goals/metrics.js';
 	import { buildAttentionItems } from '$lib/fin/attention.js';
 	import { computeFinancialScore, buildInsights } from '$lib/fin/intelligence.js';
 	import { fmtMoney, fmtDate, monthLabel, monthKey, todayISO } from '$lib/format.js';
 	import NewMovementModal from '$lib/components/NewMovementModal.svelte';
+	import MoveFormModal from '$lib/goals/MoveFormModal.svelte';
+	import { showToast } from '$lib/toast.svelte.js';
 	import BarChart from '$lib/components/charts/BarChart.svelte';
 	import DonutChart from '$lib/components/charts/DonutChart.svelte';
 	import Sparkline from '$lib/components/charts/Sparkline.svelte';
@@ -15,6 +17,7 @@
 	const DOT_PALETTE = ['#e06b5f', '#e0a23f', '#8b78db', '#4a78db', '#23a768', '#2fb7c4', '#c4519a'];
 
 	let showNew = $state(false);
+	let aporteModal = $state({ open: false, resourceId: null, goalId: null, prefill: null });
 	let contaFiltro = $state('all');
 	let tipoFiltro = $state('all');
 
@@ -108,6 +111,32 @@
 		categories: appState.categories
 	}));
 	const financialScore = $derived(computeFinancialScore(intelligenceInput));
+	let scoreExpanded = $state(false);
+	const SCORE_TIPS = {
+		fluxoCaixa: 'Suas saídas estão perto de superar as entradas este mês — reduzir um gasto não essencial ou adiar uma compra já ajuda a subir esse ponto.',
+		comprometimento: 'Uma fatia grande da sua renda já está comprometida com despesas fixas. Revisar assinaturas e parcelas recorrentes libera folga e sobe esse indicador.',
+		cartoes: 'O uso do limite dos seus cartões está alto. Antecipar parte da fatura ou reduzir o uso no cartão mais próximo do limite melhora esse ponto.',
+		reserva: 'Sua reserva cobre poucos meses de despesas. Qualquer aporte extra nela eleva esse indicador rapidamente.',
+		objetivos: 'Um ou mais objetivos estão abaixo do ritmo planejado. Um aporte extra ou um ajuste no prazo recupera o ritmo.',
+		previsibilidade: 'Suas despesas têm variado bastante mês a mês. Deixar mais gastos fixos e recorrentes estáveis melhora a previsibilidade.'
+	};
+	const scoreWeakest = $derived([...financialScore.components].sort((a, b) => a.value - b.value)[0]);
+	const scoreTip = $derived(scoreWeakest ? SCORE_TIPS[scoreWeakest.key] : '');
+
+	// Histórico mensal do score: registra o retrato do mês corrente conforme o usuário usa
+	// o app (mesmo padrão de upsertPatrimonySnapshot em Patrimony.svelte) e mostra
+	// variação + mini histórico no card.
+	$effect(() => {
+		if (!appState.ready) return;
+		upsertScoreSnapshot(currentMonthKey(), { overall: financialScore.overall });
+	});
+	const scoreHistory = $derived([...appState.scoreSnapshots].sort((a, b) => a.mKey.localeCompare(b.mKey)).slice(-12));
+	const scorePrevMonth = $derived.by(() => {
+		const mKey = currentMonthKey();
+		const prior = scoreHistory.filter((s) => s.mKey !== mKey);
+		return prior.length ? prior[prior.length - 1] : null;
+	});
+	const scoreDelta = $derived(scorePrevMonth ? financialScore.overall - scorePrevMonth.overall : null);
 	const insights = $derived(buildInsights(intelligenceInput, 3));
 	const INSIGHT_LABELS = { comportamento: 'Comportamento', oportunidade: 'Oportunidade', risco: 'Risco', objetivo: 'Objetivo', cartao: 'Cartão' };
 	function scoreColor(v) {
@@ -206,12 +235,44 @@
 			const candidato = candidatos[0];
 			if (candidato) {
 				const valor = Math.min(saldoDisponivel, candidato.m.recommendedMonthly);
-				return { text: `Você pode aportar ${fmtMoney(valor)} na meta "${candidato.goal.name}" este mês sem comprometer seu caixa.`, actionLabel: 'Fazer aporte', href: '/objetivos' };
+				const resource = appState.resources.find((r) => r.goalId === candidato.goal.id);
+				return {
+					text: `Você pode aportar ${fmtMoney(valor)} na meta "${candidato.goal.name}" este mês sem comprometer seu caixa.`,
+					actionLabel: 'Fazer aporte',
+					href: '/objetivos',
+					goalId: candidato.goal.id,
+					resourceId: resource?.id || null,
+					valor
+				};
 			}
 			return { text: `Seu caixa está tranquilo este mês: ${fmtMoney(saldoDisponivel)} disponíveis além dos compromissos e metas.`, actionLabel: 'Ver objetivos', href: '/objetivos' };
 		}
 		return { text: 'Seus compromissos e metas deste mês superam o saldo disponível em contas. Vale revisar despesas em Relatórios.', actionLabel: 'Ver relatório', href: '/relatorios' };
 	});
+	function openAporte() {
+		aporteModal = {
+			open: true,
+			resourceId: proximoPasso.resourceId,
+			goalId: proximoPasso.goalId,
+			prefill: { description: 'Aporte', amount: Math.round(proximoPasso.valor * 100) / 100 }
+		};
+	}
+	function handleAttentionAction(p) {
+		if (p.action?.kind === 'pay') {
+			const id = p.action.transactionId;
+			setPaymentStatus(id, 'pago');
+			showToast({
+				message: 'Lançamento marcado como pago.',
+				actionLabel: 'DESFAZER',
+				onAction: () => setPaymentStatus(id, 'pendente')
+			});
+			return;
+		}
+		if (p.action?.kind === 'aporte') {
+			const { goalId, resourceId, valor } = p.action;
+			aporteModal = { open: true, resourceId, goalId, prefill: { description: 'Aporte', amount: Math.round(valor * 100) / 100 } };
+		}
+	}
 
 	function futureDateISO(days) {
 		const d = new Date();
@@ -312,7 +373,11 @@
 				<div class="attention-item {p.tone}">
 					<span class="attention-dot"></span>
 					<p class="attention-text">{p.text}</p>
-					<a class="link-more" href={p.href}>{p.actionLabel} ↗</a>
+					{#if p.action}
+						<button class="link-more" onclick={() => handleAttentionAction(p)}>{p.actionLabel} ↗</button>
+					{:else}
+						<a class="link-more" href={p.href}>{p.actionLabel} ↗</a>
+					{/if}
 				</div>
 			{/each}
 		{:else}
@@ -332,7 +397,11 @@
 		<Sparkles size={20} color="var(--accent-fg)" />
 		<p class="insight-eyebrow" style="margin-top:14px">Seu próximo passo</p>
 		<p class="insight-body" style="margin:12px 0 18px">{proximoPasso.text}</p>
-		<a class="btn btn-primary sm" href={proximoPasso.href}>{proximoPasso.actionLabel}</a>
+		{#if proximoPasso.resourceId}
+			<button class="btn btn-primary sm" onclick={openAporte}>{proximoPasso.actionLabel}</button>
+		{:else}
+			<a class="btn btn-primary sm" href={proximoPasso.href}>{proximoPasso.actionLabel}</a>
+		{/if}
 	</div>
 </div>
 
@@ -416,10 +485,20 @@
 			<div>
 				<p class="stat-label" style="margin:0">Score financeiro</p>
 				<p class="score-tone" style={`color:${scoreColor(financialScore.overall)}`}>{financialScore.label}</p>
+				{#if scoreDelta !== null && scoreDelta !== 0}
+					<p class="score-delta" class:up={scoreDelta > 0} class:down={scoreDelta < 0}>
+						{scoreDelta > 0 ? '▲' : '▼'} {Math.abs(scoreDelta)} vs mês passado
+					</p>
+				{/if}
 			</div>
-			<div class="score-value-wrap">
-				<span class="score-value" style={`color:${scoreColor(financialScore.overall)}`}>{financialScore.overall}</span>
-				<span class="score-max">/100</span>
+			<div class="score-value-wrap-col">
+				<div class="score-value-wrap">
+					<span class="score-value" style={`color:${scoreColor(financialScore.overall)}`}>{financialScore.overall}</span>
+					<span class="score-max">/100</span>
+				</div>
+				{#if scoreHistory.length > 1}
+					<Sparkline values={scoreHistory.map((s) => s.overall)} width={90} height={26} color={scoreColor(financialScore.overall)} />
+				{/if}
 			</div>
 		</div>
 		<div class="score-components">
@@ -433,6 +512,17 @@
 				</div>
 			{/each}
 		</div>
+		{#if financialScore.overall < 100 && scoreWeakest}
+			<button class="score-tip-toggle" onclick={() => (scoreExpanded = !scoreExpanded)}>
+				{scoreExpanded ? 'Ocultar' : 'O que faria o score subir?'}
+			</button>
+			{#if scoreExpanded}
+				<div class="score-tip">
+					<p class="score-tip-head">Ponto mais fraco agora: <b>{scoreWeakest.label}</b> ({scoreWeakest.value}/100)</p>
+					<p class="score-tip-body">{scoreTip}</p>
+				</div>
+			{/if}
+		{/if}
 	</div>
 </div>
 
@@ -487,3 +577,10 @@
 </div>
 
 <NewMovementModal open={showNew} onClose={() => (showNew = false)} />
+<MoveFormModal
+	open={aporteModal.open}
+	resourceId={aporteModal.resourceId}
+	goalId={aporteModal.goalId}
+	prefill={aporteModal.prefill}
+	onClose={() => (aporteModal = { ...aporteModal, open: false })}
+/>

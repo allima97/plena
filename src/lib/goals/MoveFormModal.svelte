@@ -3,7 +3,7 @@
 	import { appState, addResourceMove, updateResourceMove, resolveGoalCategoryId, goalCategoryName } from '$lib/fin/store.svelte.js';
 	import { todayISO } from '$lib/format.js';
 
-	let { open, resourceId, goalId, editing = null, onClose } = $props();
+	let { open, resourceId, goalId, editing = null, prefill = null, onClose } = $props();
 
 	function blank() {
 		return { date: todayISO(), description: '', sign: '1', amount: '', categoryName: '' };
@@ -20,7 +20,7 @@
 					amount: Math.abs(editing.amount),
 					categoryName: editing.categoryId ? goalCategoryName(editing.categoryId) : ''
 				}
-			: blank();
+			: { ...blank(), ...(prefill || {}) };
 	});
 
 	function submit(e) {

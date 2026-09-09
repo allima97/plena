@@ -2,7 +2,7 @@
 	import { fmtMoney, fmtDate } from '$lib/format.js';
 	import { ArrowDownRight, ArrowUpRight, ArrowLeftRight, Repeat, Layers } from 'lucide-svelte';
 
-	let { t, categoria, subcategoria, conta, onTogglePayment, onEditOccurrence, onEditSeries, onManageSeries, onDelete } = $props();
+	let { t, categoria, subcategoria, conta, onTogglePayment, onEditOccurrence, onEditSeries, onManageSeries, onDuplicate, onDelete } = $props();
 </script>
 
 <div class="movement-row">
@@ -70,6 +70,9 @@
 			{#if t.seriesStatus !== 'cancelada'}
 				<button class="btn btn-ghost sm" onclick={() => onManageSeries(t.seriesId, 'cancelar')}>Cancelar série</button>
 			{/if}
+		{/if}
+		{#if !t.isTransferencia}
+			<button class="btn btn-ghost sm" onclick={() => onDuplicate(t)}>Duplicar</button>
 		{/if}
 		<button class="btn btn-danger sm" onclick={() => onDelete(t)}>Excluir</button>
 	</div>
