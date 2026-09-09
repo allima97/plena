@@ -15,6 +15,25 @@
 		onTogglePayment(t);
 	}
 
+	const details = $derived.by(() => {
+		const list = [];
+		list.push({ label: 'Tipo', value: t.isTransferencia ? 'Transferência' : t.tipo === 'receita' ? 'Receita' : 'Despesa' });
+		if (!t.isTransferencia) {
+			list.push({ label: 'Categoria', value: categoria?.nome || 'Sem categoria' });
+			if (subcategoria) list.push({ label: 'Subcategoria', value: subcategoria });
+		}
+		list.push({ label: 'Conta / cartão', value: conta?.nome || 'Sem conta' });
+		if (!t.isTransferencia) list.push({ label: 'Forma de pagamento', value: t.formaPagamento || '—' });
+		list.push({ label: 'Status', value: t.statusPagamento === 'pago' ? 'Pago' : 'Pendente', tone: t.statusPagamento === 'pago' ? 'positive' : undefined });
+		if (t.seriesId) {
+			list.push({
+				label: t.seriesKind === 'parcelado' ? 'Parcela' : 'Recorrência',
+				value: t.seriesKind === 'parcelado' ? `${t.parcelaAtual}/${t.parcelaTotal} · ${t.seriesStatus}` : t.seriesStatus
+			});
+		}
+		return list;
+	});
+
 	const actions = $derived.by(() => {
 		const list = [];
 		if (!t.isTransferencia) list.push({ label: 'Editar', icon: Pencil, onClick: () => onEditOccurrence(t) });
@@ -98,5 +117,6 @@
 	onClose={() => (actionsOpen = false)}
 	title={t.descricao || categoria?.nome || 'Lançamento'}
 	subtitle={`${t.tipo === 'receita' ? '+' : '−'} ${fmtMoney(t.valor)} · ${fmtDate(t.data)}`}
+	{details}
 	{actions}
 />
