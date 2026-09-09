@@ -3,12 +3,15 @@
 	import { appState, addTransactionSeries, updateTransaction, editSeries } from '$lib/fin/store.svelte.js';
 	import { FORMAS_PAGAMENTO_PADRAO } from '$lib/fin/seed.js';
 	import { todayISO } from '$lib/format.js';
+	import { Pencil, Copy, Trash2 } from 'lucide-svelte';
 
 	/**
 	 * mode: 'create' | 'edit-occurrence' | 'edit-series'
 	 * transaction: quando mode !== 'create', o lançamento (ou um representante da série) a editar
+	 * onDuplicate/onDelete/onEditSeries/onManageSeries: ações opcionais disponíveis na visualização
+	 * de uma ocorrência (mode 'edit-occurrence'), antes de destravar os campos para editar.
 	 */
-	let { open, mode = 'create', transaction = null, onClose } = $props();
+	let { open, mode = 'create', transaction = null, onClose, onDuplicate = null, onDelete = null, onEditSeries = null, onManageSeries = null } = $props();
 
 	function blank() {
 		return {
@@ -27,9 +30,12 @@
 	}
 
 	let form = $state(blank());
+	// Ao abrir para ver/editar uma ocorrência (mode 'edit-occurrence'), o modal começa travado
+	// (só visualização) -- "Editar" destrava os campos e vira "Salvar", como um app normal.
+	// 'create' e 'edit-series' continuam sempre editáveis, sem essa etapa de visualização.
+	let locked = $state(false);
 
-	$effect(() => {
-		if (!open) return;
+	function loadFromTransaction() {
 		if (transaction) {
 			form = {
 				tipo: transaction.tipo,
@@ -47,7 +53,35 @@
 		} else {
 			form = blank();
 		}
+	}
+
+	$effect(() => {
+		if (!open) return;
+		loadFromTransaction();
+		locked = mode === 'edit-occurrence';
 	});
+
+	function unlock() {
+		locked = false;
+	}
+	function cancelEdit() {
+		loadFromTransaction();
+		locked = true;
+	}
+	function handleDuplicateClick() {
+		onDuplicate?.(transaction);
+	}
+	function handleDeleteClick() {
+		onDelete?.(transaction);
+		onClose();
+	}
+	function handleEditSeriesClick() {
+		onEditSeries?.(transaction);
+	}
+	function handleManageSeriesClick(action) {
+		onManageSeries?.(transaction.seriesId, action);
+		onClose();
+	}
 
 	const categoriasDoTipo = $derived(appState.categories.filter((c) => c.tipo === form.tipo));
 	const categoriaSelecionada = $derived(appState.categories.find((c) => c.id === form.categoriaId));
@@ -83,7 +117,9 @@
 	);
 	const subtitle = $derived(
 		mode === 'edit-occurrence'
-			? 'Altera só esta ocorrência — o restante da série continua igual.'
+			? locked
+				? 'Visualização do lançamento — toque em Editar para alterar.'
+				: 'Altera só esta ocorrência — o restante da série continua igual.'
 			: mode === 'edit-series'
 				? 'Altera todas as ocorrências futuras ainda não pagas desta série.'
 				: 'Lançamento único, parcelado ou recorrente.'
@@ -91,6 +127,7 @@
 
 	function submit(e) {
 		e.preventDefault();
+		if (locked) return;
 		if (!form.valor || !form.data || !form.categoriaId) return;
 		const base = {
 			tipo: form.tipo,
@@ -120,10 +157,10 @@
 <Modal {open} {onClose} {title} {subtitle} maxWidth="560px">
 	<form onsubmit={submit} class="movement-form">
 		<div class="segmented">
-			<button type="button" class:active={form.tipo === 'despesa'} class="despesa" onclick={() => (form.tipo = 'despesa')}
+			<button type="button" class:active={form.tipo === 'despesa'} class="despesa" disabled={locked} onclick={() => (form.tipo = 'despesa')}
 				>Despesa</button
 			>
-			<button type="button" class:active={form.tipo === 'receita'} class="receita" onclick={() => (form.tipo = 'receita')}
+			<button type="button" class:active={form.tipo === 'receita'} class="receita" disabled={locked} onclick={() => (form.tipo = 'receita')}
 				>Receita</button
 			>
 		</div>
@@ -131,23 +168,23 @@
 		<div class="form-grid">
 			<label class="field">
 				<span>Valor (R$)</span>
-				<input class="field-input" type="number" step="0.01" min="0" required bind:value={form.valor} />
+				<input class="field-input" type="number" step="0.01" min="0" required disabled={locked} bind:value={form.valor} />
 			</label>
 			<label class="field">
 				<span>Data</span>
-				<input class="field-input" type="date" required bind:value={form.data} />
+				<input class="field-input" type="date" required disabled={locked} bind:value={form.data} />
 			</label>
 		</div>
 
 		<label class="field">
 			<span>Descrição</span>
-			<input class="field-input" type="text" placeholder="Ex.: Mercado do mês" bind:value={form.descricao} onblur={handleDescricaoBlur} />
+			<input class="field-input" type="text" placeholder="Ex.: Mercado do mês" disabled={locked} bind:value={form.descricao} onblur={handleDescricaoBlur} />
 		</label>
 
 		<div class="form-grid">
 			<label class="field">
 				<span>Categoria</span>
-				<select class="field-input" required bind:value={form.categoriaId}>
+				<select class="field-input" required disabled={locked} bind:value={form.categoriaId}>
 					<option value="" disabled>Selecione</option>
 					{#each categoriasDoTipo as c (c.id)}
 						<option value={c.id}>{c.nome}</option>
@@ -156,7 +193,7 @@
 			</label>
 			<label class="field">
 				<span>Subcategoria</span>
-				<select class="field-input" bind:value={form.subcategoriaId} disabled={!categoriaSelecionada?.secundarios?.length}>
+				<select class="field-input" disabled={locked || !categoriaSelecionada?.secundarios?.length} bind:value={form.subcategoriaId}>
 					<option value="">Nenhuma</option>
 					{#each categoriaSelecionada?.secundarios || [] as s (s.id)}
 						<option value={s.id}>{s.nome}</option>
@@ -168,7 +205,7 @@
 		<div class="form-grid">
 			<label class="field">
 				<span>Conta / cartão</span>
-				<select class="field-input" bind:value={form.contaId}>
+				<select class="field-input" disabled={locked} bind:value={form.contaId}>
 					<option value="">Sem conta</option>
 					{#each appState.accounts as a (a.id)}
 						<option value={a.id}>{a.nome}</option>
@@ -177,7 +214,7 @@
 			</label>
 			<label class="field">
 				<span>Forma de pagamento</span>
-				<select class="field-input" bind:value={form.formaPagamento}>
+				<select class="field-input" disabled={locked} bind:value={form.formaPagamento}>
 					{#each FORMAS_PAGAMENTO_PADRAO as f}
 						<option value={f}>{f}</option>
 					{/each}
@@ -215,9 +252,40 @@
 			{/if}
 		{/if}
 
+		{#if mode === 'edit-occurrence' && locked && transaction?.seriesId}
+			<div class="series-actions-row">
+				{#if onEditSeries}
+					<button type="button" class="btn btn-ghost sm" onclick={handleEditSeriesClick}>Editar série</button>
+				{/if}
+				{#if onManageSeries}
+					{#if transaction.seriesStatus === 'ativa'}
+						<button type="button" class="btn btn-ghost sm" onclick={() => handleManageSeriesClick('pausar')}>Pausar série</button>
+					{:else if transaction.seriesStatus === 'pausada'}
+						<button type="button" class="btn btn-ghost sm" onclick={() => handleManageSeriesClick('retomar')}>Retomar série</button>
+					{/if}
+					{#if transaction.seriesStatus !== 'cancelada'}
+						<button type="button" class="btn btn-ghost sm" onclick={() => handleManageSeriesClick('cancelar')}>Cancelar série</button>
+					{/if}
+				{/if}
+			</div>
+		{/if}
+
 		<div class="modal-footer">
-			<button type="submit" class="btn btn-primary">Salvar</button>
-			<button type="button" class="btn btn-ghost" onclick={onClose}>Cancelar</button>
+			{#if mode === 'edit-occurrence' && locked}
+				{#if onDuplicate && !transaction?.isTransferencia}
+					<button type="button" class="btn btn-ghost" onclick={handleDuplicateClick}><Copy size={16} /> Duplicar</button>
+				{/if}
+				{#if onDelete}
+					<button type="button" class="btn btn-danger" onclick={handleDeleteClick}><Trash2 size={16} /> Excluir</button>
+				{/if}
+				<button type="button" class="btn btn-primary" onclick={unlock}><Pencil size={16} /> Editar</button>
+			{:else if mode === 'edit-occurrence'}
+				<button type="button" class="btn btn-ghost" onclick={cancelEdit}>Cancelar</button>
+				<button type="submit" class="btn btn-primary">Salvar</button>
+			{:else}
+				<button type="submit" class="btn btn-primary">Salvar</button>
+				<button type="button" class="btn btn-ghost" onclick={onClose}>Cancelar</button>
+			{/if}
 		</div>
 	</form>
 </Modal>

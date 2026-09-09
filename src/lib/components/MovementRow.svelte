@@ -1,14 +1,18 @@
 <script>
 	import { fmtMoney, fmtDate } from '$lib/format.js';
-	import { ArrowDownRight, ArrowUpRight, ArrowLeftRight, Repeat, Layers, Pencil, Copy, Trash2, Pause, Play, Ban } from 'lucide-svelte';
+	import { ArrowDownRight, ArrowUpRight, ArrowLeftRight, Repeat, Layers, Trash2 } from 'lucide-svelte';
 	import RowActionsModal from './RowActionsModal.svelte';
 
-	let { t, categoria, subcategoria, conta, onTogglePayment, onEditOccurrence, onEditSeries, onManageSeries, onDuplicate, onDelete } = $props();
+	let { t, categoria, subcategoria, conta, onTogglePayment, onEditOccurrence, onDelete } = $props();
 
+	// Transferências não têm formulário de edição próprio (o de lançamento normal não serve
+	// pra elas) -- pra essas, o clique abre um resumo simples com a opção de excluir. As demais
+	// abrem o formulário de lançamento direto, travado pra visualização (ver NewMovementModal).
 	let actionsOpen = $state(false);
 
-	function openActions() {
-		actionsOpen = true;
+	function handleRowClick() {
+		if (t.isTransferencia) actionsOpen = true;
+		else onEditOccurrence(t);
 	}
 	function togglePaymentClick(e) {
 		e.stopPropagation();
@@ -18,46 +22,23 @@
 	const details = $derived.by(() => {
 		const list = [];
 		list.push({ label: 'Tipo', value: t.isTransferencia ? 'Transferência' : t.tipo === 'receita' ? 'Receita' : 'Despesa' });
-		if (!t.isTransferencia) {
-			list.push({ label: 'Categoria', value: categoria?.nome || 'Sem categoria' });
-			if (subcategoria) list.push({ label: 'Subcategoria', value: subcategoria });
-		}
 		list.push({ label: 'Conta / cartão', value: conta?.nome || 'Sem conta' });
-		if (!t.isTransferencia) list.push({ label: 'Forma de pagamento', value: t.formaPagamento || '—' });
 		list.push({ label: 'Status', value: t.statusPagamento === 'pago' ? 'Pago' : 'Pendente', tone: t.statusPagamento === 'pago' ? 'positive' : undefined });
-		if (t.seriesId) {
-			list.push({
-				label: t.seriesKind === 'parcelado' ? 'Parcela' : 'Recorrência',
-				value: t.seriesKind === 'parcelado' ? `${t.parcelaAtual}/${t.parcelaTotal} · ${t.seriesStatus}` : t.seriesStatus
-			});
-		}
 		return list;
 	});
 
-	const actions = $derived.by(() => {
-		const list = [];
-		if (!t.isTransferencia) list.push({ label: 'Editar', icon: Pencil, onClick: () => onEditOccurrence(t) });
-		if (t.seriesId) {
-			list.push({ label: 'Editar série', icon: Layers, onClick: () => onEditSeries(t) });
-			if (t.seriesStatus === 'ativa') list.push({ label: 'Pausar série', icon: Pause, onClick: () => onManageSeries(t.seriesId, 'pausar') });
-			else if (t.seriesStatus === 'pausada') list.push({ label: 'Retomar série', icon: Play, onClick: () => onManageSeries(t.seriesId, 'retomar') });
-			if (t.seriesStatus !== 'cancelada') list.push({ label: 'Cancelar série', icon: Ban, onClick: () => onManageSeries(t.seriesId, 'cancelar') });
-		}
-		if (!t.isTransferencia) list.push({ label: 'Duplicar', icon: Copy, onClick: () => onDuplicate(t) });
-		list.push({ label: 'Excluir', icon: Trash2, variant: 'danger', onClick: () => onDelete(t) });
-		return list;
-	});
+	const actions = $derived.by(() => [{ label: 'Excluir', icon: Trash2, variant: 'danger', onClick: () => onDelete(t) }]);
 </script>
 
 <div
 	class="movement-row"
 	role="button"
 	tabindex="0"
-	onclick={openActions}
+	onclick={handleRowClick}
 	onkeydown={(e) => {
 		if (e.key === 'Enter' || e.key === ' ') {
 			e.preventDefault();
-			openActions();
+			handleRowClick();
 		}
 	}}
 >

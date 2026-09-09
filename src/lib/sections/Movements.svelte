@@ -239,9 +239,6 @@ import TransferModal from '$lib/components/TransferModal.svelte';
 						conta={appState.accounts.find((a) => a.id === t.contaId)}
 						onTogglePayment={togglePayment}
 						onEditOccurrence={openEditOccurrence}
-						onEditSeries={openEditSeries}
-						onManageSeries={manageSeries}
-						onDuplicate={duplicateTransaction}
 						onDelete={handleDelete}
 					/>
 				{/each}
@@ -250,7 +247,16 @@ import TransferModal from '$lib/components/TransferModal.svelte';
 	{/if}
 </div>
 
-<NewMovementModal open={modal.open} mode={modal.mode} transaction={modal.transaction} onClose={closeModal} />
+<NewMovementModal
+	open={modal.open}
+	mode={modal.mode}
+	transaction={modal.transaction}
+	onClose={closeModal}
+	onDuplicate={duplicateTransaction}
+	onDelete={handleDelete}
+	onEditSeries={openEditSeries}
+	onManageSeries={manageSeries}
+/>
 <ReportCenterModal open={showReport} onClose={() => (showReport = false)} />
 <TransferModal open={showTransfer} onClose={() => (showTransfer = false)} />
 

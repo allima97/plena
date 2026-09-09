@@ -300,6 +300,12 @@ textarea.field-input {
 	color: var(--ink-faint);
 	font-weight: 500;
 }
+.field-input:disabled {
+	background: var(--surface-2);
+	color: var(--ink-soft);
+	cursor: default;
+	opacity: 1;
+}
 select.field-input {
 	appearance: none;
 	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2353636b' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
@@ -340,6 +346,9 @@ select.field-input {
 }
 .segmented button.active.receita {
 	color: var(--income);
+}
+.segmented button:disabled {
+	cursor: default;
 }
 
 /* Type chip (Receita/Despesa) */
@@ -1403,6 +1412,14 @@ table.list .num {
 	display: flex;
 	gap: 8px;
 	flex-wrap: wrap;
+}
+
+.series-actions-row {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+	padding-top: 12px;
+	border-top: 1px solid var(--border-soft);
 }
 
 .badge {
