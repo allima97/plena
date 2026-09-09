@@ -153,12 +153,6 @@
 		<div class="main-inner">
 			<header class="topbar">
 				<div class="topbar-left">
-					<button class="icon-btn mobile-only" onclick={() => (mobileNavOpen = true)} aria-label="Abrir menu">
-						<Menu size={19} />
-					</button>
-					<div class="mobile-only">
-						<p class="font-display brand-name-sm">Plena</p>
-					</div>
 					<p class="section-label">{activeLabel}</p>
 				</div>
 				<div class="topbar-right">
@@ -180,6 +174,9 @@
 						style="border:none;cursor:{appState.user ? 'pointer' : 'default'}"
 					>
 						{initials}
+					</button>
+					<button class="icon-btn mobile-only" onclick={() => (mobileNavOpen = true)} aria-label="Abrir menu">
+						<Menu size={19} />
 					</button>
 				</div>
 			</header>
