@@ -5,9 +5,10 @@
 	import { fmtMoney, todayISO } from '$lib/format.js';
 	import Modal from '$lib/components/Modal.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import RowActionsModal from '$lib/components/RowActionsModal.svelte';
 	import BarChart from '$lib/components/charts/BarChart.svelte';
 	import DonutChart from '$lib/components/charts/DonutChart.svelte';
-	import { Plus, Landmark, TrendingUp, TrendingDown, Wallet, Building2, MoreHorizontal } from 'lucide-svelte';
+	import { Plus, Landmark, TrendingUp, TrendingDown, Wallet, Building2, Pencil, Trash2, History } from 'lucide-svelte';
 
 	const MES_ABBR = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 	const TIPO_LABELS = { investimento: 'Investimento', imovel: 'Imóvel', outro: 'Outro ativo' };
@@ -15,7 +16,7 @@
 	let showModal = $state(false);
 	let editing = $state(null);
 	let deleting = $state(null);
-	let menuOpenId = $state(null);
+	let rowActions = $state({ open: false, title: '', subtitle: '', actions: [] });
 
 	// Histórico de aportes/valorização por ativo (P4.4).
 	let historyModal = $state({ open: false, item: null });
@@ -26,7 +27,18 @@
 	function openHistory(item) {
 		historyModal = { open: true, item };
 		moveForm = blankMove();
-		menuOpenId = null;
+	}
+	function openPatrimonyItemActions(item) {
+		rowActions = {
+			open: true,
+			title: item.nome,
+			subtitle: TIPO_LABELS[item.tipo] || 'Outro',
+			actions: [
+				{ label: 'Histórico', icon: History, onClick: () => openHistory(item) },
+				{ label: 'Editar', icon: Pencil, onClick: () => openEdit(item) },
+				{ label: 'Excluir', icon: Trash2, variant: 'danger', onClick: () => (deleting = item) }
+			]
+		};
 	}
 	const historyMoves = $derived(
 		historyModal.item
@@ -57,7 +69,6 @@
 		editing = item;
 		form = { tipo: item.tipo, nome: item.nome, valor: item.valor };
 		showModal = true;
-		menuOpenId = null;
 	}
 	function submit(e) {
 		e.preventDefault();
@@ -276,23 +287,21 @@
 		</div>
 		{#if appState.patrimonyItems.length}
 			{#each appState.patrimonyItems as item (item.id)}
-				<div class="patrimony-row">
+				<div
+					class="patrimony-row"
+					role="button"
+					tabindex="0"
+					onclick={() => openPatrimonyItemActions(item)}
+					onkeydown={(e) => {
+						if (e.key === 'Enter' || e.key === ' ') {
+							e.preventDefault();
+							openPatrimonyItemActions(item);
+						}
+					}}
+				>
 					<span class="patrimony-row-name">{item.nome} <span class="patrimony-row-tag">{TIPO_LABELS[item.tipo] || 'Outro'}</span></span>
 					<div class="patrimony-row-actions">
 						<span class="patrimony-row-value privacy-value">{fmtMoney(item.valor)}</span>
-						<div class="account-menu-wrap">
-							<button class="account-menu-btn" onclick={() => (menuOpenId = menuOpenId === item.id ? null : item.id)} aria-label="Mais opções">
-								<MoreHorizontal size={16} />
-							</button>
-							{#if menuOpenId === item.id}
-								<div class="menu-backdrop" onclick={() => (menuOpenId = null)} role="presentation"></div>
-								<div class="account-menu">
-									<button onclick={() => openHistory(item)}>Histórico</button>
-									<button onclick={() => openEdit(item)}>Editar</button>
-									<button class="danger" onclick={() => { deleting = item; menuOpenId = null; }}>Excluir</button>
-								</div>
-							{/if}
-						</div>
 					</div>
 				</div>
 			{/each}
@@ -339,6 +348,14 @@
 		</div>
 	</form>
 </Modal>
+
+<RowActionsModal
+	open={rowActions.open}
+	onClose={() => (rowActions = { ...rowActions, open: false })}
+	title={rowActions.title}
+	subtitle={rowActions.subtitle}
+	actions={rowActions.actions}
+/>
 
 <ConfirmDialog
 	open={deleting !== null}

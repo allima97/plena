@@ -1777,6 +1777,12 @@ table.list .num {
 	padding: 16px 0;
 	border-bottom: 1px solid var(--border-soft);
 	flex-wrap: wrap;
+	cursor: pointer;
+	border-radius: var(--radius-md);
+	transition: background 0.15s ease;
+}
+.movement-row:hover {
+	background: var(--surface-2);
 }
 .movement-row:last-child {
 	border-bottom: none;
@@ -1873,18 +1879,6 @@ table.list .num {
 	font-size: 11px;
 	font-weight: 600;
 	color: var(--ink-faint);
-}
-.movement-actions {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 4px;
-	width: 100%;
-	justify-content: flex-end;
-}
-@media (min-width: 860px) {
-	.movement-actions {
-		width: auto;
-	}
 }
 .btn.sm {
 	min-height: 30px;
@@ -2264,12 +2258,17 @@ table.list .num {
 	border-radius: var(--radius-md);
 	overflow: hidden;
 	margin-bottom: 10px;
+	cursor: pointer;
+	transition: background 0.15s ease;
 }
 .inst-card:last-child {
 	margin-bottom: 0;
 }
 .inst-card.is-ref {
 	border-color: var(--ring);
+}
+.inst-card:hover .inst-row {
+	background: var(--surface-2);
 }
 .inst-row {
 	display: flex;
@@ -2279,7 +2278,6 @@ table.list .num {
 	padding: 12px 14px;
 	background: var(--card);
 	border: none;
-	cursor: pointer;
 	color: inherit;
 	font: inherit;
 	text-align: left;
@@ -2302,17 +2300,6 @@ table.list .num {
 	text-align: right;
 	font-variant-numeric: tabular-nums;
 }
-.inst-actions {
-	display: flex;
-	align-items: center;
-	gap: 2px;
-	flex-shrink: 0;
-}
-.inst-body {
-	border-top: 1px solid var(--border-soft);
-	background: var(--surface-2);
-	padding: 12px 14px 14px;
-}
 .inst-grid {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
@@ -2334,24 +2321,7 @@ table.list .num {
 	margin-top: 4px;
 	padding-top: 8px;
 }
-.inst-body-actions {
-	display: none;
-}
 @media (max-width: 640px) {
-	.inst-actions {
-		display: none;
-	}
-	.inst-body-actions {
-		display: flex;
-		gap: 10px;
-		margin-top: 12px;
-		padding-top: 12px;
-		border-top: 1px solid var(--border-soft);
-	}
-	.inst-body-actions .btn {
-		flex: 1;
-		justify-content: center;
-	}
 	.inst-row {
 		flex-wrap: wrap;
 		row-gap: 6px;
@@ -2502,6 +2472,11 @@ table.list .num {
 	justify-content: space-between;
 	color: #fff;
 	box-shadow: var(--shadow-card);
+	cursor: pointer;
+	transition: transform 0.15s ease;
+}
+.account-tile:not(.add-tile):hover {
+	transform: translateY(-2px);
 }
 .tile-decor-wrap {
 	position: absolute;
@@ -3903,6 +3878,14 @@ table.list .num {
 }
 .patrimony-row:last-child {
 	border-bottom: none;
+}
+.patrimony-row[role='button'] {
+	cursor: pointer;
+	border-radius: var(--radius-md);
+	transition: background 0.15s ease;
+}
+.patrimony-row[role='button']:hover {
+	background: var(--surface-2);
 }
 .patrimony-move-list {
 	margin-top: 16px;

@@ -4,7 +4,8 @@
 	import { fmtMoney, todayISO } from '$lib/format.js';
 	import Modal from '$lib/components/Modal.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
-	import { Plus, Wallet, CreditCard, Landmark, MoreHorizontal } from 'lucide-svelte';
+	import RowActionsModal from '$lib/components/RowActionsModal.svelte';
+	import { Plus, Wallet, CreditCard, Landmark, Pencil, Trash2 } from 'lucide-svelte';
 
 	const PALETTE = ['grad-red', 'grad-purple', 'grad-blue', 'grad-dark', 'grad-orange', 'grad-green'];
 	const PALETTE_LABELS = { 'grad-red': 'Vermelho', 'grad-purple': 'Roxo', 'grad-blue': 'Azul', 'grad-dark': 'Escuro', 'grad-orange': 'Laranja', 'grad-green': 'Verde' };
@@ -12,7 +13,18 @@
 	let showModal = $state(false);
 	let editing = $state(null);
 	let deleting = $state(null);
-	let menuOpenId = $state(null);
+	let rowActions = $state({ open: false, title: '', subtitle: '', actions: [] });
+	function openAccountActions(acc) {
+		rowActions = {
+			open: true,
+			title: acc.nome,
+			subtitle: acc.tipo === 'cartao' ? 'Cartão de crédito' : 'Conta corrente',
+			actions: [
+				{ label: 'Editar', icon: Pencil, onClick: () => openEdit(acc) },
+				{ label: 'Excluir', icon: Trash2, variant: 'danger', onClick: () => (deleting = acc) }
+			]
+		};
+	}
 
 	function blank() {
 		return { nome: '', tipo: 'conta', banco: '', saldoInicial: 0, limite: 0, fechamento: '', cor: '' };
@@ -28,7 +40,6 @@
 		editing = acc;
 		form = { nome: acc.nome, tipo: acc.tipo, banco: acc.banco || '', saldoInicial: acc.saldoInicial || 0, limite: acc.limite || 0, fechamento: acc.fechamento || '', cor: acc.cor || PALETTE[appState.accounts.indexOf(acc) % PALETTE.length] };
 		showModal = true;
-		menuOpenId = null;
 	}
 	function submit(e) {
 		e.preventDefault();
@@ -74,7 +85,18 @@
 <div class="account-grid">
 	{#each appState.accounts as acc, i (acc.id)}
 		{@const grad = acc.cor || PALETTE[i % PALETTE.length]}
-		<div class="account-tile {grad}">
+		<div
+			class="account-tile {grad}"
+			role="button"
+			tabindex="0"
+			onclick={() => openAccountActions(acc)}
+			onkeydown={(e) => {
+				if (e.key === 'Enter' || e.key === ' ') {
+					e.preventDefault();
+					openAccountActions(acc);
+				}
+			}}
+		>
 			<div class="tile-decor-wrap">
 				<div class="tile-decor d1"></div>
 				<div class="tile-decor d2"></div>
@@ -86,18 +108,6 @@
 						<p class="account-tile-name">{acc.nome}</p>
 						<p class="account-tile-type">{acc.tipo === 'cartao' ? 'Cartão de crédito' : 'Conta corrente'}</p>
 					</div>
-				</div>
-				<div class="account-menu-wrap">
-					<button class="account-menu-btn" onclick={() => (menuOpenId = menuOpenId === acc.id ? null : acc.id)} aria-label="Mais opções">
-						<MoreHorizontal size={18} />
-					</button>
-					{#if menuOpenId === acc.id}
-						<div class="menu-backdrop" onclick={() => (menuOpenId = null)} role="presentation"></div>
-						<div class="account-menu">
-							<button onclick={() => openEdit(acc)}>Editar</button>
-							<button class="danger" onclick={() => { deleting = acc; menuOpenId = null; }}>Excluir</button>
-						</div>
-					{/if}
 				</div>
 			</div>
 			<div class="account-tile-body">
@@ -200,6 +210,14 @@
 		</div>
 	</form>
 </Modal>
+
+<RowActionsModal
+	open={rowActions.open}
+	onClose={() => (rowActions = { ...rowActions, open: false })}
+	title={rowActions.title}
+	subtitle={rowActions.subtitle}
+	actions={rowActions.actions}
+/>
 
 <ConfirmDialog
 	open={deleting !== null}

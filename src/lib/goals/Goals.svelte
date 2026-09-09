@@ -17,6 +17,8 @@
 	import MoveFormModal from './MoveFormModal.svelte';
 	import InstallmentFormModal from './InstallmentFormModal.svelte';
 	import AmortizationFormModal from './AmortizationFormModal.svelte';
+	import RowActionsModal from '$lib/components/RowActionsModal.svelte';
+	import Modal from '$lib/components/Modal.svelte';
 	import { Plus, Archive, ArchiveRestore, Pencil, Trash2, ChevronDown, ChevronUp, Wallet, Eye, X, Minus } from 'lucide-svelte';
 
 	const MONTH_ABBR = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -29,8 +31,18 @@
 	let expandedAmortCard = $state({}); // goalId -> expandido? (padrao: fechado)
 	let amortPage = $state({}); // goalId -> pagina atual
 
-	let expandedInstallment = $state({}); // installmentId -> expandido? (padrao: fechado)
 	let instPage = $state({}); // goalId -> pagina atual
+
+	// Modal genérico de ações de uma linha (movimentação de recurso ou
+	// amortização) -- substitui os botões "Editar/Excluir" sempre visíveis.
+	let rowActions = $state({ open: false, title: '', subtitle: '', actions: [] });
+	function openRowActions(config) {
+		rowActions = { open: true, ...config };
+	}
+
+	// Prestação selecionada para o modal de detalhes/ações (substitui o
+	// expandir-em-linha + botões de ícone que existiam antes).
+	let installmentDetail = $state({ open: false, installment: null });
 	let instFindMonth = $state(''); // "YYYY-MM" digitado na busca de Ultimas Prestacoes
 
 	let installmentYear = $state(null); // ano escolhido em "Prestacoes do financiamento"
@@ -377,17 +389,30 @@
 									<button class="btn btn-danger sm" onclick={() => (deleting = { kind: 'resource', id: r.id, label: `"${r.name}"`, warn: 'O histórico de movimentações desse recurso será apagado.' })}>Excluir recurso</button>
 								</div>
 								{#each mp.items as mv (mv.id)}
-									<div class="movement-row" style="padding:10px 0">
+									<div
+										class="movement-row"
+										style="padding:10px 0"
+										role="button"
+										tabindex="0"
+										onclick={() =>
+											openRowActions({
+												title: mv.description,
+												subtitle: fmtDate(mv.date),
+												actions: [
+													{ label: 'Editar', icon: Pencil, onClick: () => (moveModal = { open: true, resourceId: r.id, goalId: selectedGoal.id, editing: mv }) },
+													{ label: 'Excluir', icon: Trash2, variant: 'danger', onClick: () => (deleting = { kind: 'move', id: mv.id, label: `"${mv.description}"`, warn: '' }) }
+												]
+											})}
+										onkeydown={(e) => {
+											if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click();
+										}}
+									>
 										<div class="movement-info">
 											<p class="movement-desc">{mv.description}</p>
 											<p class="movement-meta">{fmtDate(mv.date)}</p>
 										</div>
 										<div class="movement-amount">
 											<p class="font-display privacy-value" class:money-in={mv.amount >= 0} class:money-out={mv.amount < 0}>{fmtMoney(mv.amount)}</p>
-										</div>
-										<div class="movement-actions">
-											<button class="btn btn-ghost sm" onclick={() => (moveModal = { open: true, resourceId: r.id, goalId: selectedGoal.id, editing: mv })}>Editar</button>
-											<button class="btn btn-danger sm" onclick={() => (deleting = { kind: 'move', id: mv.id, label: `"${mv.description}"`, warn: '' })}>Excluir</button>
 										</div>
 									</div>
 								{:else}
@@ -434,16 +459,29 @@
 							{#if expandedAmortCard[selectedGoal.id]}
 								<div class="resource-body">
 									{#each ap.items as a (a.id)}
-										<div class="movement-row" style="padding:10px 0">
+										<div
+											class="movement-row"
+											style="padding:10px 0"
+											role="button"
+											tabindex="0"
+											onclick={() =>
+												openRowActions({
+													title: a.tipo,
+													subtitle: fmtDate(a.date),
+													actions: [
+														{ label: 'Editar', icon: Pencil, onClick: () => (amortModal = { open: true, goalId: selectedGoal.id, editing: a }) },
+														{ label: 'Excluir', icon: Trash2, variant: 'danger', onClick: () => (deleting = { kind: 'amortization', id: a.id, label: 'esta amortização', warn: '' }) }
+													]
+												})}
+											onkeydown={(e) => {
+												if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click();
+											}}
+										>
 											<div class="movement-info">
 												<p class="movement-desc">{a.tipo}</p>
 												<p class="movement-meta">{fmtDate(a.date)}</p>
 											</div>
 											<div class="movement-amount"><p class="font-display money-out privacy-value">-{fmtMoney(a.amount)}</p></div>
-											<div class="movement-actions">
-												<button class="btn btn-ghost sm" onclick={() => (amortModal = { open: true, goalId: selectedGoal.id, editing: a })}>Editar</button>
-												<button class="btn btn-danger sm" onclick={() => (deleting = { kind: 'amortization', id: a.id, label: 'esta amortização', warn: '' })}>Excluir</button>
-											</div>
 										</div>
 									{/each}
 									{#if metrics.amortizations.length > 5}
@@ -705,40 +743,24 @@
 							<p class="empty">Nenhuma prestação encontrada para esse mês/ano.</p>
 						{:else}
 							{#each listInsts as it (it.id)}
-								<div class="inst-card" class:is-ref={compositionRef && it.id === compositionRef.id}>
-									<div class="inst-row" role="button" tabindex="0" onclick={() => (expandedInstallment = { ...expandedInstallment, [it.id]: !expandedInstallment[it.id] })} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); expandedInstallment = { ...expandedInstallment, [it.id]: !expandedInstallment[it.id] }; } }}>
-										<span style="color:var(--ink-faint);display:flex;transform:rotate({expandedInstallment[it.id] ? 90 : 0}deg)"><ChevronDown size={15} /></span>
+								<div
+									class="inst-card"
+									class:is-ref={compositionRef && it.id === compositionRef.id}
+									role="button"
+									tabindex="0"
+									onclick={() => (installmentDetail = { open: true, installment: it })}
+									onkeydown={(e) => {
+										if (e.key === 'Enter' || e.key === ' ') {
+											e.preventDefault();
+											installmentDetail = { open: true, installment: it };
+										}
+									}}
+								>
+									<div class="inst-row">
 										<span class="inst-num">Nº {it.number}</span>
 										<span class="inst-date">{fmtDate(it.date)}</span>
 										<span class="font-display inst-val privacy-value">{fmtMoney(it.valorPrestacao)}</span>
-										<span class="inst-actions">
-											<button class="btn btn-ghost sm" title="Ver composição em Encargos e Abatimentos" onclick={(e) => { e.stopPropagation(); viewComposition(it.id); }}><Eye size={14} /></button>
-											<button class="btn btn-ghost sm" title="Editar" onclick={(e) => { e.stopPropagation(); installmentModal = { open: true, goalId: selectedGoal.id, editing: it }; }}><Pencil size={14} /></button>
-											<button class="btn btn-danger sm" title="Remover" onclick={(e) => { e.stopPropagation(); deleting = { kind: 'installment', id: it.id, label: `prestação nº ${it.number}`, warn: '' }; }}><Trash2 size={14} /></button>
-										</span>
 									</div>
-									{#if expandedInstallment[it.id]}
-										<div class="inst-body">
-											<div class="inst-grid">
-												<span class="k">Amortização</span><span class="v privacy-value">{fmtMoney(it.amortizacao)}</span>
-												<span class="k">Juros</span><span class="v privacy-value">{fmtMoney(it.juros)}</span>
-												<span class="k">Seguros</span><span class="v privacy-value">{fmtMoney(it.seguros)}</span>
-												<span class="k">Taxas</span><span class="v privacy-value">{fmtMoney(it.taxas)}</span>
-												<span class="k">Encargo líquido</span><span class="v privacy-value">{fmtMoney(it.encargoLiquido)}</span>
-												<span class="k">Valor devido</span><span class="v privacy-value">{fmtMoney(it.valorDevido)}</span>
-												<span class="k">Valor da diferença</span><span class="v privacy-value">{fmtMoney(it.valorDiferenca)}</span>
-												<span class="k">Correção monetária</span><span class="v privacy-value">{fmtMoney(it.correcaoMonetaria)}</span>
-												<div class="full" style="grid-column:1/-1;display:flex;justify-content:space-between;align-items:center">
-													<span class="k" style="font-weight:700">Saldo devedor</span><span class="v privacy-value" style="font-size:13.5px">{fmtMoney(it.saldoDevedor)}</span>
-												</div>
-											</div>
-											<div class="inst-body-actions">
-												<button type="button" class="btn sm" class:btn-primary={compositionRef && it.id === compositionRef.id} onclick={() => viewComposition(it.id)}><Eye size={14} /> Ver</button>
-												<button type="button" class="btn btn-primary sm" onclick={() => (installmentModal = { open: true, goalId: selectedGoal.id, editing: it })}><Pencil size={14} /> Editar</button>
-												<button type="button" class="btn btn-danger sm" onclick={() => (deleting = { kind: 'installment', id: it.id, label: `prestação nº ${it.number}`, warn: '' })}><Trash2 size={14} /> Excluir</button>
-											</div>
-										</div>
-									{/if}
 								</div>
 							{/each}
 						{/if}
@@ -763,6 +785,75 @@
 <MoveFormModal open={moveModal.open} resourceId={moveModal.resourceId} goalId={moveModal.goalId} editing={moveModal.editing} onClose={() => (moveModal = { ...moveModal, open: false })} />
 <InstallmentFormModal open={installmentModal.open} goalId={installmentModal.goalId} editing={installmentModal.editing} onClose={() => (installmentModal = { ...installmentModal, open: false })} />
 <AmortizationFormModal open={amortModal.open} goalId={amortModal.goalId} editing={amortModal.editing} onClose={() => (amortModal = { ...amortModal, open: false })} />
+
+<RowActionsModal
+	open={rowActions.open}
+	onClose={() => (rowActions = { ...rowActions, open: false })}
+	title={rowActions.title}
+	subtitle={rowActions.subtitle}
+	actions={rowActions.actions}
+/>
+
+<Modal
+	open={installmentDetail.open}
+	onClose={() => (installmentDetail = { ...installmentDetail, open: false })}
+	title={installmentDetail.installment ? `Prestação nº ${installmentDetail.installment.number}` : ''}
+	subtitle={installmentDetail.installment ? `${fmtDate(installmentDetail.installment.date)} · ${fmtMoney(installmentDetail.installment.valorPrestacao)}` : ''}
+	maxWidth="440px"
+>
+	{#if installmentDetail.installment}
+		{@const it = installmentDetail.installment}
+		<div class="inst-grid">
+			<span class="k">Amortização</span><span class="v privacy-value">{fmtMoney(it.amortizacao)}</span>
+			<span class="k">Juros</span><span class="v privacy-value">{fmtMoney(it.juros)}</span>
+			<span class="k">Seguros</span><span class="v privacy-value">{fmtMoney(it.seguros)}</span>
+			<span class="k">Taxas</span><span class="v privacy-value">{fmtMoney(it.taxas)}</span>
+			<span class="k">Encargo líquido</span><span class="v privacy-value">{fmtMoney(it.encargoLiquido)}</span>
+			<span class="k">Valor devido</span><span class="v privacy-value">{fmtMoney(it.valorDevido)}</span>
+			<span class="k">Valor da diferença</span><span class="v privacy-value">{fmtMoney(it.valorDiferenca)}</span>
+			<span class="k">Correção monetária</span><span class="v privacy-value">{fmtMoney(it.correcaoMonetaria)}</span>
+			<div class="full" style="grid-column:1/-1;display:flex;justify-content:space-between;align-items:center">
+				<span class="k" style="font-weight:700">Saldo devedor</span><span class="v privacy-value" style="font-size:13.5px">{fmtMoney(it.saldoDevedor)}</span>
+			</div>
+		</div>
+	{/if}
+	{#snippet footer()}
+		{#if installmentDetail.installment}
+			{@const it = installmentDetail.installment}
+			<button
+				type="button"
+				class="btn sm"
+				class:btn-primary={compositionRef && it.id === compositionRef.id}
+				onclick={() => {
+					installmentDetail = { ...installmentDetail, open: false };
+					viewComposition(it.id);
+				}}
+			>
+				<Eye size={14} /> Ver composição
+			</button>
+			<button
+				type="button"
+				class="btn btn-primary sm"
+				onclick={() => {
+					installmentDetail = { ...installmentDetail, open: false };
+					installmentModal = { open: true, goalId: selectedGoal.id, editing: it };
+				}}
+			>
+				<Pencil size={14} /> Editar
+			</button>
+			<button
+				type="button"
+				class="btn btn-danger sm"
+				onclick={() => {
+					installmentDetail = { ...installmentDetail, open: false };
+					deleting = { kind: 'installment', id: it.id, label: `prestação nº ${it.number}`, warn: '' };
+				}}
+			>
+				<Trash2 size={14} /> Excluir
+			</button>
+		{/if}
+	{/snippet}
+</Modal>
 
 <ConfirmDialog
 	open={deleting !== null}
