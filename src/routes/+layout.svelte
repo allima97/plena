@@ -70,10 +70,10 @@
 	const activeLabel = $derived(navItems.find((n) => isActive(n.href))?.label ?? 'Plena');
 
 	const bottomNavItems = [
-		{ href: '/', label: 'Início', icon: LayoutDashboard },
-		{ href: '/movimentacoes', label: 'Mov.', icon: ReceiptText }
+		{ href: '/', label: 'Início', icon: LayoutDashboard }
 	];
 	const bottomNavItemsEnd = [
+		{ href: '/movimentacoes', label: 'Mov.', icon: ReceiptText },
 		{ href: '/objetivos', label: 'Objetivos', icon: Target }
 	];
 
