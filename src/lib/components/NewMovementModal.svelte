@@ -270,15 +270,15 @@
 			</div>
 		{/if}
 
-		<div class="modal-footer">
+		<div class="modal-footer" class:view-footer={mode === 'edit-occurrence' && locked}>
 			{#if mode === 'edit-occurrence' && locked}
+				<button type="button" class="btn btn-primary" onclick={unlock}><Pencil size={16} /> Editar</button>
 				{#if onDuplicate && !transaction?.isTransferencia}
 					<button type="button" class="btn btn-ghost" onclick={handleDuplicateClick}><Copy size={16} /> Duplicar</button>
 				{/if}
 				{#if onDelete}
 					<button type="button" class="btn btn-danger" onclick={handleDeleteClick}><Trash2 size={16} /> Excluir</button>
 				{/if}
-				<button type="button" class="btn btn-primary" onclick={unlock}><Pencil size={16} /> Editar</button>
 			{:else if mode === 'edit-occurrence'}
 				<button type="button" class="btn btn-ghost" onclick={cancelEdit}>Cancelar</button>
 				<button type="submit" class="btn btn-primary">Salvar</button>
@@ -289,3 +289,23 @@
 		</div>
 	</form>
 </Modal>
+
+<style>
+	/* Rodapé do modo visualização (Editar/Duplicar/Excluir): sempre na ordem do
+	   DOM (Editar, Duplicar, Excluir) e sempre na mesma linha, mesmo no mobile
+	   -- diferente do rodapé padrão (.modal-footer), que é row-reverse pra
+	   destacar a ação primária (Salvar) à direita nos outros modos. */
+	.modal-footer.view-footer {
+		flex-direction: row;
+		flex-wrap: nowrap;
+	}
+	@media (max-width: 480px) {
+		.modal-footer.view-footer .btn {
+			flex: 1 1 0;
+			gap: 4px;
+			padding: 0 8px;
+			font-size: 12px;
+			white-space: nowrap;
+		}
+	}
+</style>
