@@ -153,9 +153,7 @@
 		<div class="main-inner">
 			<header class="topbar">
 				<div class="topbar-left">
-					<button class="icon-btn mobile-only" onclick={() => (mobileNavOpen = true)} aria-label="Abrir menu">
-						<Menu size={19} />
-					</button>
+					<img src="/icons/icon-192.png" alt="Plena" class="brand-mark topbar-logo mobile-only" />
 					<p class="section-label">{activeLabel}</p>
 				</div>
 				<div class="topbar-right">
@@ -195,6 +193,10 @@
 <ToastHost />
 
 <nav class="bottom-nav">
+	<button class="bottom-nav-item" onclick={() => (mobileNavOpen = true)} aria-label="Mais opções">
+		<Menu size={20} />
+		<span>Mais</span>
+	</button>
 	{#each bottomNavItems as item (item.href)}
 		<a href={item.href} class="bottom-nav-item" class:active={isActive(item.href)}>
 			<item.icon size={20} strokeWidth={isActive(item.href) ? 2.2 : 1.8} />
@@ -210,8 +212,4 @@
 			<span>{item.label}</span>
 		</a>
 	{/each}
-	<button class="bottom-nav-item" onclick={() => (mobileNavOpen = true)} aria-label="Mais opções">
-		<Menu size={20} />
-		<span>Mais</span>
-	</button>
 </nav>

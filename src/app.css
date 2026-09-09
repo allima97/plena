@@ -965,6 +965,11 @@ table.list .num {
 	align-items: center;
 	gap: 12px;
 }
+.topbar-logo {
+	width: 34px;
+	height: 34px;
+	border-radius: 11px;
+}
 .topbar-right {
 	display: flex;
 	align-items: center;
