@@ -497,7 +497,7 @@ table.list .num {
 .sidebar {
 	position: fixed;
 	inset: 0 auto 0 0;
-	z-index: 40;
+	z-index: 47;
 	width: 248px;
 	display: flex;
 	flex-direction: column;
@@ -506,6 +506,11 @@ table.list .num {
 	padding: 24px 20px;
 	transform: translateX(-100%);
 	transition: transform 0.22s ease;
+}
+@media (max-width: 1023px) {
+	.sidebar {
+		padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+	}
 }
 @media (min-width: 1024px) {
 	.sidebar {
@@ -523,7 +528,7 @@ table.list .num {
 	display: block;
 	position: fixed;
 	inset: 0;
-	z-index: 35;
+	z-index: 46;
 	background: rgba(23, 33, 43, 0.45);
 }
 @media (min-width: 1024px) {
@@ -613,6 +618,18 @@ table.list .num {
 	background: rgba(255, 255, 255, 0.1);
 	color: #fff;
 	box-shadow: inset 3px 0 0 var(--mint);
+}
+.logout-btn {
+	width: 100%;
+	border: none;
+	background: none;
+	cursor: pointer;
+	font-family: inherit;
+	text-align: left;
+	margin-top: 12px;
+}
+.logout-btn:hover {
+	color: #f6ab9e;
 }
 
 .sidebar-footer {

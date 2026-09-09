@@ -13,6 +13,7 @@
 		Landmark,
 		Menu,
 		X,
+		LogOut,
 		Search,
 		Bell,
 		Eye,
@@ -144,6 +145,12 @@
 					Carregando…
 				{/if}
 			</div>
+			{#if appState.user?.logoutUrl}
+				<button class="nav-item logout-btn" onclick={handleAvatarClick}>
+					<LogOut size={18} strokeWidth={1.8} />
+					<span>Sair</span>
+				</button>
+			{/if}
 		</div>
 	</aside>
 
