@@ -137,6 +137,27 @@
 		return prior.length ? prior[prior.length - 1] : null;
 	});
 	const scoreDelta = $derived(scorePrevMonth ? financialScore.overall - scorePrevMonth.overall : null);
+
+	// Orçamento por categoria (P2.3): categorias de despesa com orçamento mensal definido,
+	// gasto do mês corrente e % de uso -- mesma fonte de dados de Categories.svelte.
+	const categoriasComOrcamento = $derived.by(() => {
+		const mesTx = monthTransactions(appState.transactions, currentMonthKey());
+		return appState.categories
+			.filter((c) => c.tipo === 'despesa' && c.orcamentoMensal)
+			.map((c) => {
+				const gasto = mesTx.filter((t) => t.categoriaId === c.id).reduce((s, t) => s + (Number(t.valor) || 0), 0);
+				const pct = Math.min(100, Math.round((gasto / c.orcamentoMensal) * 100));
+				return { cat: c, gasto, pct };
+			})
+			.sort((a, b) => b.pct - a.pct);
+	});
+	function corOrcamento(pct) {
+		if (pct >= 100) return 'var(--expense)';
+		if (pct >= 80) return 'var(--kpi-amber, #a67c1e)';
+		return 'var(--income)';
+	}
+	const gastoTotalMes = $derived(monthTransactions(appState.transactions, currentMonthKey()).filter((t) => t.tipo === 'despesa' && !t.isTransferencia).reduce((s, t) => s + (Number(t.valor) || 0), 0));
+	const pctOrcamentoGlobal = $derived(appState.budgetGlobal ? Math.min(100, Math.round((gastoTotalMes / appState.budgetGlobal) * 100)) : null);
 	const insights = $derived(buildInsights(intelligenceInput, 3));
 	const INSIGHT_LABELS = { comportamento: 'Comportamento', oportunidade: 'Oportunidade', risco: 'Risco', objetivo: 'Objetivo', cartao: 'Cartão' };
 	function scoreColor(v) {
@@ -209,6 +230,113 @@
 		return Math.max(1, lastDay - now.getDate() + 1);
 	});
 	const gastoDiario = $derived(saldoDisponivel > 0 ? saldoDisponivel / diasRestantesMes : 0);
+
+	// Resumo semanal (P3.3): compara o gasto da semana corrente (até hoje) com a janela
+	// equivalente da semana anterior (mesmo número de dias), para não distorcer com semana
+	// parcial vs. semana cheia.
+	function isoAddDays(iso, days) {
+		const d = new Date(iso + 'T12:00:00');
+		d.setDate(d.getDate() + days);
+		const pad = (n) => String(n).padStart(2, '0');
+		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+	}
+	function mondayOf(iso) {
+		const d = new Date(iso + 'T12:00:00');
+		const dow = d.getDay(); // 0=domingo
+		const diff = dow === 0 ? -6 : 1 - dow;
+		return isoAddDays(iso, diff);
+	}
+	const resumoSemanal = $derived.by(() => {
+		const hoje = todayISO();
+		const inicioSemana = mondayOf(hoje);
+		const diasDecorridos = Math.round((new Date(hoje) - new Date(inicioSemana)) / 86400000) + 1;
+		const inicioSemanaAnterior = isoAddDays(inicioSemana, -7);
+		const fimSemanaAnterior = isoAddDays(inicioSemanaAnterior, diasDecorridos - 1);
+
+		const despesasSemana = appState.transactions.filter((t) => t.tipo === 'despesa' && !t.isTransferencia && t.data >= inicioSemana && t.data <= hoje);
+		const despesasSemanaAnterior = appState.transactions.filter((t) => t.tipo === 'despesa' && !t.isTransferencia && t.data >= inicioSemanaAnterior && t.data <= fimSemanaAnterior);
+		const receitasSemana = appState.transactions.filter((t) => t.tipo === 'receita' && !t.isTransferencia && t.data >= inicioSemana && t.data <= hoje);
+
+		const gastoSemana = despesasSemana.reduce((s, t) => s + (Number(t.valor) || 0), 0);
+		const gastoSemanaAnterior = despesasSemanaAnterior.reduce((s, t) => s + (Number(t.valor) || 0), 0);
+		const receitaSemana = receitasSemana.reduce((s, t) => s + (Number(t.valor) || 0), 0);
+		const variacaoPct = gastoSemanaAnterior > 0 ? Math.round(((gastoSemana - gastoSemanaAnterior) / gastoSemanaAnterior) * 100) : null;
+
+		const porCategoria = new Map();
+		for (const t of despesasSemana) {
+			const cat = appState.categories.find((c) => c.id === t.categoriaId);
+			const nome = cat ? cat.nome : 'Sem categoria';
+			porCategoria.set(nome, (porCategoria.get(nome) || 0) + (Number(t.valor) || 0));
+		}
+		const maiorGasto = [...porCategoria.entries()].sort((a, b) => b[1] - a[1])[0] || null;
+
+		const aportesSemana = appState.resourceMoves.filter((m) => m.amount > 0 && m.date >= inicioSemana && m.date <= hoje).reduce((s, m) => s + m.amount, 0);
+		const guardado = Math.max(0, receitaSemana - gastoSemana);
+
+		return { gastoSemana, variacaoPct, maiorGasto, guardado, aportesSemana };
+	});
+
+	// Fechamento mensal automático (P3.4): retrato fechado do mês anterior, sempre disponível
+	// (não só no dia 1) para o usuário conferir quando quiser.
+	let fechamentoAberto = $state(false);
+	const fechamentoMensal = $derived.by(() => {
+		const mesAnteriorKey = shiftMonthKey(currentMonthKey(), -1);
+		const txMesAnterior = monthTransactions(appState.transactions, mesAnteriorKey);
+		const tot = totals(txMesAnterior);
+		const taxaPoupanca = tot.receitas > 0 ? Math.round((tot.saldo / tot.receitas) * 1000) / 10 : null;
+
+		const porCategoria = new Map();
+		for (const t of txMesAnterior) {
+			if (t.tipo !== 'despesa' || t.isTransferencia) continue;
+			const cat = appState.categories.find((c) => c.id === t.categoriaId);
+			const nome = cat ? cat.nome : 'Sem categoria';
+			porCategoria.set(nome, (porCategoria.get(nome) || 0) + (Number(t.valor) || 0));
+		}
+		const maiorGasto = [...porCategoria.entries()].sort((a, b) => b[1] - a[1])[0] || null;
+
+		const aportesPorRecurso = new Map();
+		for (const m of appState.resourceMoves) {
+			if (monthKey(m.date) !== mesAnteriorKey) continue;
+			aportesPorRecurso.set(m.resourceId, (aportesPorRecurso.get(m.resourceId) || 0) + m.amount);
+		}
+		let melhorResultado = null;
+		for (const [resId, valor] of aportesPorRecurso) {
+			if (valor <= 0) continue;
+			const res = appState.resources.find((r) => r.id === resId);
+			if (!res) continue;
+			if (!melhorResultado || valor > melhorResultado.valor) melhorResultado = { nome: res.nome, valor };
+		}
+
+		const snapAnterior = appState.scoreSnapshots.find((s) => s.mKey === mesAnteriorKey);
+
+		return {
+			mesAnteriorKey,
+			receitas: tot.receitas,
+			despesas: tot.despesas,
+			guardado: tot.saldo,
+			taxaPoupanca,
+			maiorGasto,
+			melhorResultado,
+			scoreAnterior: snapAnterior ? snapAnterior.overall : null
+		};
+	});
+
+	// Timeline financeira (P3.5): próximos lançamentos pendentes em contas correntes (exclui
+	// cartão, que só afeta o saldo via fatura), em ordem cronológica, com saldo acumulado --
+	// complementa os pontos de "saldo projetado" mostrando os eventos que os formam.
+	const timelineFinanceira = $derived.by(() => {
+		const hoje = todayISO();
+		const contaIds = new Set(contasLiquidas.map((a) => a.id));
+		const futuros = appState.transactions
+			.filter((t) => !t.isTransferencia && t.statusPagamento !== 'pago' && t.data >= hoje && contaIds.has(t.contaId))
+			.sort((a, b) => (a.data === b.data ? 0 : a.data < b.data ? -1 : 1))
+			.slice(0, 12);
+		let saldo = saldoAtualGeral;
+		return futuros.map((t) => {
+			saldo += t.tipo === 'receita' ? Number(t.valor) || 0 : -(Number(t.valor) || 0);
+			return { id: t.id, data: t.data, descricao: t.descricao, tipo: t.tipo, valor: Number(t.valor) || 0, saldoAcumulado: saldo };
+		});
+	});
 
 	const prioridades = $derived(
 		buildAttentionItems(
@@ -420,6 +548,25 @@
 	</div>
 </div>
 
+{#if timelineFinanceira.length}
+	<div class="card">
+		<div class="feed-list-head">
+			<p class="stat-label" style="margin:0">Timeline financeira</p>
+			<a class="link-more" href="/movimentacoes">Ver todas ↗</a>
+		</div>
+		{#each timelineFinanceira as ev (ev.id)}
+			<div class="timeline-row">
+				<span class="timeline-date">{fmtDate(ev.data)}</span>
+				<span class="timeline-desc">{ev.descricao || 'Lançamento'}</span>
+				<span class="timeline-valor privacy-value" class:money-in={ev.tipo === 'receita'} class:money-out={ev.tipo === 'despesa'}>
+					{ev.tipo === 'receita' ? '+' : '−'} {fmtMoney(ev.valor)}
+				</span>
+				<span class="timeline-saldo privacy-value" class:down={ev.saldoAcumulado < 0}>{fmtMoney(ev.saldoAcumulado)}</span>
+			</div>
+		{/each}
+	</div>
+{/if}
+
 <div class="charts-row">
 	<div class="card">
 		<div class="chart-card-head">
@@ -525,6 +672,119 @@
 		{/if}
 	</div>
 </div>
+
+<div class="score-row">
+	<div class="card">
+		<div class="feed-list-head">
+			<p class="stat-label" style="margin:0">Seu resumo da semana</p>
+		</div>
+		<div class="week-summary-grid">
+			<div class="week-summary-item">
+				<p class="week-summary-label">Você gastou</p>
+				<p class="week-summary-value privacy-value">{fmtMoney(resumoSemanal.gastoSemana)}</p>
+				{#if resumoSemanal.variacaoPct !== null}
+					<p class="week-summary-delta" class:down={resumoSemanal.variacaoPct < 0} class:up={resumoSemanal.variacaoPct > 0}>
+						{resumoSemanal.variacaoPct > 0 ? '↑' : '↓'} {Math.abs(resumoSemanal.variacaoPct)}% vs. semana anterior
+					</p>
+				{/if}
+			</div>
+			{#if resumoSemanal.maiorGasto}
+				<div class="week-summary-item">
+					<p class="week-summary-label">Maior gasto</p>
+					<p class="week-summary-value">{resumoSemanal.maiorGasto[0]}</p>
+					<p class="week-summary-delta privacy-value">{fmtMoney(resumoSemanal.maiorGasto[1])}</p>
+				</div>
+			{/if}
+			<div class="week-summary-item">
+				<p class="week-summary-label">Você guardou</p>
+				<p class="week-summary-value privacy-value">{fmtMoney(resumoSemanal.guardado)}</p>
+			</div>
+			{#if resumoSemanal.aportesSemana > 0}
+				<div class="week-summary-item">
+					<p class="week-summary-label">Aportes em metas</p>
+					<p class="week-summary-value privacy-value">+{fmtMoney(resumoSemanal.aportesSemana)}</p>
+				</div>
+			{/if}
+			<div class="week-summary-item">
+				<p class="week-summary-label">Score atual</p>
+				<p class="week-summary-value" style={`color:${scoreColor(financialScore.overall)}`}>{financialScore.overall}</p>
+			</div>
+		</div>
+		<button class="score-tip-toggle" style="margin-top:14px" onclick={() => (fechamentoAberto = !fechamentoAberto)}>
+			{fechamentoAberto ? 'Ocultar' : `Ver fechamento de ${monthLabel(fechamentoMensal.mesAnteriorKey)}`}
+		</button>
+		{#if fechamentoAberto}
+			<div class="score-tip" style="margin-top:10px">
+				<p class="score-tip-head">{monthLabel(fechamentoMensal.mesAnteriorKey).toUpperCase()} FOI ASSIM</p>
+				<div class="week-summary-grid" style="margin-top:10px">
+					<div class="week-summary-item">
+						<p class="week-summary-label">Receitas</p>
+						<p class="week-summary-value privacy-value">{fmtMoney(fechamentoMensal.receitas)}</p>
+					</div>
+					<div class="week-summary-item">
+						<p class="week-summary-label">Despesas</p>
+						<p class="week-summary-value privacy-value">{fmtMoney(fechamentoMensal.despesas)}</p>
+					</div>
+					<div class="week-summary-item">
+						<p class="week-summary-label">Você guardou</p>
+						<p class="week-summary-value privacy-value">{fmtMoney(fechamentoMensal.guardado)}</p>
+						{#if fechamentoMensal.taxaPoupanca !== null}
+							<p class="week-summary-delta">Taxa de poupança: {fechamentoMensal.taxaPoupanca}%</p>
+						{/if}
+					</div>
+					{#if fechamentoMensal.maiorGasto}
+						<div class="week-summary-item">
+							<p class="week-summary-label">Seu maior gasto</p>
+							<p class="week-summary-value">{fechamentoMensal.maiorGasto[0]}</p>
+							<p class="week-summary-delta privacy-value">{fmtMoney(fechamentoMensal.maiorGasto[1])}</p>
+						</div>
+					{/if}
+					{#if fechamentoMensal.melhorResultado}
+						<div class="week-summary-item">
+							<p class="week-summary-label">Seu melhor resultado</p>
+							<p class="week-summary-value">{fechamentoMensal.melhorResultado.nome}</p>
+							<p class="week-summary-delta privacy-value">+{fmtMoney(fechamentoMensal.melhorResultado.valor)}</p>
+						</div>
+					{/if}
+					<div class="week-summary-item">
+						<p class="week-summary-label">Score</p>
+						<p class="week-summary-value" style={`color:${scoreColor(financialScore.overall)}`}>
+							{fechamentoMensal.scoreAnterior !== null ? `${fechamentoMensal.scoreAnterior} → ${financialScore.overall}` : financialScore.overall}
+						</p>
+					</div>
+				</div>
+			</div>
+		{/if}
+	</div>
+</div>
+
+{#if categoriasComOrcamento.length || appState.budgetGlobal}
+	<div class="score-row">
+		<div class="card">
+			<div class="feed-list-head">
+				<p class="stat-label" style="margin:0">Orçamento por categoria</p>
+				<a class="link-more" href="/categorias">Gerenciar ↗</a>
+			</div>
+			{#if appState.budgetGlobal}
+				<div class="mini-progress-track" style="margin-bottom:4px">
+					<div class="mini-progress-fill" style={`width:${pctOrcamentoGlobal}%; background:${corOrcamento(pctOrcamentoGlobal)}`}></div>
+				</div>
+				<p class="cat-row-sub" style="margin:0 0 12px">Total do mês: {fmtMoney(gastoTotalMes)} de {fmtMoney(appState.budgetGlobal)} ({pctOrcamentoGlobal}%)</p>
+			{/if}
+			<div class="score-components" style="grid-template-columns:1fr">
+				{#each categoriasComOrcamento as { cat, gasto, pct } (cat.id)}
+					<div class="score-component-row" style="grid-template-columns:120px 1fr 90px">
+						<span class="score-component-label">{cat.nome}</span>
+						<div class="score-component-track">
+							<div class="score-component-fill" style={`width:${pct}%; background:${corOrcamento(pct)}`}></div>
+						</div>
+						<span class="score-component-value" style="text-align:right">{fmtMoney(gasto)} / {fmtMoney(cat.orcamentoMensal)}</span>
+					</div>
+				{/each}
+			</div>
+		</div>
+	</div>
+{/if}
 
 <div class="feed-row">
 	<div class="card">

@@ -6,7 +6,9 @@
 		removeCategory,
 		addSubcategory,
 		renameSubcategory,
-		removeSubcategory
+		removeSubcategory,
+		setCategoryBudget,
+		setBudgetGlobal
 	} from '$lib/fin/store.svelte.js';
 	import { monthTransactions, currentMonthKey } from '$lib/fin/derived.js';
 	import { fmtMoney } from '$lib/format.js';
@@ -28,6 +30,41 @@
 
 	function valorDoMes(cat) {
 		return mesTx.filter((t) => t.categoriaId === cat.id).reduce((s, t) => s + (Number(t.valor) || 0), 0);
+	}
+
+	// Orçamento mensal total (P3.1) -- limite geral de gasto do mês, separado do orçamento por categoria.
+	let editandoOrcamentoGlobal = $state(false);
+	let orcamentoGlobalInput = $state('');
+	const gastoTotalMes = $derived(mesTx.filter((t) => t.tipo === 'despesa' && !t.isTransferencia).reduce((s, t) => s + (Number(t.valor) || 0), 0));
+	const pctOrcamentoGlobal = $derived(appState.budgetGlobal ? Math.min(100, Math.round((gastoTotalMes / appState.budgetGlobal) * 100)) : null);
+	function abrirOrcamentoGlobal() {
+		orcamentoGlobalInput = appState.budgetGlobal || '';
+		editandoOrcamentoGlobal = true;
+	}
+	function salvarOrcamentoGlobal() {
+		setBudgetGlobal(orcamentoGlobalInput);
+		editandoOrcamentoGlobal = false;
+	}
+
+	// Orçamento mensal por categoria (só para despesas): progresso de uso no mês corrente.
+	let editandoOrcamento = $state(null);
+	let orcamentoInput = $state('');
+	function pctOrcamento(cat) {
+		if (!cat.orcamentoMensal) return null;
+		return Math.min(100, Math.round((valorDoMes(cat) / cat.orcamentoMensal) * 100));
+	}
+	function corOrcamento(pct) {
+		if (pct >= 100) return 'var(--expense)';
+		if (pct >= 80) return 'var(--kpi-amber, #a67c1e)';
+		return 'var(--income)';
+	}
+	function abrirOrcamento(cat) {
+		editandoOrcamento = cat.id;
+		orcamentoInput = cat.orcamentoMensal || '';
+	}
+	function salvarOrcamento(cat) {
+		setCategoryBudget(cat.id, orcamentoInput);
+		editandoOrcamento = null;
 	}
 
 	function criar(e) {
@@ -62,6 +99,38 @@
 	<button class="btn btn-primary" onclick={() => (showModal = true)}><Plus size={16} /> Nova categoria</button>
 </div>
 
+<div class="card" style="margin-bottom:16px">
+	<div class="feed-list-head">
+		<p class="stat-label" style="margin:0">Orçamento mensal total</p>
+		{#if !editandoOrcamentoGlobal}
+			<button class="btn btn-ghost sm" onclick={abrirOrcamentoGlobal}>{appState.budgetGlobal ? 'Editar' : 'Definir'}</button>
+		{/if}
+	</div>
+	{#if editandoOrcamentoGlobal}
+		<div class="report-row">
+			<input
+				class="field-input"
+				style="flex:1"
+				type="number"
+				min="0"
+				step="0.01"
+				placeholder="Ex.: 6000"
+				bind:value={orcamentoGlobalInput}
+				onkeydown={(e) => { if (e.key === 'Enter') salvarOrcamentoGlobal(); }}
+			/>
+			<button class="btn sm" onclick={salvarOrcamentoGlobal}>Salvar</button>
+			<button class="btn btn-ghost sm" onclick={() => (editandoOrcamentoGlobal = false)}>Cancelar</button>
+		</div>
+	{:else if appState.budgetGlobal}
+		<div class="mini-progress-track" style="margin-top:8px">
+			<div class="mini-progress-fill" style={`width:${pctOrcamentoGlobal}%; background:${corOrcamento(pctOrcamentoGlobal)}`}></div>
+		</div>
+		<p class="cat-row-sub" style="margin-top:6px">{fmtMoney(gastoTotalMes)} de {fmtMoney(appState.budgetGlobal)} ({pctOrcamentoGlobal}%) -- restam {fmtMoney(Math.max(0, appState.budgetGlobal - gastoTotalMes))}</p>
+	{:else}
+		<p class="empty">Nenhum orçamento total definido ainda.</p>
+	{/if}
+</div>
+
 <div class="categories-layout">
 	<div class="card">
 		<div class="cat-list-head">
@@ -82,9 +151,17 @@
 							<span class="cat-row-name">{cat.nome}</span>
 							<span class="tag" class:receita={cat.tipo === 'receita'} class:despesa={cat.tipo === 'despesa'}>{cat.tipo}</span>
 						</div>
-						<div style="text-align:right">
+						<div style="text-align:right;min-width:130px">
 							<p class="cat-row-value privacy-value" class:money-in={cat.tipo === 'receita'} class:money-out={cat.tipo === 'despesa'}>{fmtMoney(valorDoMes(cat))}</p>
-							<p class="cat-row-sub">{cat.secundarios?.length || 0} subitem{(cat.secundarios?.length || 0) === 1 ? '' : 'ns'} cadastrado{(cat.secundarios?.length || 0) === 1 ? '' : 's'}</p>
+							{#if cat.tipo === 'despesa' && cat.orcamentoMensal}
+								{@const pct = pctOrcamento(cat)}
+								<div class="mini-progress-track" style="margin-top:6px">
+									<div class="mini-progress-fill" style={`width:${pct}%; background:${corOrcamento(pct)}`}></div>
+								</div>
+								<p class="cat-row-sub">{pct}% de {fmtMoney(cat.orcamentoMensal)}</p>
+							{:else}
+								<p class="cat-row-sub">{cat.secundarios?.length || 0} subitem{(cat.secundarios?.length || 0) === 1 ? '' : 'ns'} cadastrado{(cat.secundarios?.length || 0) === 1 ? '' : 's'}</p>
+							{/if}
 						</div>
 					</div>
 
@@ -104,6 +181,29 @@
 								{/if}
 								<button class="btn btn-danger sm" onclick={() => (deletando = cat)}>Excluir categoria</button>
 							</div>
+
+							{#if cat.tipo === 'despesa'}
+								<div class="report-row">
+									{#if editandoOrcamento === cat.id}
+										<input
+											class="field-input"
+											style="flex:1"
+											type="number"
+											min="0"
+											step="0.01"
+											placeholder="Ex.: 500"
+											bind:value={orcamentoInput}
+											onkeydown={(e) => { if (e.key === 'Enter') salvarOrcamento(cat); }}
+										/>
+										<button class="btn sm" onclick={() => salvarOrcamento(cat)}>Salvar</button>
+									{:else}
+										<span class="cat-row-sub" style="flex:1">
+											Orçamento mensal: {cat.orcamentoMensal ? fmtMoney(cat.orcamentoMensal) : 'não definido'}
+										</span>
+										<button class="btn btn-ghost sm" onclick={() => abrirOrcamento(cat)}>{cat.orcamentoMensal ? 'Editar' : 'Definir'} orçamento</button>
+									{/if}
+								</div>
+							{/if}
 
 							{#if cat.secundarios?.length}
 								<div class="sub-list">

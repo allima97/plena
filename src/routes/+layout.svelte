@@ -18,7 +18,8 @@
 		Bell,
 		Eye,
 		EyeOff,
-		Plus
+		Plus,
+		Wand2
 	} from 'lucide-svelte';
 	import { upcomingDue } from '$lib/fin/derived.js';
 	import GlobalSearch from '$lib/components/GlobalSearch.svelte';
@@ -39,7 +40,8 @@
 		{ href: '/categorias', label: 'Categorias', icon: Tags },
 		{ href: '/relatorios', label: 'Relatórios', icon: BarChart3 },
 		{ href: '/objetivos', label: 'Objetivos', icon: Target },
-		{ href: '/patrimonio', label: 'Patrimônio', icon: Landmark }
+		{ href: '/patrimonio', label: 'Patrimônio', icon: Landmark },
+		{ href: '/simulador', label: 'Simulador', icon: Wand2 }
 	];
 
 	let mobileNavOpen = $state(false);

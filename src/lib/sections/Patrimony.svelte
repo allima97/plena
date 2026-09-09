@@ -1,6 +1,7 @@
 <script>
-	import { appState, addPatrimonyItem, updatePatrimonyItem, removePatrimonyItem, upsertPatrimonySnapshot } from '$lib/fin/store.svelte.js';
+	import { appState, addPatrimonyItem, updatePatrimonyItem, removePatrimonyItem, upsertPatrimonySnapshot, addPatrimonyItemMove, removePatrimonyItemMove } from '$lib/fin/store.svelte.js';
 	import { currentMonthKey, faturaDoCartao, saldoContaAte } from '$lib/fin/derived.js';
+	import { monthKey } from '$lib/format.js';
 	import { fmtMoney, todayISO } from '$lib/format.js';
 	import Modal from '$lib/components/Modal.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -15,6 +16,32 @@
 	let editing = $state(null);
 	let deleting = $state(null);
 	let menuOpenId = $state(null);
+
+	// Histórico de aportes/valorização por ativo (P4.4).
+	let historyModal = $state({ open: false, item: null });
+	function blankMove() {
+		return { tipo: 'valorizacao', sinal: '1', valor: '', data: todayISO(), descricao: '' };
+	}
+	let moveForm = $state(blankMove());
+	function openHistory(item) {
+		historyModal = { open: true, item };
+		moveForm = blankMove();
+		menuOpenId = null;
+	}
+	const historyMoves = $derived(
+		historyModal.item
+			? appState.patrimonyItemMoves.filter((m) => m.itemId === historyModal.item.id).sort((a, b) => (a.data < b.data ? 1 : -1))
+			: []
+	);
+	function submitMove(e) {
+		e.preventDefault();
+		if (!moveForm.valor) return;
+		const sinal = Number(moveForm.sinal) < 0 ? -1 : 1;
+		const valor = Math.abs(Number(moveForm.valor) || 0) * sinal;
+		addPatrimonyItemMove(historyModal.item.id, { tipo: moveForm.tipo, valor, data: moveForm.data || todayISO(), descricao: moveForm.descricao.trim() });
+		historyModal = { ...historyModal, item: { ...historyModal.item, valor: historyModal.item.valor + valor } };
+		moveForm = blankMove();
+	}
 
 	function blank() {
 		return { tipo: 'investimento', nome: '', valor: '' };
@@ -77,6 +104,7 @@
 	const ativosTotal = $derived(contasSaldoTotal + patrimonyItemsTotal);
 	const passivosTotal = $derived(financiamentosTotal + cartaoFaturasTotal);
 	const patrimonioLiquido = $derived(ativosTotal - passivosTotal);
+	const dividaPctAtivos = $derived(ativosTotal > 0 ? Math.round((passivosTotal / ativosTotal) * 100) : null);
 
 	const donutSlices = $derived([
 		{ label: 'Contas', value: Math.max(contasSaldoTotal, 0), color: '#4a78db' },
@@ -95,12 +123,43 @@
 		});
 	});
 
-	const evolucaoData = $derived.by(() => {
-		const ordered = [...appState.patrimonySnapshots].sort((a, b) => a.mKey.localeCompare(b.mKey)).slice(-12);
-		return ordered.map((s) => {
+	const snapshotsOrdenados = $derived([...appState.patrimonySnapshots].sort((a, b) => a.mKey.localeCompare(b.mKey)).slice(-12));
+	const evolucaoData = $derived(
+		snapshotsOrdenados.map((s) => {
 			const [, m] = s.mKey.split('-');
 			return { label: MES_ABBR[Number(m) - 1] || s.mKey, a: s.valor, b: 0, current: s.mKey === currentMonthKey() };
-		});
+		})
+	);
+
+	// Variação no período (P4.1): quebra o quanto o patrimônio líquido mudou entre o primeiro e
+	// o último retrato salvo em Aportes (metas + ativos) / Valorização (ativos) / Redução de
+	// dívidas / Saldo em contas (resíduo -- receitas menos despesas do período), para sempre
+	// fechar exatamente com a variação total, sem número solto sem explicação.
+	let variacaoAberta = $state(false);
+	let tabelaMensalAberta = $state(false);
+	// Tabela mensal (P4.3): valores exatos mês a mês, já que as barras do gráfico não têm
+	// rótulo numérico -- o usuário só via a forma, não os números do mockup do doc.
+	const tabelaMensal = $derived(
+		snapshotsOrdenados
+			.map((s, i) => ({ mKey: s.mKey, valor: s.valor, variacao: i > 0 ? s.valor - snapshotsOrdenados[i - 1].valor : null }))
+			.reverse()
+	);
+
+	const variacaoPeriodo = $derived.by(() => {
+		if (snapshotsOrdenados.length < 2) return null;
+		const primeiro = snapshotsOrdenados[0];
+		const ultimo = snapshotsOrdenados[snapshotsOrdenados.length - 1];
+		const totalVariacao = ultimo.valor - primeiro.valor;
+		const reducaoDividas = primeiro.passivos - ultimo.passivos;
+
+		const aportesMetas = appState.resourceMoves.filter((m) => m.amount > 0 && monthKey(m.date) >= primeiro.mKey && monthKey(m.date) <= ultimo.mKey).reduce((s, m) => s + m.amount, 0);
+		const movesPeriodo = appState.patrimonyItemMoves.filter((m) => monthKey(m.data) >= primeiro.mKey && monthKey(m.data) <= ultimo.mKey);
+		const aportesAtivos = movesPeriodo.filter((m) => m.tipo === 'aporte').reduce((s, m) => s + m.valor, 0);
+		const valorizacao = movesPeriodo.filter((m) => m.tipo === 'valorizacao').reduce((s, m) => s + m.valor, 0);
+		const aportes = aportesMetas + aportesAtivos;
+		const saldoContas = totalVariacao - reducaoDividas - aportes - valorizacao;
+
+		return { desde: primeiro.mKey, totalVariacao, aportes, valorizacao, reducaoDividas, saldoContas };
 	});
 </script>
 
@@ -121,10 +180,59 @@
 			<span class="patrimony-hero-chip good"><TrendingUp size={14} /> Ativos <b class="privacy-value">{fmtMoney(ativosTotal)}</b></span>
 			<span class="patrimony-hero-chip bad"><TrendingDown size={14} /> Dívidas <b class="privacy-value">{fmtMoney(passivosTotal)}</b></span>
 		</div>
+		{#if dividaPctAtivos !== null && passivosTotal > 0}
+			<p class="patrimony-debt-ratio">Sua dívida representa <b>{dividaPctAtivos}%</b> dos seus ativos.</p>
+		{/if}
 		{#if evolucaoData.length > 1}
 			<div class="patrimony-evolution">
 				<p class="stat-label" style="margin:0 0 6px">Evolução patrimonial</p>
 				<BarChart data={evolucaoData} height={140} colorA="#c7d7f5" colorAActive="#4a78db" />
+				{#if variacaoPeriodo}
+					<p class="patrimony-variacao-headline" class:negative={variacaoPeriodo.totalVariacao < 0}>
+						{variacaoPeriodo.totalVariacao >= 0 ? '+' : ''}{fmtMoney(variacaoPeriodo.totalVariacao)} desde {variacaoPeriodo.desde}
+					</p>
+					<button class="score-tip-toggle" onclick={() => (variacaoAberta = !variacaoAberta)}>
+						{variacaoAberta ? 'Ocultar detalhamento' : 'Ver de onde veio essa variação'}
+					</button>
+					{#if variacaoAberta}
+						<div class="week-summary-grid" style="margin-top:10px">
+							<div class="week-summary-item">
+								<p class="week-summary-label">Aportes</p>
+								<p class="week-summary-value privacy-value">+{fmtMoney(variacaoPeriodo.aportes)}</p>
+							</div>
+							<div class="week-summary-item">
+								<p class="week-summary-label">Valorização</p>
+								<p class="week-summary-value privacy-value" class:down={variacaoPeriodo.valorizacao < 0}>{variacaoPeriodo.valorizacao >= 0 ? '+' : ''}{fmtMoney(variacaoPeriodo.valorizacao)}</p>
+							</div>
+							<div class="week-summary-item">
+								<p class="week-summary-label">Redução de dívidas</p>
+								<p class="week-summary-value privacy-value" class:down={variacaoPeriodo.reducaoDividas < 0}>{variacaoPeriodo.reducaoDividas >= 0 ? '+' : ''}{fmtMoney(variacaoPeriodo.reducaoDividas)}</p>
+							</div>
+							<div class="week-summary-item">
+								<p class="week-summary-label">Saldo em contas</p>
+								<p class="week-summary-value privacy-value" class:down={variacaoPeriodo.saldoContas < 0}>{variacaoPeriodo.saldoContas >= 0 ? '+' : ''}{fmtMoney(variacaoPeriodo.saldoContas)}</p>
+							</div>
+						</div>
+					{/if}
+				{/if}
+				<button class="score-tip-toggle" style="margin-top:8px" onclick={() => (tabelaMensalAberta = !tabelaMensalAberta)}>
+					{tabelaMensalAberta ? 'Ocultar valores por mês' : 'Ver valores por mês'}
+				</button>
+				{#if tabelaMensalAberta}
+					<div class="patrimony-move-list">
+						{#each tabelaMensal as row (row.mKey)}
+							<div class="patrimony-row">
+								<span class="patrimony-row-name">{row.mKey}</span>
+								<div class="patrimony-row-actions">
+									{#if row.variacao !== null}
+										<span class="patrimony-delta privacy-value" class:negative={row.variacao < 0}>{row.variacao >= 0 ? '+' : ''}{fmtMoney(row.variacao)}</span>
+									{/if}
+									<span class="patrimony-row-value privacy-value" class:negative={row.valor < 0}>{fmtMoney(row.valor)}</span>
+								</div>
+							</div>
+						{/each}
+					</div>
+				{/if}
 			</div>
 		{/if}
 	</div>
@@ -179,6 +287,7 @@
 							{#if menuOpenId === item.id}
 								<div class="menu-backdrop" onclick={() => (menuOpenId = null)} role="presentation"></div>
 								<div class="account-menu">
+									<button onclick={() => openHistory(item)}>Histórico</button>
 									<button onclick={() => openEdit(item)}>Editar</button>
 									<button class="danger" onclick={() => { deleting = item; menuOpenId = null; }}>Excluir</button>
 								</div>
@@ -242,3 +351,51 @@
 		deleting = null;
 	}}
 />
+
+<Modal open={historyModal.open} onClose={() => (historyModal = { ...historyModal, open: false })} title={`Histórico -- ${historyModal.item?.nome || ''}`} maxWidth="480px">
+	<form onsubmit={submitMove} class="movement-form">
+		<div class="form-grid">
+			<label class="field">
+				<span>Tipo</span>
+				<select class="field-input" bind:value={moveForm.tipo}>
+					<option value="aporte">Aporte</option>
+					<option value="valorizacao">Valorização/desvalorização</option>
+				</select>
+			</label>
+			<label class="field">
+				<span>Sinal</span>
+				<select class="field-input" bind:value={moveForm.sinal}>
+					<option value="1">Positivo (+)</option>
+					<option value="-1">Negativo (-)</option>
+				</select>
+			</label>
+		</div>
+		<div class="form-grid">
+			<label class="field"><span>Data</span><input class="field-input" type="date" bind:value={moveForm.data} /></label>
+			<label class="field"><span>Valor</span><input class="field-input" type="number" step="0.01" min="0" required bind:value={moveForm.valor} /></label>
+		</div>
+		<label class="field"><span>Descrição (opcional)</span><input class="field-input" placeholder="Ex.: Rendimento do mês" bind:value={moveForm.descricao} /></label>
+		<div class="modal-footer">
+			<button type="submit" class="btn btn-primary">Registrar</button>
+		</div>
+	</form>
+
+	{#if historyMoves.length}
+		<div class="patrimony-move-list">
+			{#each historyMoves as m (m.id)}
+				<div class="patrimony-row">
+					<span class="patrimony-row-name">
+						{m.tipo === 'aporte' ? 'Aporte' : 'Valorização'}{m.descricao ? ` -- ${m.descricao}` : ''}
+						<span class="patrimony-row-tag">{m.data}</span>
+					</span>
+					<div class="patrimony-row-actions">
+						<span class="patrimony-row-value privacy-value" class:negative={m.valor < 0}>{m.valor >= 0 ? '+' : ''}{fmtMoney(m.valor)}</span>
+						<button class="btn btn-ghost sm" onclick={() => removePatrimonyItemMove(m.id)}>Remover</button>
+					</div>
+				</div>
+			{/each}
+		</div>
+	{:else}
+		<p class="empty" style="margin-top:14px">Nenhum evento registrado ainda.</p>
+	{/if}
+</Modal>

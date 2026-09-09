@@ -9,6 +9,7 @@ let reportTemplates = $state([]);
 let reportHistory = $state([]);
 let reportSchedule = $state({ ativo: false, templateId: null, dia: 5, hora: '08:00' });
 let alertThresholds = $state({ um: 1, tres: 3, sete: 7 });
+let budgetGlobal = $state(null); // orçamento mensal total (P3.1), distinto do orçamento por categoria
 
 // ---- objetivos (mesmo modelo de dados do Rumo Financeiro / nextgoals) ----
 let goals = $state([]);
@@ -21,6 +22,7 @@ let amortizations = $state([]);
 // ---- patrimonio (fase 4: investimentos manuais + historico mensal de patrimonio liquido) ----
 let patrimonyItems = $state([]);
 let patrimonySnapshots = $state([]);
+let patrimonyItemMoves = $state([]); // P4.4: historico de aportes/valorizacao por ativo
 
 // ---- score financeiro: historico mensal (fase P2.6) ----
 let scoreSnapshots = $state([]);
@@ -54,6 +56,9 @@ export const appState = {
 	get alertThresholds() {
 		return alertThresholds;
 	},
+	get budgetGlobal() {
+		return budgetGlobal;
+	},
 	get goals() {
 		return goals;
 	},
@@ -81,6 +86,9 @@ export const appState = {
 	get scoreSnapshots() {
 		return scoreSnapshots;
 	},
+	get patrimonyItemMoves() {
+		return patrimonyItemMoves;
+	},
 	get mode() {
 		return mode;
 	},
@@ -104,6 +112,7 @@ function snapshot() {
 		reportHistory,
 		reportSchedule,
 		alertThresholds,
+		budgetGlobal,
 		goals,
 		resources,
 		resourceMoves,
@@ -112,7 +121,8 @@ function snapshot() {
 		amortizations,
 		patrimonyItems,
 		patrimonySnapshots,
-		scoreSnapshots
+		scoreSnapshots,
+		patrimonyItemMoves
 	};
 }
 
@@ -131,6 +141,7 @@ export async function boot() {
 		reportHistory = local.reportHistory || [];
 		reportSchedule = local.reportSchedule || { ativo: false, templateId: null, dia: 5, hora: '08:00' };
 		alertThresholds = local.alertThresholds || { um: 1, tres: 3, sete: 7 };
+		budgetGlobal = local.budgetGlobal ?? null;
 		goals = local.goals || [];
 		resources = local.resources || [];
 		resourceMoves = local.resourceMoves || [];
@@ -140,6 +151,7 @@ export async function boot() {
 		patrimonyItems = local.patrimonyItems || [];
 		patrimonySnapshots = local.patrimonySnapshots || [];
 		scoreSnapshots = local.scoreSnapshots || [];
+		patrimonyItemMoves = local.patrimonyItemMoves || [];
 	}
 	ready = true;
 
@@ -174,6 +186,7 @@ export async function boot() {
 	reportHistory = remote.reportHistory || reportHistory;
 	reportSchedule = remote.reportSchedule || reportSchedule;
 	alertThresholds = remote.alertThresholds || alertThresholds;
+	budgetGlobal = remote.budgetGlobal ?? budgetGlobal;
 	goals = remote.goals || goals;
 	resources = remote.resources || resources;
 	resourceMoves = remote.resourceMoves || resourceMoves;
@@ -183,6 +196,7 @@ export async function boot() {
 	patrimonyItems = remote.patrimonyItems || patrimonyItems;
 	patrimonySnapshots = remote.patrimonySnapshots || patrimonySnapshots;
 	scoreSnapshots = remote.scoreSnapshots || scoreSnapshots;
+	patrimonyItemMoves = remote.patrimonyItemMoves || patrimonyItemMoves;
 	mode = 'api';
 	persistLocalSnapshot();
 }
@@ -240,6 +254,17 @@ export function renameCategory(id, nome) {
 export function removeCategory(id) {
 	categories = categories.filter((c) => c.id !== id);
 	erase('finCategories', id);
+}
+
+/** Define (ou remove, com valor <= 0) o orçamento mensal de uma categoria de despesa --
+ * usado para a barra de progresso de uso em Categorias e o resumo no Dashboard. */
+export function setCategoryBudget(id, valor) {
+	const cat = categories.find((c) => c.id === id);
+	if (!cat) return;
+	const n = Number(valor) || 0;
+	cat.orcamentoMensal = n > 0 ? n : null;
+	categories = [...categories];
+	write('finCategories', id, cat);
 }
 
 export function addSubcategory(categoriaId, nome) {
@@ -479,6 +504,13 @@ export function setAlertThresholds(thresholds) {
 	if (mode === 'api') apiPut('alertThresholds', 'singleton', alertThresholds);
 }
 
+export function setBudgetGlobal(valor) {
+	const n = Number(valor) || 0;
+	budgetGlobal = n > 0 ? n : null;
+	persistLocalSnapshot();
+	if (mode === 'api') apiPut('budgetGlobal', 'singleton', budgetGlobal);
+}
+
 // ============================================================================
 // ---- objetivos (Rumo Financeiro / nextgoals, portado por completo) --------
 // ============================================================================
@@ -669,8 +701,41 @@ export function updatePatrimonyItem(id, patch) {
 }
 
 export function removePatrimonyItem(id) {
+	const moveIds = patrimonyItemMoves.filter((m) => m.itemId === id).map((m) => m.id);
 	patrimonyItems = patrimonyItems.filter((p) => p.id !== id);
+	patrimonyItemMoves = patrimonyItemMoves.filter((m) => m.itemId !== id);
 	erase('patrimonyItems', id);
+	moveIds.forEach((mid) => erase('patrimonyItemMoves', mid));
+}
+
+/** Registra um evento de aporte ou valorização/desvalorização de um ativo, e ajusta o valor
+ * atual do item de acordo -- P4.4: separa "dinheiro que eu coloquei" de "o mercado rendeu",
+ * o que também alimenta a quebra de Aportes x Valorização na evolução patrimonial. */
+export function addPatrimonyItemMove(itemId, data) {
+	const m = { id: uid(), itemId, ...data };
+	patrimonyItemMoves = [...patrimonyItemMoves, m];
+	write('patrimonyItemMoves', m.id, m);
+	const item = patrimonyItems.find((p) => p.id === itemId);
+	if (item) {
+		const updated = { ...item, valor: (Number(item.valor) || 0) + (Number(data.valor) || 0) };
+		patrimonyItems = patrimonyItems.map((p) => (p.id === itemId ? updated : p));
+		write('patrimonyItems', itemId, updated);
+	}
+	return m;
+}
+
+export function removePatrimonyItemMove(id) {
+	const m = patrimonyItemMoves.find((x) => x.id === id);
+	patrimonyItemMoves = patrimonyItemMoves.filter((x) => x.id !== id);
+	erase('patrimonyItemMoves', id);
+	if (m) {
+		const item = patrimonyItems.find((p) => p.id === m.itemId);
+		if (item) {
+			const updated = { ...item, valor: (Number(item.valor) || 0) - (Number(m.valor) || 0) };
+			patrimonyItems = patrimonyItems.map((p) => (p.id === m.itemId ? updated : p));
+			write('patrimonyItems', m.itemId, updated);
+		}
+	}
 }
 
 /** Grava (ou substitui) o retrato do patrimônio líquido do mês `mKey` -- id determinístico

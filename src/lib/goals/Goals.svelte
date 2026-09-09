@@ -8,7 +8,7 @@
 		removeInstallment,
 		removeAmortization
 	} from '$lib/fin/store.svelte.js';
-	import { computeMetrics, progressColor, encargosAbatimentoSummary, installmentYearsOf, estimateMonthlyRate, simulateAmortizationScenario } from './metrics.js';
+	import { computeMetrics, progressColor, encargosAbatimentoSummary, installmentYearsOf, estimateMonthlyRate, simulateAmortizationScenario, simulateMultipleAmortizations } from './metrics.js';
 	import { GOAL_TYPES } from './constants.js';
 	import { fmtMoney, fmtDate } from '$lib/format.js';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -39,6 +39,7 @@
 	let compositionInstallmentId = $state(null); // prestacao escolhida (icone de olho / seletor / Anterior-Proxima)
 
 	let simAporte = $state(''); // Fase 5: simulador de amortizacao extra -- valor hipotetico digitado pelo usuario
+	let simAportesMultiplos = $state([]); // P5.4: lista de aportes futuros planejados { id, mes, valor }
 
 	const ENCARGOS_MAIN_PERIODS = [
 		{ key: 'currentYear', label: 'Ano atual' },
@@ -81,7 +82,14 @@
 	$effect(() => {
 		selectedGoalId;
 		simAporte = '';
+		simAportesMultiplos = [];
 	});
+	function addSimAporteMultiplo() {
+		simAportesMultiplos = [...simAportesMultiplos, { id: `${Date.now()}-${Math.random()}`, mes: '', valor: '' }];
+	}
+	function removeSimAporteMultiplo(id) {
+		simAportesMultiplos = simAportesMultiplos.filter((a) => a.id !== id);
+	}
 	const simTaxaMensal = $derived(metrics ? estimateMonthlyRate(metrics.installmentRows) : null);
 	const simBase = $derived.by(() => {
 		if (!metrics || !metrics.installmentRows.length || !simTaxaMensal) return null;
@@ -92,6 +100,14 @@
 	const simResult = $derived.by(() => {
 		if (!simBase) return { valido: false };
 		return simulateAmortizationScenario({ ...simBase, aporte: Number(simAporte) || 0 });
+	});
+	const simMultiploResult = $derived.by(() => {
+		if (!simBase) return { valido: false };
+		const aportes = simAportesMultiplos
+			.filter((a) => Number(a.mes) >= 1 && Number(a.valor) > 0)
+			.map((a) => ({ mes: Number(a.mes), valor: Number(a.valor) }));
+		if (!aportes.length) return { valido: false };
+		return simulateMultipleAmortizations({ ...simBase, aportes });
 	});
 
 	// ---------- Prestações do financiamento: anos disponíveis (5 mais recentes) ----------
@@ -444,6 +460,29 @@
 				</div>
 
 				{#if simBase}
+					<!-- Central do financiamento (P5.1): os 4 números que mais importam, num só lugar. -->
+					<div class="card" style="margin-top:16px">
+						<p class="stat-label" style="margin:0 0 12px">Central do financiamento</p>
+						<div class="grid-cards">
+							<div class="stat-card kpi-rose">
+								<p class="stat-label">Saldo devedor</p>
+								<p class="font-display stat-value privacy-value">{fmtMoney(simBase.saldo)}</p>
+							</div>
+							<div class="stat-card kpi-blue">
+								<p class="stat-label">Prestação atual</p>
+								<p class="font-display stat-value privacy-value">{fmtMoney(simBase.parcela)}</p>
+							</div>
+							<div class="stat-card">
+								<p class="stat-label">Prazo restante</p>
+								<p class="font-display stat-value">{selectedGoal.remainingTermMonths ?? '—'}{selectedGoal.remainingTermMonths ? ' meses' : ''}</p>
+							</div>
+							<div class="stat-card kpi-gold">
+								<p class="stat-label">Taxa estimada</p>
+								<p class="font-display stat-value">{(simBase.taxaMensal * 100).toFixed(2)}% a.m.</p>
+							</div>
+						</div>
+					</div>
+
 					<!-- Simulador de amortização (Fase 5): "e se eu pagasse R$X a mais agora?" -->
 					<div class="card sim-card" style="margin-top:16px">
 						<div class="page-head" style="margin-bottom:6px">
@@ -480,8 +519,59 @@
 									<p class="sim-scenario-detail">Economia de juros: <span class="privacy-value">{fmtMoney(simResult.parcelaReduzida.jurosEconomizados)}</span></p>
 								</div>
 							</div>
+							{#if simResult.prazoReduzido.jurosEconomizados !== simResult.parcelaReduzida.jurosEconomizados}
+								{@const prazoGanha = simResult.prazoReduzido.jurosEconomizados > simResult.parcelaReduzida.jurosEconomizados}
+								{@const diferenca = Math.abs(simResult.prazoReduzido.jurosEconomizados - simResult.parcelaReduzida.jurosEconomizados)}
+								<p class="sim-verdict">
+									<b>{prazoGanha ? 'Reduzir o prazo' : 'Reduzir a parcela'}</b> economiza aproximadamente <span class="privacy-value">{fmtMoney(diferenca)}</span> a mais em juros do que a outra opção.
+								</p>
+							{/if}
 						{:else if simResult.valido}
 							<p class="empty">Informe um valor de aporte para ver os cenários.</p>
+						{/if}
+					</div>
+
+					<!-- Simulação de vários aportes ao longo do tempo (P5.4) -->
+					<div class="card sim-card" style="margin-top:16px">
+						<p class="stat-label" style="margin:0 0 4px">Simular vários aportes</p>
+						<p class="movement-meta" style="margin:0 0 12px">
+							Planeje mais de um aporte de amortização em momentos diferentes e veja o efeito combinado no prazo e nos juros, mantendo a parcela atual.
+						</p>
+						{#each simAportesMultiplos as ap (ap.id)}
+							<div class="sim-multi-row">
+								<label class="field">
+									<span>Daqui a quantos meses</span>
+									<input class="field-input" type="number" step="1" min="1" placeholder="Ex.: 6" bind:value={ap.mes} />
+								</label>
+								<label class="field">
+									<span>Valor do aporte</span>
+									<input class="field-input" type="number" step="0.01" min="0" placeholder="R$ 0,00" bind:value={ap.valor} />
+								</label>
+								<button type="button" class="icon-btn" onclick={() => removeSimAporteMultiplo(ap.id)} aria-label="Remover aporte">
+									<Trash2 size={16} />
+								</button>
+							</div>
+						{/each}
+						<button type="button" class="btn-ghost sim-multi-add" onclick={addSimAporteMultiplo}>
+							<Plus size={14} /> Adicionar aporte
+						</button>
+						{#if simMultiploResult.valido}
+							<div class="sim-scenarios">
+								<div class="sim-scenario">
+									<p class="sim-scenario-title">Prazo com os aportes</p>
+									<p class="sim-scenario-sub">Total aportado: <span class="privacy-value">{fmtMoney(simMultiploResult.totalAportado)}</span></p>
+									<p class="sim-scenario-value privacy-value">{Math.round(simMultiploResult.mesesEconomizados)} meses a menos</p>
+									<p class="sim-scenario-detail">Prazo final: ~{simMultiploResult.mesesComAportes} meses (era ~{Math.ceil(simMultiploResult.mesesSemAporte)})</p>
+								</div>
+								<div class="sim-scenario">
+									<p class="sim-scenario-title">Economia de juros</p>
+									<p class="sim-scenario-sub">Mantendo a parcela de <span class="privacy-value">{fmtMoney(simBase.parcela)}</span></p>
+									<p class="sim-scenario-value privacy-value">{fmtMoney(simMultiploResult.jurosEconomizados)}</p>
+									<p class="sim-scenario-detail">Juros totais: <span class="privacy-value">{fmtMoney(simMultiploResult.jurosComAportes)}</span> (era <span class="privacy-value">{fmtMoney(simMultiploResult.jurosSemAporte)}</span>)</p>
+								</div>
+							</div>
+						{:else if simAportesMultiplos.length}
+							<p class="empty" style="margin-top:12px">Informe o mês e o valor de ao menos um aporte para ver o resultado.</p>
 						{/if}
 					</div>
 				{/if}

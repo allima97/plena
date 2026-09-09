@@ -364,3 +364,57 @@ export function simulateAmortizationScenario({ saldo, taxaMensal, parcela, aport
 		}
 	};
 }
+
+/**
+ * Simulador de múltiplos aportes (P5.4): estende o simulador acima para uma sequência de aportes
+ * em meses diferentes (ex.: um aporte daqui a 3 meses, outro daqui a 8), mantendo a parcela atual
+ * -- ou seja, sempre reduzindo o prazo a cada aporte. Simula mês a mês pela Tabela Price aplicando
+ * cada aporte no mês indicado, e compara com o cenário sem nenhum aporte extra.
+ * `aportes`: array de { mes, valor } onde `mes` é "daqui a quantos meses" (1 = próximo mês).
+ */
+export function simulateMultipleAmortizations({ saldo, taxaMensal, parcela, aportes }) {
+	if (!(saldo > 0) || !(taxaMensal > 0) || !(parcela > 0)) return { valido: false };
+
+	const aportesOrdenados = (aportes || [])
+		.filter((a) => a && Number(a.valor) > 0 && Number(a.mes) >= 1)
+		.map((a) => ({ mes: Math.round(Number(a.mes)), valor: Number(a.valor) }))
+		.sort((a, b) => a.mes - b.mes);
+	if (!aportesOrdenados.length) return { valido: false };
+
+	const mesesSemAporte = mesesParaQuitar(saldo, taxaMensal, parcela);
+	if (!Number.isFinite(mesesSemAporte)) return { valido: false };
+	const jurosSemAporte = mesesSemAporte * parcela - saldo;
+
+	let saldoAtual = saldo;
+	let mes = 0;
+	let jurosAcumulados = 0;
+	let totalAportado = 0;
+	const maxMeses = 1200; // trava de segurança (100 anos)
+	while (saldoAtual > 0.01 && mes < maxMeses) {
+		mes += 1;
+		const juros = saldoAtual * taxaMensal;
+		let amortizacao = parcela - juros;
+		if (amortizacao > saldoAtual) amortizacao = saldoAtual;
+		saldoAtual = Math.max(saldoAtual - amortizacao, 0);
+		jurosAcumulados += juros;
+
+		for (const a of aportesOrdenados) {
+			if (a.mes !== mes || saldoAtual <= 0) continue;
+			const valorAplicado = Math.min(a.valor, saldoAtual);
+			saldoAtual = Math.max(saldoAtual - valorAplicado, 0);
+			totalAportado += valorAplicado;
+		}
+	}
+
+	return {
+		valido: true,
+		mesesSemAporte,
+		jurosSemAporte,
+		mesesComAportes: mes,
+		mesesEconomizados: Math.max(mesesSemAporte - mes, 0),
+		jurosComAportes: jurosAcumulados,
+		jurosEconomizados: Math.max(jurosSemAporte - jurosAcumulados, 0),
+		totalAportado,
+		quitado: saldoAtual <= 0.01
+	};
+}

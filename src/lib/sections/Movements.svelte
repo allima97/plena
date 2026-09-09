@@ -111,6 +111,34 @@ import TransferModal from '$lib/components/TransferModal.svelte';
 			.sort((a, b) => b.data.localeCompare(a.data))
 	);
 
+	const MES_ABBR = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+	function yesterdayISO() {
+		const d = new Date();
+		d.setDate(d.getDate() - 1);
+		const pad = (n) => String(n).padStart(2, '0');
+		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+	}
+	function dateGroupLabel(iso) {
+		if (iso === todayISO()) return 'Hoje';
+		if (iso === yesterdayISO()) return 'Ontem';
+		const [, m, d] = iso.split('-');
+		return `${d} ${MES_ABBR[Number(m) - 1]}`;
+	}
+	// Agrupa a lista já filtrada/ordenada por data (desc) em seções com cabeçalho
+	// (Hoje / Ontem / DD MES), sem alterar os filtros existentes.
+	const groupedFiltered = $derived.by(() => {
+		const groups = [];
+		let current = null;
+		for (const t of filtered) {
+			if (!current || current.date !== t.data) {
+				current = { date: t.data, label: dateGroupLabel(t.data), items: [] };
+				groups.push(current);
+			}
+			current.items.push(t);
+		}
+		return groups;
+	});
+
 	const resumoMesKey = $derived(monthFilter === 'all' ? currentMonthKey() : monthFilter);
 	const resumoMesTx = $derived(monthTransactions(appState.transactions, resumoMesKey));
 	const comprometido = $derived(committedThisMonth(appState.transactions, resumoMesKey));
@@ -200,19 +228,24 @@ import TransferModal from '$lib/components/TransferModal.svelte';
 	{#if filtered.length === 0}
 		<p class="empty">Nenhum lançamento encontrado.</p>
 	{:else}
-		{#each filtered as t (t.id)}
-			<MovementRow
-				{t}
-				categoria={appState.categories.find((c) => c.id === t.categoriaId)}
-				subcategoria={appState.categories.find((c) => c.id === t.categoriaId)?.secundarios?.find((s) => s.id === t.subcategoriaId)?.nome}
-				conta={appState.accounts.find((a) => a.id === t.contaId)}
-				onTogglePayment={togglePayment}
-				onEditOccurrence={openEditOccurrence}
-				onEditSeries={openEditSeries}
-				onManageSeries={manageSeries}
-				onDuplicate={duplicateTransaction}
-				onDelete={handleDelete}
-			/>
+		{#each groupedFiltered as g (g.date)}
+			<div class="movement-date-group">
+				<p class="movement-date-heading">{g.label}</p>
+				{#each g.items as t (t.id)}
+					<MovementRow
+						{t}
+						categoria={appState.categories.find((c) => c.id === t.categoriaId)}
+						subcategoria={appState.categories.find((c) => c.id === t.categoriaId)?.secundarios?.find((s) => s.id === t.subcategoriaId)?.nome}
+						conta={appState.accounts.find((a) => a.id === t.contaId)}
+						onTogglePayment={togglePayment}
+						onEditOccurrence={openEditOccurrence}
+						onEditSeries={openEditSeries}
+						onManageSeries={manageSeries}
+						onDuplicate={duplicateTransaction}
+						onDelete={handleDelete}
+					/>
+				{/each}
+			</div>
 		{/each}
 	{/if}
 </div>
