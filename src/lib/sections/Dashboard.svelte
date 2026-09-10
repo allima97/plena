@@ -580,7 +580,7 @@
 			{#if saidasDeltaPct !== null}<p class="mini-stat-delta">{saidasDeltaPct >= 0 ? '↑' : '↓'} {Math.abs(saidasDeltaPct).toFixed(1)}% vs. {monthLabel(prevMKey)}</p>{/if}
 		</div>
 		<div class="mini-stat">
-			<div class="mini-stat-top"><span class="stat-label">Guardado no mês</span><span class="mini-stat-dot" style="background:{t.saldo >= 0 ? 'var(--income)' : 'var(--expense)'}"></span></div>
+			<div class="mini-stat-top"><span class="stat-label">Saldo do mês</span><span class="mini-stat-dot" style="background:{t.saldo >= 0 ? 'var(--income)' : 'var(--expense)'}"></span></div>
 			<p class="mini-stat-value font-display privacy-value" class:money-in={t.saldo > 0} class:money-out={t.saldo < 0}>{fmtMoney(t.saldo)}</p>
 			<p class="mini-stat-delta">{t.receitas > 0 ? Math.round((t.saldo / t.receitas) * 100) : 0}% da renda do mês</p>
 		</div>
