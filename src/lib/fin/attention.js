@@ -1,5 +1,11 @@
-import { upcomingDue, pausedSeries, currentMonthKey, faturaDoCartao } from './derived.js';
+import { upcomingDue, pausedSeries, currentMonthKey, faturaDoCartao, saldoContaAte } from './derived.js';
 import { computeMetrics } from '../goals/metrics.js';
+
+function shiftMonthKey(mKey, delta) {
+	const [y, m] = mKey.split('-').map(Number);
+	const d = new Date(y, m - 1 + delta, 1);
+	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
 
 /**
  * Lista unificada de itens que merecem atenção do usuário (vencimentos próximos,
@@ -66,6 +72,46 @@ export function buildAttentionItems(
 			});
 		} else if (m.statusTone === 'good' && m.percent < 1) {
 			list.push({ tone: 'green', text: `Meta "${g.name}" está acima do ritmo`, actionLabel: 'Ver objetivo', href: '/objetivos', weight: 5 });
+		}
+	}
+
+	// Alerta futuro (Fase 3): projeta o saldo em contas líquidas dia a dia pelos próximos 30 dias
+	// (mesmo cálculo de saldoContaAte usado no Dashboard) e avisa assim que ele cruzar pra negativo
+	// -- diferente do alerta de vencimento, que olha só o lançamento em si, não o caixa acumulado.
+	const contasLiquidas = accounts.filter((a) => a.tipo !== 'cartao');
+	if (contasLiquidas.length) {
+		for (let dias = 1; dias <= 30; dias++) {
+			const d = new Date();
+			d.setDate(d.getDate() + dias);
+			const pad = (n) => String(n).padStart(2, '0');
+			const dataISO = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+			const saldoProjetado = contasLiquidas.reduce((s, acc) => s + saldoContaAte(transactions, acc, dataISO), 0);
+			if (saldoProjetado < 0) {
+				list.push({
+					tone: 'red',
+					text: `Seu saldo pode ficar negativo em ${dias} dia${dias > 1 ? 's' : ''}`,
+					actionLabel: 'Ver projeção',
+					href: '/',
+					weight: 95
+				});
+				break;
+			}
+		}
+	}
+
+	// Fatura bem acima da média dos últimos 3 meses -- sinal de comportamento de gasto, diferente
+	// do alerta de "perto do limite" acima (que é sobre risco de estourar o cartão).
+	for (const acc of accounts.filter((a) => a.tipo === 'cartao')) {
+		const faturaAtual = faturaDoCartao(transactions, acc, mKey);
+		const mediaAnterior = [1, 2, 3].reduce((s, i) => s + faturaDoCartao(transactions, acc, shiftMonthKey(mKey, -i)), 0) / 3;
+		if (mediaAnterior >= 50 && faturaAtual > mediaAnterior * 1.25) {
+			list.push({
+				tone: 'orange',
+				text: `Fatura do cartão ${acc.nome} está ${Math.round((faturaAtual / mediaAnterior - 1) * 100)}% acima da média`,
+				actionLabel: 'Ver fatura',
+				href: '/contas',
+				weight: 55
+			});
 		}
 	}
 

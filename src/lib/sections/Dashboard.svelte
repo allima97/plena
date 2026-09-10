@@ -11,12 +11,14 @@
 	import BarChart from '$lib/components/charts/BarChart.svelte';
 	import DonutChart from '$lib/components/charts/DonutChart.svelte';
 	import Sparkline from '$lib/components/charts/Sparkline.svelte';
-	import { Bell, CalendarDays, Plus, ArrowUpRight, ArrowDownRight, ArrowLeftRight, Sparkles, ChevronDown } from 'lucide-svelte';
+	import { Bell, CalendarDays, CalendarRange, Plus, ArrowUpRight, ArrowDownRight, ArrowLeftRight, Sparkles, ChevronDown, Wand2 } from 'lucide-svelte';
+	import FinancialCalendarModal from '$lib/components/FinancialCalendarModal.svelte';
 
 	const MES_ABBR = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 	const DOT_PALETTE = ['#e06b5f', '#e0a23f', '#8b78db', '#4a78db', '#23a768', '#2fb7c4', '#c4519a'];
 
 	let showNew = $state(false);
+	let showCalendar = $state(false);
 	let aporteModal = $state({ open: false, resourceId: null, goalId: null, prefill: null });
 	let contaFiltro = $state('all');
 	let tipoFiltro = $state('all');
@@ -122,6 +124,18 @@
 	};
 	const scoreWeakest = $derived([...financialScore.components].sort((a, b) => a.value - b.value)[0]);
 	const scoreTip = $derived(scoreWeakest ? SCORE_TIPS[scoreWeakest.key] : '');
+	// "Para chegar a X" (Fase 3): em vez de só o ponto mais fraco, lista os 2 componentes com
+	// mais espaço pra melhorar -- cada um já tem uma dica concreta em SCORE_TIPS.
+	const scoreWeakestTwo = $derived([...financialScore.components].sort((a, b) => a.value - b.value).slice(0, 2).filter((c) => c.value < 90));
+	const scoreTarget = $derived(Math.min(100, financialScore.overall + 8));
+	const SCORE_DESC = {
+		fluxoCaixa: 'Compara quanto entrou com quanto saiu este mês.',
+		comprometimento: 'Quanto da sua renda já está tomado por despesas fixas, parcelas e recorrências.',
+		cartoes: 'Quão perto do limite estão seus cartões neste mês.',
+		reserva: 'Quantos meses de despesas sua reserva de emergência cobriria hoje.',
+		objetivos: 'Se seus objetivos ativos estão no ritmo planejado.',
+		previsibilidade: 'O quanto suas despesas variam de mês a mês.'
+	};
 
 	// Histórico mensal do score: registra o retrato do mês corrente conforme o usuário usa
 	// o app (mesmo padrão de upsertPatrimonySnapshot em Patrimony.svelte) e mostra
@@ -446,7 +460,11 @@
 		<h1 class="font-display page-title">Seu dinheiro, em perspectiva.</h1>
 		<p class="page-sub">Uma leitura simples do que entrou, do que saiu e do que está por vir neste mês.</p>
 	</div>
-	<button class="btn btn-primary" onclick={() => (showNew = true)}><Plus size={16} /> Novo lançamento</button>
+	<div class="actions-row">
+		<a class="btn" href="/simulador"><Wand2 size={16} /> Simular</a>
+		<button class="btn" onclick={() => (showCalendar = true)}><CalendarRange size={16} /> Calendário</button>
+		<button class="btn btn-primary" onclick={() => (showNew = true)}><Plus size={16} /> Novo lançamento</button>
+	</div>
 </div>
 
 <div class="dash-filters">
@@ -619,17 +637,28 @@
 				</div>
 			{/each}
 		</div>
-		{#if financialScore.overall < 100 && scoreWeakest}
+		{#if financialScore.overall < 100 && scoreWeakestTwo.length}
 			<button class="score-tip-toggle" onclick={() => (scoreExpanded = !scoreExpanded)}>
-				{scoreExpanded ? 'Ocultar' : 'O que faria o score subir?'}
+				{scoreExpanded ? 'Ocultar' : `Para chegar a ${scoreTarget}`}
 			</button>
 			{#if scoreExpanded}
 				<div class="score-tip">
-					<p class="score-tip-head">Ponto mais fraco agora: <b>{scoreWeakest.label}</b> ({scoreWeakest.value}/100)</p>
-					<p class="score-tip-body">{scoreTip}</p>
+					<p class="score-tip-head">Para chegar a {scoreTarget}:</p>
+					<ol class="score-tip-list">
+						{#each scoreWeakestTwo as comp (comp.key)}
+							<li><b>{comp.label}</b> ({comp.value}/100) — {SCORE_TIPS[comp.key]}</li>
+						{/each}
+					</ol>
 				</div>
 			{/if}
 		{/if}
+		<details class="hero-breakdown score-explain">
+			<summary>Como calculamos esse número?</summary>
+			{#each financialScore.components as comp (comp.key)}
+				<div class="score-explain-row"><span class="score-explain-label">{comp.label}</span><span class="score-explain-desc">{SCORE_DESC[comp.key]}</span></div>
+			{/each}
+			<p class="score-disclaimer">Esse indicador é uma leitura do seu comportamento financeiro com base nos dados cadastrados no Plena — não é um score de crédito oficial.</p>
+		</details>
 	</div>
 </div>
 
@@ -812,6 +841,7 @@
 				<p class="stat-label" style="margin:0">Orçamento por categoria</p>
 				<a class="link-more" href="/categorias">Gerenciar ↗</a>
 			</div>
+			<p class="cat-row-sub" style="margin:0 0 10px">Ainda falta{diasRestantesMes === 1 ? '' : 'm'} {diasRestantesMes} dia{diasRestantesMes > 1 ? 's' : ''} para o fim do mês.</p>
 			{#if appState.budgetGlobal}
 				<div class="mini-progress-track" style="margin-bottom:4px">
 					<div class="mini-progress-fill" style={`width:${pctOrcamentoGlobal}%; background:${corOrcamento(pctOrcamentoGlobal)}`}></div>
@@ -888,6 +918,7 @@
 </div>
 {/if}
 
+<FinancialCalendarModal open={showCalendar} onClose={() => (showCalendar = false)} />
 <NewMovementModal open={showNew} onClose={() => (showNew = false)} />
 <MoveFormModal
 	open={aporteModal.open}

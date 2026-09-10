@@ -1064,6 +1064,114 @@ table.list .num {
 	text-decoration: underline;
 }
 
+/* ---------- calendário financeiro ---------- */
+
+.fin-cal-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 12px;
+}
+.fin-cal-month {
+	margin: 0;
+	font-weight: 800;
+	font-size: 15px;
+	font-family: var(--font-display);
+	text-transform: capitalize;
+}
+.fin-cal-grid {
+	display: grid;
+	grid-template-columns: repeat(7, 1fr);
+	gap: 4px;
+}
+.fin-cal-weekdays {
+	margin-bottom: 4px;
+}
+.fin-cal-weekdays span {
+	text-align: center;
+	font-size: 10px;
+	font-weight: 800;
+	text-transform: uppercase;
+	color: var(--ink-faint);
+}
+.fin-cal-cell {
+	aspect-ratio: 1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 3px;
+	border: 1px solid transparent;
+	border-radius: 10px;
+	background: none;
+	cursor: pointer;
+	font-size: 12px;
+	color: var(--ink);
+}
+.fin-cal-cell:not(.empty):hover {
+	background: var(--surface-3);
+}
+.fin-cal-cell.today .fin-cal-daynum {
+	font-weight: 800;
+	color: var(--accent-fg);
+}
+.fin-cal-cell.selected {
+	border-color: var(--ink);
+	background: var(--surface-3);
+}
+.fin-cal-dots {
+	display: flex;
+	gap: 2px;
+}
+.fin-cal-dot {
+	width: 5px;
+	height: 5px;
+	border-radius: 999px;
+}
+.fin-cal-dot.green {
+	background: var(--income);
+}
+.fin-cal-dot.red {
+	background: var(--expense);
+}
+.fin-cal-dot.amber {
+	background: var(--kpi-amber, #a67c1e);
+}
+.fin-cal-day-panel {
+	margin-top: 16px;
+	padding-top: 14px;
+	border-top: 1px solid var(--border);
+}
+.fin-cal-event {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	padding: 7px 0;
+	font-size: 13px;
+	border-bottom: 1px solid var(--border-soft, var(--border));
+}
+.fin-cal-event:last-child {
+	border-bottom: none;
+}
+.fin-cal-event-desc {
+	color: var(--ink-soft);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.fin-cal-event-total {
+	margin-top: 4px;
+	padding-top: 10px;
+	border-top: 1px dashed var(--border);
+	font-weight: 800;
+}
+@media (max-width: 480px) {
+	.fin-cal-daynum {
+		font-size: 11px;
+	}
+}
+
 
 .topbar {
 	display: flex;
@@ -1422,6 +1530,17 @@ table.list .num {
 .stat-value {
 	margin: 10px 0 0;
 	font-size: 26px;
+}
+.report-section-label {
+	margin: 28px 0 12px;
+	font-size: 13px;
+	font-weight: 800;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--ink-faint);
+}
+.report-section-label:first-of-type {
+	margin-top: 4px;
 }
 .stat-sub {
 	margin: 6px 0 0;
@@ -2263,6 +2382,12 @@ table.list .num {
 	margin: 6px 0 0;
 	font-size: 12.5px;
 	color: var(--ink-muted);
+}
+.goal-list-pace {
+	margin: 3px 0 0;
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--ink-faint);
 }
 
 .goal-detail {
@@ -3920,6 +4045,48 @@ table.list .num {
 	font-size: 13px;
 	color: var(--ink);
 	margin: 0;
+	line-height: 1.5;
+}
+.score-tip-list {
+	margin: 0;
+	padding-left: 18px;
+	font-size: 13px;
+	color: var(--ink);
+	line-height: 1.6;
+}
+.score-explain {
+	margin-top: 10px;
+}
+.score-explain summary {
+	font-size: 12px;
+	font-weight: 700;
+	color: var(--accent-fg);
+	cursor: pointer;
+}
+.score-explain-row {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 8px 0;
+	border-bottom: 1px solid var(--border-soft, var(--border));
+}
+.score-explain-row:last-of-type {
+	border-bottom: none;
+}
+.score-explain-label {
+	font-size: 12px;
+	font-weight: 800;
+	color: var(--ink);
+}
+.score-explain-desc {
+	font-size: 12px;
+	color: var(--ink-muted);
+	line-height: 1.5;
+}
+.score-disclaimer {
+	margin: 8px 0 0;
+	font-size: 11px;
+	color: var(--ink-faint);
 	line-height: 1.5;
 }
 .feed-list-head {

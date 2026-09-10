@@ -310,6 +310,9 @@
 					<div class="goal-progress-fill" style="width:{m.percent * 100}%;background:{progressColor(m.percent)}"></div>
 				</div>
 				<p class="goal-list-values"><span class="privacy-value">{fmtMoney(m.totalAccumulated)}</span> de <span class="privacy-value">{fmtMoney(m.effectiveTarget)}</span></p>
+				{#if m.status !== 'concluido' && m.targetDate && m.projectedDate}
+					<p class="goal-list-pace">Previsão: {m.projectedDate.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}</p>
+				{/if}
 			</button>
 		{:else}
 			<p class="empty">Nenhum objetivo ainda.</p>
@@ -583,6 +586,39 @@
 							<input class="field-input" type="number" step="0.01" min="0" max={simBase.saldo} placeholder="R$ 0,00" bind:value={simAporte} />
 						</label>
 						{#if simResult.valido && simResult.aporte > 0}
+							<div class="table-wrap" style="margin-bottom:16px">
+								<table class="list">
+									<thead>
+										<tr><th>Hoje × Depois</th><th class="num">Hoje</th><th class="num">Reduzindo prazo</th><th class="num">Reduzindo parcela</th></tr>
+									</thead>
+									<tbody>
+										<tr>
+											<td data-label="">Saldo devedor</td>
+											<td class="num privacy-value" data-label="Hoje">{fmtMoney(simResult.saldo)}</td>
+											<td class="num privacy-value" data-label="Reduzindo prazo">{fmtMoney(simResult.novoSaldo)}</td>
+											<td class="num privacy-value" data-label="Reduzindo parcela">{fmtMoney(simResult.novoSaldo)}</td>
+										</tr>
+										<tr>
+											<td data-label="">Parcela</td>
+											<td class="num privacy-value" data-label="Hoje">{fmtMoney(simBase.parcela)}</td>
+											<td class="num privacy-value" data-label="Reduzindo prazo">{fmtMoney(simBase.parcela)}</td>
+											<td class="num privacy-value" data-label="Reduzindo parcela">{fmtMoney(simResult.parcelaReduzida.parcela)}</td>
+										</tr>
+										<tr>
+											<td data-label="">Prazo</td>
+											<td class="num" data-label="Hoje">{Math.ceil(simResult.mesesAtual)} meses</td>
+											<td class="num" data-label="Reduzindo prazo">{Math.ceil(simResult.prazoReduzido.meses)} meses</td>
+											<td class="num" data-label="Reduzindo parcela">{Math.ceil(simResult.mesesAtual)} meses</td>
+										</tr>
+										<tr>
+											<td data-label="">Juros restantes</td>
+											<td class="num privacy-value" data-label="Hoje">{fmtMoney(simResult.jurosAtual)}</td>
+											<td class="num privacy-value" data-label="Reduzindo prazo">{fmtMoney(simResult.prazoReduzido.juros)}</td>
+											<td class="num privacy-value" data-label="Reduzindo parcela">{fmtMoney(simResult.parcelaReduzida.juros)}</td>
+										</tr>
+									</tbody>
+								</table>
+							</div>
 							<div class="sim-scenarios">
 								<div class="sim-scenario">
 									<p class="sim-scenario-title">Reduzindo o prazo</p>

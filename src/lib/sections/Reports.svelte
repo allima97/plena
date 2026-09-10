@@ -1,10 +1,13 @@
 <script>
 	import { appState } from '$lib/fin/store.svelte.js';
 	import { monthTransactions, totals, byCategory, currentMonthKey, faturaDoCartao } from '$lib/fin/derived.js';
+	import { buildInsights } from '$lib/fin/intelligence.js';
 	import { fmtMoney, monthKey, monthLabel, yearKey, todayISO } from '$lib/format.js';
 	import ReportCenterModal from '$lib/components/ReportCenterModal.svelte';
 	import BarChart from '$lib/components/charts/BarChart.svelte';
-	import { FileBarChart, CheckCircle2, AlertTriangle } from 'lucide-svelte';
+	import { FileBarChart, CheckCircle2, AlertTriangle, Sparkles } from 'lucide-svelte';
+
+	const INSIGHT_LABELS = { comportamento: 'Comportamento', oportunidade: 'Oportunidade', risco: 'Risco', objetivo: 'Objetivo', cartao: 'Cartão' };
 
 	const MES_ABBR = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -74,6 +77,42 @@
 	});
 	const maiorReceita = $derived(byCategory(mesAtualTx, appState.categories, 'receita')[0]);
 
+	// "O que devo fazer?" (Fase 4): reaproveita o mesmo motor de insights do Dashboard --
+	// recomendação centralizada, não duplicada, em ambas as telas.
+	const intelligenceInput = $derived.by(() => ({
+		transactions: appState.transactions,
+		accounts: appState.accounts,
+		goals: appState.goals,
+		resources: appState.resources,
+		resourceMoves: appState.resourceMoves,
+		goalCategories: appState.goalCategories,
+		installments: appState.installments,
+		amortizations: appState.amortizations,
+		categories: appState.categories
+	}));
+	const insights = $derived(buildInsights(intelligenceInput, 4));
+
+	// Previsão de 3 meses (Fase 4): extrapola a média dos últimos 3 meses fechados -- leitura
+	// diferente da projeção de caixa dia a dia do Dashboard, aqui é sobre padrão de receita/despesa.
+	function shiftMonthKey(mKey, delta) {
+		const [y, m] = mKey.split('-').map(Number);
+		const d = new Date(y, m - 1 + delta, 1);
+		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+	}
+	const previsao3Meses = $derived.by(() => {
+		const mKey = currentMonthKey();
+		let receitas = 0;
+		let despesas = 0;
+		for (let i = 1; i <= 3; i++) {
+			const tt = totals(monthTransactions(appState.transactions, shiftMonthKey(mKey, -i)));
+			receitas += tt.receitas;
+			despesas += tt.despesas;
+		}
+		const mediaReceitas = receitas / 3;
+		const mediaDespesas = despesas / 3;
+		return { receitas: mediaReceitas * 3, despesas: mediaDespesas * 3, guardado: (mediaReceitas - mediaDespesas) * 3 };
+	});
+
 	// detalhamento por categoria (mês específico, independente do período acima)
 	const mesesDisponiveis = $derived.by(() => {
 		const set = new Set(appState.transactions.map((t) => monthKey(t.data)));
@@ -96,6 +135,8 @@
 	</div>
 	<button class="btn" onclick={() => (showReport = true)}><FileBarChart size={16} /> Exportar relatório</button>
 </div>
+
+<p class="report-section-label">Como estou?</p>
 
 <div class="actions-row" style="margin-bottom:20px">
 	<div class="period-tabs">
@@ -172,6 +213,8 @@
 	</div>
 </div>
 
+<p class="report-section-label">Onde estou gastando?</p>
+
 <div class="page-head" style="margin-top:6px">
 	<div>
 		<p class="font-display" style="margin:0;font-size:18px">Detalhamento por categoria</p>
@@ -215,6 +258,32 @@
 			<p class="empty">Sem receitas neste mês.</p>
 		{/if}
 	</div>
+</div>
+
+<p class="report-section-label">O que devo fazer?</p>
+
+<div class="card" style="margin-bottom:16px">
+	<div class="feed-list-head">
+		<p class="stat-label" style="margin:0"><Sparkles size={16} color="var(--accent-fg)" style="vertical-align:-3px; margin-right:6px" />Recomendações</p>
+	</div>
+	{#if insights.length}
+		<div class="insight-list">
+			{#each insights as ins, i (i)}
+				<div class="insight-item">
+					<span class="insight-item-tag" data-tipo={ins.tipo}>{INSIGHT_LABELS[ins.tipo] || 'Insight'}</span>
+					<p class="insight-item-title">{ins.title}</p>
+					<p class="insight-item-body">{ins.body}</p>
+				</div>
+			{/each}
+		</div>
+	{:else}
+		<p class="empty">Sem recomendações por enquanto -- continue registrando seus lançamentos.</p>
+	{/if}
+	<p class="cat-row-sub" style="margin-top:14px">
+		Mantendo o ritmo dos últimos 3 meses, sua previsão para o próximo trimestre é <span class="privacy-value">{fmtMoney(previsao3Meses.receitas)}</span> em receitas,
+		<span class="privacy-value">{fmtMoney(previsao3Meses.despesas)}</span> em despesas e
+		<span class="privacy-value" class:money-out={previsao3Meses.guardado < 0}>{fmtMoney(previsao3Meses.guardado)}</span> guardado{previsao3Meses.guardado === 1 ? '' : 's'}.
+	</p>
 </div>
 
 <ReportCenterModal open={showReport} onClose={() => (showReport = false)} />
