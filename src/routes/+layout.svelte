@@ -63,7 +63,7 @@
 			items: [
 				{ href: '/movimentacoes', label: 'Movimentações', icon: ReceiptText },
 				{ href: '/contas', label: 'Contas e cartões', icon: WalletCards },
-				{ href: '/categorias', label: 'Categorias', icon: Tags }
+				{ href: '/categorias', label: 'Gestão de Categorias', icon: Tags }
 			]
 		},
 		{
