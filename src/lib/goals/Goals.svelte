@@ -357,15 +357,15 @@
 						{#if selectedGoal.paused}<p class="movement-meta" style="margin-top:6px">Objetivo pausado: não entra no score financeiro, nos avisos nem nos totais da Dashboard, do Simulador ou do Patrimônio.</p>{/if}
 					</div>
 					<div class="actions-row">
-						<button class="btn btn-ghost sm" onclick={() => (goalModal = { open: true, editing: selectedGoal })}><Pencil size={14} /> Editar</button>
-						<button class="btn btn-ghost sm" onclick={() => updateGoal(selectedGoal.id, { paused: !selectedGoal.paused })}>
-							{#if selectedGoal.paused}<Play size={14} /> Retomar{:else}<Pause size={14} /> Pausar{/if}
+						<button class="btn btn-ghost sm" aria-label="Editar" onclick={() => (goalModal = { open: true, editing: selectedGoal })}><Pencil size={14} /> <span class="btn-label">Editar</span></button>
+						<button class="btn btn-ghost sm" aria-label={selectedGoal.paused ? 'Retomar' : 'Pausar'} onclick={() => updateGoal(selectedGoal.id, { paused: !selectedGoal.paused })}>
+							{#if selectedGoal.paused}<Play size={14} /> <span class="btn-label">Retomar</span>{:else}<Pause size={14} /> <span class="btn-label">Pausar</span>{/if}
 						</button>
-						<button class="btn btn-ghost sm" onclick={() => updateGoal(selectedGoal.id, { archived: !selectedGoal.archived })}>
-							{#if selectedGoal.archived}<ArchiveRestore size={14} /> Reativar{:else}<Archive size={14} /> Arquivar{/if}
+						<button class="btn btn-ghost sm" aria-label={selectedGoal.archived ? 'Reativar' : 'Arquivar'} onclick={() => updateGoal(selectedGoal.id, { archived: !selectedGoal.archived })}>
+							{#if selectedGoal.archived}<ArchiveRestore size={14} /> <span class="btn-label">Reativar</span>{:else}<Archive size={14} /> <span class="btn-label">Arquivar</span>{/if}
 						</button>
-						<button class="btn btn-danger sm" onclick={() => (deleting = { kind: 'goal', id: selectedGoal.id, label: `"${selectedGoal.name}"`, warn: 'Todos os recursos, movimentações e prestações desse objetivo serão apagados.' })}>
-							<Trash2 size={14} /> Excluir
+						<button class="btn btn-danger sm" aria-label="Excluir" onclick={() => (deleting = { kind: 'goal', id: selectedGoal.id, label: `"${selectedGoal.name}"`, warn: 'Todos os recursos, movimentações e prestações desse objetivo serão apagados.' })}>
+							<Trash2 size={14} /> <span class="btn-label">Excluir</span>
 						</button>
 					</div>
 				</div>

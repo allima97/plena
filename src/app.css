@@ -2479,21 +2479,24 @@ table.list .num {
 	gap: 16px;
 	flex-wrap: wrap;
 }
-/* Editar / Pausar / Arquivar / Excluir sempre lado a lado numa única linha -- em telas estreitas,
-   em vez de quebrar cada botão numa linha própria (.actions-row normal usa flex-wrap:wrap), essa
-   linha específica rola na horizontal se não couber tudo de uma vez. */
+/* Editar / Pausar / Arquivar / Excluir sempre lado a lado numa única linha -- em vez de quebrar
+   cada botão numa linha própria (.actions-row normal usa flex-wrap:wrap) ou depender de scroll
+   horizontal (cortava o botão Excluir na borda da tela em telas estreitas), o texto do botão
+   some abaixo de 480px e sobra só o ícone, sempre cabendo os 4 numa linha só. */
 .goal-detail-head .actions-row {
 	flex-wrap: nowrap;
-	overflow-x: auto;
-	max-width: 100%;
-	-webkit-overflow-scrolling: touch;
-	scrollbar-width: none;
-}
-.goal-detail-head .actions-row::-webkit-scrollbar {
-	display: none;
 }
 .goal-detail-head .actions-row .btn {
 	flex-shrink: 0;
+}
+@media (max-width: 480px) {
+	.goal-detail-head .actions-row .btn {
+		padding: 0 10px;
+		gap: 0;
+	}
+	.goal-detail-head .actions-row .btn-label {
+		display: none;
+	}
 }
 
 /* ---------- objetivos: tipo de meta (form) ---------- */
