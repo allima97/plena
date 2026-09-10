@@ -256,6 +256,12 @@ export function removeCategory(id) {
 	erase('finCategories', id);
 }
 
+/** Reinsere uma categoria removida (mesmo id e dados), usado pelo "desfazer" do toast de exclusão. */
+export function restoreCategory(cat) {
+	categories = [...categories, cat];
+	write('finCategories', cat.id, cat);
+}
+
 /** Define (ou remove, com valor <= 0) o orçamento mensal de uma categoria de despesa --
  * usado para a barra de progresso de uso em Categorias e o resumo no Dashboard. */
 export function setCategoryBudget(id, valor) {
@@ -324,6 +330,12 @@ export function updateAccount(id, data) {
 export function removeAccount(id) {
 	accounts = accounts.filter((a) => a.id !== id);
 	erase('finAccounts', id);
+}
+
+/** Reinsere uma conta removida (mesmo id e dados), usado pelo "desfazer" do toast de exclusão. */
+export function restoreAccount(acc) {
+	accounts = [...accounts, acc];
+	write('finAccounts', acc.id, acc);
 }
 
 export function accountById(id) {
@@ -583,6 +595,13 @@ export function removeResource(id) {
 	moveIds.forEach((mid) => erase('resourceMoves', mid));
 }
 
+/** Reinsere um recurso removido (mesmo id e dados), usado pelo "desfazer" do toast de exclusão.
+ * As movimentações desse recurso são restauradas separadamente com restoreResourceMove. */
+export function restoreResource(r) {
+	resources = [...resources, r];
+	write('resources', r.id, r);
+}
+
 export function addResourceMove(resourceId, goalId, data) {
 	const m = { id: uid(), resourceId, goalId, categoryId: null, ...data };
 	resourceMoves = [...resourceMoves, m];
@@ -601,6 +620,12 @@ export function updateResourceMove(id, patch) {
 export function removeResourceMove(id) {
 	resourceMoves = resourceMoves.filter((m) => m.id !== id);
 	erase('resourceMoves', id);
+}
+
+/** Reinsere uma movimentação de recurso removida (mesmo id e dados), usado pelo "desfazer" do toast de exclusão. */
+export function restoreResourceMove(m) {
+	resourceMoves = [...resourceMoves, m];
+	write('resourceMoves', m.id, m);
 }
 
 // ---- categorias de movimentações de objetivo (separado das categorias financeiras) ----
@@ -661,6 +686,13 @@ export function removeInstallment(id) {
 	if (goalId) adjustRemainingTerm(goalId, 1);
 }
 
+/** Reinsere uma prestação removida (mesmo id e dados), usado pelo "desfazer" do toast de exclusão. */
+export function restoreInstallment(i) {
+	installments = [...installments, i];
+	write('installments', i.id, i);
+	adjustRemainingTerm(i.goalId, -1);
+}
+
 // ---- amortizações extras (fora do financiamento) --------------------------
 
 export function addAmortization(goalId, data) {
@@ -681,6 +713,12 @@ export function updateAmortization(id, patch) {
 export function removeAmortization(id) {
 	amortizations = amortizations.filter((a) => a.id !== id);
 	erase('amortizations', id);
+}
+
+/** Reinsere uma amortização removida (mesmo id e dados), usado pelo "desfazer" do toast de exclusão. */
+export function restoreAmortization(a) {
+	amortizations = [...amortizations, a];
+	write('amortizations', a.id, a);
 }
 
 // ---- patrimonio (fase 4: ativos rastreados manualmente + historico mensal) ----
@@ -706,6 +744,19 @@ export function removePatrimonyItem(id) {
 	patrimonyItemMoves = patrimonyItemMoves.filter((m) => m.itemId !== id);
 	erase('patrimonyItems', id);
 	moveIds.forEach((mid) => erase('patrimonyItemMoves', mid));
+}
+
+/** Reinsere um item de patrimônio removido (mesmo id e dados), usado pelo "desfazer" do toast de
+ * exclusão. O histórico de aportes/valorização desse item é restaurado à parte, chamando
+ * restorePatrimonyItemMove pra cada evento salvo antes da exclusão. */
+export function restorePatrimonyItem(p) {
+	patrimonyItems = [...patrimonyItems, p];
+	write('patrimonyItems', p.id, p);
+}
+
+export function restorePatrimonyItemMove(m) {
+	patrimonyItemMoves = [...patrimonyItemMoves, m];
+	write('patrimonyItemMoves', m.id, m);
 }
 
 /** Registra um evento de aporte ou valorização/desvalorização de um ativo, e ajusta o valor

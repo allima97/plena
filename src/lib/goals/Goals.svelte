@@ -6,8 +6,14 @@
 		removeResource,
 		removeResourceMove,
 		removeInstallment,
-		removeAmortization
+		removeAmortization,
+		restoreResource,
+		restoreResourceMove,
+		restoreInstallment,
+		restoreAmortization
 	} from '$lib/fin/store.svelte.js';
+	import { showToast } from '$lib/toast.svelte.js';
+	import { page } from '$app/state';
 	import { computeMetrics, progressColor, encargosAbatimentoSummary, installmentYearsOf, estimateMonthlyRate, simulateAmortizationScenario, simulateMultipleAmortizations } from './metrics.js';
 	import { GOAL_TYPES } from './constants.js';
 	import { fmtMoney, fmtDate } from '$lib/format.js';
@@ -23,7 +29,9 @@
 
 	const MONTH_ABBR = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
-	let selectedGoalId = $state(null);
+	// Se a página abriu a partir da busca global (?goal=<id>), começa com esse objetivo
+	// selecionado -- o efeito abaixo cai pro primeiro objetivo se o id não existir/for inválido.
+	let selectedGoalId = $state(page.url.searchParams.get('goal'));
 	let showArchived = $state(false);
 	let expandedResource = $state({});
 	let movesPage = $state({}); // resourceId -> pagina atual
@@ -237,11 +245,43 @@
 	function confirmDelete() {
 		if (!deleting) return;
 		const { kind, id } = deleting;
-		if (kind === 'goal') removeGoal(id);
-		else if (kind === 'resource') removeResource(id);
-		else if (kind === 'move') removeResourceMove(id);
-		else if (kind === 'installment') removeInstallment(id);
-		else if (kind === 'amortization') removeAmortization(id);
+		if (kind === 'goal') {
+			// Objetivo inteiro: cascata grande demais (recursos, movimentações, prestações,
+			// amortizações) pra desfazer com segurança -- o aviso no ConfirmDialog já cobre isso.
+			removeGoal(id);
+		} else if (kind === 'resource') {
+			const snapshot = appState.resources.find((r) => r.id === id);
+			const movesSnapshot = appState.resourceMoves.filter((m) => m.resourceId === id).map((m) => ({ ...m }));
+			removeResource(id);
+			if (snapshot) {
+				showToast({
+					message: `Recurso "${snapshot.name}" excluído.`,
+					actionLabel: 'DESFAZER',
+					onAction: () => {
+						restoreResource(snapshot);
+						movesSnapshot.forEach((m) => restoreResourceMove(m));
+					}
+				});
+			}
+		} else if (kind === 'move') {
+			const snapshot = appState.resourceMoves.find((m) => m.id === id);
+			removeResourceMove(id);
+			if (snapshot) {
+				showToast({ message: 'Movimentação excluída.', actionLabel: 'DESFAZER', onAction: () => restoreResourceMove(snapshot) });
+			}
+		} else if (kind === 'installment') {
+			const snapshot = appState.installments.find((i) => i.id === id);
+			removeInstallment(id);
+			if (snapshot) {
+				showToast({ message: `Prestação nº ${snapshot.number} excluída.`, actionLabel: 'DESFAZER', onAction: () => restoreInstallment(snapshot) });
+			}
+		} else if (kind === 'amortization') {
+			const snapshot = appState.amortizations.find((a) => a.id === id);
+			removeAmortization(id);
+			if (snapshot) {
+				showToast({ message: 'Amortização excluída.', actionLabel: 'DESFAZER', onAction: () => restoreAmortization(snapshot) });
+			}
+		}
 		deleting = null;
 	}
 </script>

@@ -1,8 +1,9 @@
 <script>
 	import Modal from './Modal.svelte';
-	import { appState, addTransactionSeries, updateTransaction, editSeries } from '$lib/fin/store.svelte.js';
+	import { appState, addTransactionSeries, updateTransaction, editSeries, removeTransaction, seriesOf } from '$lib/fin/store.svelte.js';
 	import { FORMAS_PAGAMENTO_PADRAO } from '$lib/fin/seed.js';
-	import { todayISO } from '$lib/format.js';
+	import { todayISO, fmtMoney } from '$lib/format.js';
+	import { showToast } from '$lib/toast.svelte.js';
 	import { Pencil, Copy, Trash2 } from 'lucide-svelte';
 
 	/**
@@ -140,15 +141,30 @@
 			formaPagamento: form.formaPagamento
 		};
 		if (mode === 'edit-occurrence') {
+			const snapshot = { ...transaction };
 			updateTransaction(transaction.id, base);
+			showToast({ message: '✓ Lançamento atualizado.', actionLabel: 'DESFAZER', onAction: () => updateTransaction(snapshot.id, snapshot) });
 		} else if (mode === 'edit-series') {
+			const snapshot = seriesOf(transaction.seriesId).map((t) => ({ ...t }));
 			editSeries(transaction.seriesId, base);
+			showToast({
+				message: '✓ Série atualizada.',
+				actionLabel: 'DESFAZER',
+				onAction: () => snapshot.forEach((t) => updateTransaction(t.id, t))
+			});
 		} else {
-			addTransactionSeries(
+			const created = addTransactionSeries(
 				base,
 				form.schedule,
 				form.schedule === 'parcelado' ? form.parcelas : form.mesesRecorrencia
 			);
+			const tipoLabel = base.tipo === 'receita' ? 'Receita' : 'Despesa';
+			const seriesLabel = created.length > 1 ? ` (${created.length}x)` : '';
+			showToast({
+				message: `✓ ${tipoLabel} de ${fmtMoney(base.valor)} registrada${seriesLabel}.`,
+				actionLabel: 'DESFAZER',
+				onAction: () => created.forEach((tx) => removeTransaction(tx.id))
+			});
 		}
 		onClose();
 	}

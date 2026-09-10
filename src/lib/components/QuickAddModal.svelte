@@ -1,8 +1,8 @@
 <script>
-	import { appState, addTransaction } from '$lib/fin/store.svelte.js';
-	import { todayISO } from '$lib/format.js';
+	import { appState, addTransaction, removeTransaction } from '$lib/fin/store.svelte.js';
+	import { todayISO, fmtMoney } from '$lib/format.js';
 	import { showToast } from '$lib/toast.svelte.js';
-	import { X, Check } from 'lucide-svelte';
+	import { X, Check, Wand2 } from 'lucide-svelte';
 
 	let { open, onClose } = $props();
 
@@ -54,20 +54,31 @@
 		queueMicrotask(() => valorEl?.focus());
 	}
 
-	// Categorização por regra local: reaproveita conta/categoria da última vez que essa descrição foi usada.
-	function handleDescricaoBlur() {
-		if (form.categoriaId || !form.descricao.trim()) return;
+	// Inteligência de preenchimento: em vez de aplicar em silêncio no blur, mostra uma sugestão
+	// visível ("Mercado → Despesa · Nubank · Alimentação") que o usuário confirma com um clique --
+	// mais transparente que preencher os campos sem avisar.
+	const sugestao = $derived.by(() => {
+		if (form.categoriaId || !form.descricao.trim()) return null;
 		const key = norm(form.descricao);
+		if (!key) return null;
 		const match = [...appState.transactions].sort((a, b) => b.data.localeCompare(a.data)).find((tr) => norm(tr.descricao) === key);
-		if (match) {
-			form = {
-				...form,
-				tipo: match.tipo,
-				contaId: match.contaId || form.contaId,
-				categoriaId: match.categoriaId || '',
-				subcategoriaId: match.subcategoriaId || ''
-			};
-		}
+		if (!match || (!match.categoriaId && !match.contaId)) return null;
+		const conta = appState.accounts.find((a) => a.id === match.contaId);
+		const cat = appState.categories.find((c) => c.id === match.categoriaId);
+		const partes = [match.tipo === 'receita' ? 'Receita' : 'Despesa', conta?.nome, cat?.nome].filter(Boolean);
+		return { match, label: partes.join(' · ') };
+	});
+
+	function usarSugestao() {
+		if (!sugestao) return;
+		const match = sugestao.match;
+		form = {
+			...form,
+			tipo: match.tipo,
+			contaId: match.contaId || form.contaId,
+			categoriaId: match.categoriaId || '',
+			subcategoriaId: match.subcategoriaId || ''
+		};
 	}
 
 	const categoriasDoTipo = $derived(appState.categories.filter((c) => c.tipo === form.tipo));
@@ -75,7 +86,7 @@
 	function submit(e) {
 		e.preventDefault();
 		if (!form.valor || !Number(form.valor)) return;
-		addTransaction({
+		const created = addTransaction({
 			tipo: form.tipo,
 			valor: Number(form.valor),
 			data: todayISO(),
@@ -86,7 +97,11 @@
 			formaPagamento: null,
 			statusPagamento: 'pago'
 		});
-		showToast({ message: '✓ Lançamento salvo.' });
+		showToast({
+			message: `✓ ${form.tipo === 'receita' ? 'Receita' : 'Despesa'} de ${fmtMoney(created.valor)} registrada.`,
+			actionLabel: 'DESFAZER',
+			onAction: () => removeTransaction(created.id)
+		});
 		onClose();
 	}
 </script>
@@ -107,7 +122,14 @@
 					<button type="button" class="quick-add-type-btn" class:active={form.tipo === 'receita'} onclick={() => (form = { ...form, tipo: 'receita', categoriaId: '' })}>Receita</button>
 				</div>
 				<input bind:this={valorEl} class="quick-add-value" type="number" step="0.01" min="0" placeholder="R$ 0,00" bind:value={form.valor} required />
-				<input class="field-input" type="text" placeholder="Descrição (ex: Mercado)" bind:value={form.descricao} onblur={handleDescricaoBlur} />
+				<input class="field-input" type="text" placeholder="Descrição (ex: Mercado)" bind:value={form.descricao} />
+				{#if sugestao}
+					<button type="button" class="quick-add-suggestion" onclick={usarSugestao}>
+						<Wand2 size={13} />
+						<span><b>{form.descricao}</b> → {sugestao.label}</span>
+						<span class="quick-add-suggestion-cta">Usar</span>
+					</button>
+				{/if}
 				<div class="quick-add-row">
 					<select class="field-input" bind:value={form.contaId}>
 						{#each appState.accounts as acc (acc.id)}

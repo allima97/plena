@@ -1,7 +1,8 @@
 <script>
 	import Modal from '$lib/components/Modal.svelte';
-	import { appState, addResourceMove, updateResourceMove, resolveGoalCategoryId, goalCategoryName } from '$lib/fin/store.svelte.js';
-	import { todayISO } from '$lib/format.js';
+	import { appState, addResourceMove, updateResourceMove, removeResourceMove, resolveGoalCategoryId, goalCategoryName } from '$lib/fin/store.svelte.js';
+	import { todayISO, fmtMoney } from '$lib/format.js';
+	import { showToast } from '$lib/toast.svelte.js';
 
 	let { open, resourceId, goalId, editing = null, prefill = null, onClose } = $props();
 
@@ -32,8 +33,14 @@
 		const categoryId = resolveGoalCategoryId(form.categoryName);
 		if (editing) {
 			updateResourceMove(editing.id, { date: form.date || todayISO(), description, amount, categoryId });
+			showToast({ message: '✓ Lançamento atualizado.' });
 		} else {
-			addResourceMove(resourceId, goalId, { date: form.date || todayISO(), description, amount, categoryId });
+			const created = addResourceMove(resourceId, goalId, { date: form.date || todayISO(), description, amount, categoryId });
+			showToast({
+				message: `✓ ${amount >= 0 ? 'Aporte' : 'Retirada'} de ${fmtMoney(Math.abs(amount))} registrado${amount >= 0 ? '' : 'a'}.`,
+				actionLabel: 'DESFAZER',
+				onAction: () => removeResourceMove(created.id)
+			});
 		}
 		onClose();
 	}

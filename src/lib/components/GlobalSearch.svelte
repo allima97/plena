@@ -38,9 +38,9 @@
 		if (q.length < 2) return [];
 		const out = [];
 		for (const c of appState.categories) {
-			if (norm(c.nome).includes(q)) out.push({ key: c.id, nome: c.nome });
+			if (norm(c.nome).includes(q)) out.push({ key: c.id, id: c.id, nome: c.nome });
 			for (const s of c.secundarios || []) {
-				if (norm(s.nome).includes(q)) out.push({ key: `${c.id}:${s.id}`, nome: `${c.nome} · ${s.nome}` });
+				if (norm(s.nome).includes(q)) out.push({ key: `${c.id}:${s.id}`, id: s.id, nome: `${c.nome} · ${s.nome}` });
 			}
 		}
 		return out.slice(0, 6);
@@ -76,7 +76,7 @@
 					{#if movimentacoes.length}
 						<p class="search-group-label">Movimentações · {movimentacoes.length}</p>
 						{#each movimentacoes as tr (tr.id)}
-							<button class="search-result-item" onclick={() => pick('/movimentacoes')}>
+							<button class="search-result-item" onclick={() => pick(`/movimentacoes?open=${tr.id}`)}>
 								<span class="search-result-icon"><ReceiptText size={15} /></span>
 								<span class="search-result-main">
 									<span class="search-result-name">{tr.descricao || 'Lançamento'}</span>
@@ -89,7 +89,7 @@
 					{#if contas.length}
 						<p class="search-group-label">Contas · {contas.length}</p>
 						{#each contas as acc (acc.id)}
-							<button class="search-result-item" onclick={() => pick('/contas')}>
+							<button class="search-result-item" onclick={() => pick(`/contas?open=${acc.id}`)}>
 								<span class="search-result-icon"><WalletCards size={15} /></span>
 								<span class="search-result-main"><span class="search-result-name">{acc.nome}</span></span>
 							</button>
@@ -98,7 +98,7 @@
 					{#if categorias.length}
 						<p class="search-group-label">Categorias · {categorias.length}</p>
 						{#each categorias as cat (cat.key)}
-							<button class="search-result-item" onclick={() => pick('/categorias')}>
+							<button class="search-result-item" onclick={() => pick(`/categorias?open=${cat.id}`)}>
 								<span class="search-result-icon"><Tags size={15} /></span>
 								<span class="search-result-main"><span class="search-result-name">{cat.nome}</span></span>
 							</button>
@@ -107,7 +107,7 @@
 					{#if objetivos.length}
 						<p class="search-group-label">Objetivos · {objetivos.length}</p>
 						{#each objetivos as g (g.id)}
-							<button class="search-result-item" onclick={() => pick('/objetivos')}>
+							<button class="search-result-item" onclick={() => pick(`/objetivos?goal=${g.id}`)}>
 								<span class="search-result-icon"><Target size={15} /></span>
 								<span class="search-result-main"><span class="search-result-name">{g.name}</span></span>
 							</button>

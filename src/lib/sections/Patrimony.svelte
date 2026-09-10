@@ -1,8 +1,9 @@
 <script>
-	import { appState, addPatrimonyItem, updatePatrimonyItem, removePatrimonyItem, upsertPatrimonySnapshot, addPatrimonyItemMove, removePatrimonyItemMove } from '$lib/fin/store.svelte.js';
+	import { appState, addPatrimonyItem, updatePatrimonyItem, removePatrimonyItem, restorePatrimonyItem, restorePatrimonyItemMove, upsertPatrimonySnapshot, addPatrimonyItemMove, removePatrimonyItemMove } from '$lib/fin/store.svelte.js';
 	import { currentMonthKey, faturaDoCartao, saldoContaAte } from '$lib/fin/derived.js';
 	import { monthKey } from '$lib/format.js';
 	import { fmtMoney, todayISO } from '$lib/format.js';
+	import { showToast } from '$lib/toast.svelte.js';
 	import Modal from '$lib/components/Modal.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import RowActionsModal from '$lib/components/RowActionsModal.svelte';
@@ -364,7 +365,17 @@
 	confirmLabel="Excluir"
 	onCancel={() => (deleting = null)}
 	onConfirm={() => {
+		const snapshot = { ...deleting };
+		const movesSnapshot = appState.patrimonyItemMoves.filter((m) => m.itemId === deleting.id).map((m) => ({ ...m }));
 		removePatrimonyItem(deleting.id);
+		showToast({
+			message: `"${snapshot.nome}" excluído do patrimônio.`,
+			actionLabel: 'DESFAZER',
+			onAction: () => {
+				restorePatrimonyItem(snapshot);
+				movesSnapshot.forEach((m) => restorePatrimonyItemMove(m));
+			}
+		});
 		deleting = null;
 	}}
 />

@@ -1,7 +1,8 @@
 <script>
 	import Modal from '$lib/components/Modal.svelte';
-	import { appState, addInstallment, updateInstallment } from '$lib/fin/store.svelte.js';
-	import { todayISO } from '$lib/format.js';
+	import { appState, addInstallment, updateInstallment, removeInstallment } from '$lib/fin/store.svelte.js';
+	import { todayISO, fmtMoney } from '$lib/format.js';
+	import { showToast } from '$lib/toast.svelte.js';
 
 	let { open, goalId, editing = null, onClose } = $props();
 
@@ -78,8 +79,17 @@
 			correcaoMonetaria: n(form.correcaoMonetaria),
 			saldoDevedor: n(form.saldoDevedor)
 		};
-		if (editing) updateInstallment(editing.id, payload);
-		else addInstallment(goalId, payload);
+		if (editing) {
+			updateInstallment(editing.id, payload);
+			showToast({ message: '✓ Prestação atualizada.' });
+		} else {
+			const created = addInstallment(goalId, payload);
+			showToast({
+				message: `✓ Prestação nº ${payload.number} registrada — saldo devedor atualizado para ${fmtMoney(payload.saldoDevedor)}.`,
+				actionLabel: 'DESFAZER',
+				onAction: () => removeInstallment(created.id)
+			});
+		}
 		onClose();
 	}
 </script>

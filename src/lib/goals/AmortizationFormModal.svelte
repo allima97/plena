@@ -1,8 +1,9 @@
 <script>
 	import Modal from '$lib/components/Modal.svelte';
-	import { addAmortization, updateAmortization } from '$lib/fin/store.svelte.js';
+	import { addAmortization, updateAmortization, removeAmortization } from '$lib/fin/store.svelte.js';
 	import { AMORT_TIPOS } from './constants.js';
-	import { todayISO } from '$lib/format.js';
+	import { todayISO, fmtMoney } from '$lib/format.js';
+	import { showToast } from '$lib/toast.svelte.js';
 
 	let { open, goalId, editing = null, onClose } = $props();
 
@@ -20,8 +21,17 @@
 		e.preventDefault();
 		if (form.amount === '' || !form.date) return;
 		const payload = { date: form.date, amount: Math.abs(Number(form.amount) || 0), tipo: form.tipo };
-		if (editing) updateAmortization(editing.id, payload);
-		else addAmortization(goalId, payload);
+		if (editing) {
+			updateAmortization(editing.id, payload);
+			showToast({ message: '✓ Amortização atualizada.' });
+		} else {
+			const created = addAmortization(goalId, payload);
+			showToast({
+				message: `✓ Amortização de ${fmtMoney(payload.amount)} registrada.`,
+				actionLabel: 'DESFAZER',
+				onAction: () => removeAmortization(created.id)
+			});
+		}
 		onClose();
 	}
 </script>

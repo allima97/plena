@@ -8,18 +8,36 @@
 import TransferModal from '$lib/components/TransferModal.svelte';
 	import { showToast } from '$lib/toast.svelte.js';
 	import MovementRow from '$lib/components/MovementRow.svelte';
-	import { Plus, FileBarChart, Search, Download, FileDown, ArrowLeftRight } from 'lucide-svelte';
+	import { Plus, FileBarChart, Search, Download, FileDown, ArrowLeftRight, ChevronDown } from 'lucide-svelte';
+	import { page } from '$app/state';
 
 	let query = $state('');
 	let monthFilter = $state(currentMonthKey());
+	let quickFilter = $state('all'); // all | receita | despesa | pendente
 	let seriesFilter = $state('all');
 	let statusFilter = $state('all');
 	let paymentFilter = $state('all');
 	let dateFilter = $state('');
+	let maisFiltrosAbertos = $state(false);
 
 	let modal = $state({ open: false, mode: 'create', transaction: null });
 	let showReport = $state(false);
 	let showTransfer = $state(false);
+
+	// Vindo da busca global (?open=<id>): abre direto o lançamento exato, uma única vez,
+	// e amplia o filtro de mês para garantir que ele apareça mesmo fora do mês corrente.
+	let openedFromSearch = false;
+	$effect(() => {
+		if (openedFromSearch) return;
+		const id = page.url.searchParams.get('open');
+		if (!id) return;
+		const tx = appState.transactions.find((t) => t.id === id);
+		if (tx) {
+			openedFromSearch = true;
+			monthFilter = 'all';
+			openEditOccurrence(tx);
+		}
+	});
 
 
 	function handleDelete(tx) {
@@ -77,12 +95,23 @@ import TransferModal from '$lib/components/TransferModal.svelte';
 
 	function limparFiltros() {
 		query = '';
+		quickFilter = 'all';
 		monthFilter = 'all';
 		seriesFilter = 'all';
 		statusFilter = 'all';
 		paymentFilter = 'all';
 		dateFilter = '';
 	}
+
+	// Conta quantos filtros "avançados" (escondidos atrás de "Mais filtros") estão ativos,
+	// para mostrar o badge "Filtros · N" sem precisar abrir o painel.
+	const filtrosAtivosCount = $derived(
+		(monthFilter !== currentMonthKey() ? 1 : 0) +
+			(seriesFilter !== 'all' ? 1 : 0) +
+			(statusFilter !== 'all' ? 1 : 0) +
+			(paymentFilter !== 'all' ? 1 : 0) +
+			(dateFilter ? 1 : 0)
+	);
 
 	const mesesDisponiveis = $derived.by(() => {
 		const set = new Set(appState.transactions.map((t) => monthKey(t.data)));
@@ -100,6 +129,9 @@ import TransferModal from '$lib/components/TransferModal.svelte';
 					if (!haystack.includes(query.toLowerCase())) return false;
 				}
 				if (monthFilter !== 'all' && monthKey(t.data) !== monthFilter) return false;
+				if (quickFilter === 'receita' && t.tipo !== 'receita') return false;
+				if (quickFilter === 'despesa' && t.tipo !== 'despesa') return false;
+				if (quickFilter === 'pendente' && t.statusPagamento !== 'pendente') return false;
 				if (seriesFilter === 'parcelado' && t.seriesKind !== 'parcelado') return false;
 				if (seriesFilter === 'recorrente' && t.seriesKind !== 'recorrente') return false;
 				if (seriesFilter === 'nenhuma' && t.seriesId) return false;
@@ -193,36 +225,52 @@ import TransferModal from '$lib/components/TransferModal.svelte';
 		<span class="search-icon"><Search size={15} /></span>
 		<input type="text" placeholder="Buscar por descrição, categoria ou conta" bind:value={query} />
 	</div>
-	<select bind:value={monthFilter}>
-		<option value="all">Todos os meses</option>
-		{#each mesesDisponiveis as m}
-			<option value={m}>{monthLabel(m)}</option>
-		{/each}
-	</select>
 	<button class="btn btn-ghost sm" onclick={() => (showReport = true)}><FileBarChart size={14} /> Central de relatórios</button>
 </div>
 
-<div class="filters-bar">
-	<select bind:value={paymentFilter}>
-		<option value="all">Todos os pagamentos</option>
-		<option value="pago">Só pagos</option>
-		<option value="pendente">Só pendentes</option>
-	</select>
-	<select bind:value={seriesFilter}>
-		<option value="all">Todos os lançamentos</option>
-		<option value="parcelado">Parcelamentos</option>
-		<option value="recorrente">Recorrentes</option>
-		<option value="nenhuma">Sem série</option>
-	</select>
-	<select bind:value={statusFilter}>
-		<option value="all">Todos os status</option>
-		<option value="ativa">Ativas</option>
-		<option value="pausada">Pausadas</option>
-		<option value="cancelada">Canceladas</option>
-	</select>
-	<input type="date" bind:value={dateFilter} aria-label="Vencimento específico" />
-	<button class="btn btn-ghost sm" onclick={limparFiltros}>Limpar filtros</button>
+<div class="quick-filters-row">
+	<button type="button" class="quick-filter-chip" class:active={quickFilter === 'all'} onclick={() => (quickFilter = 'all')}>Todos</button>
+	<button type="button" class="quick-filter-chip" class:active={quickFilter === 'receita'} onclick={() => (quickFilter = 'receita')}>Receitas</button>
+	<button type="button" class="quick-filter-chip" class:active={quickFilter === 'despesa'} onclick={() => (quickFilter = 'despesa')}>Despesas</button>
+	<button type="button" class="quick-filter-chip" class:active={quickFilter === 'pendente'} onclick={() => (quickFilter = 'pendente')}>Pendentes</button>
+	<button type="button" class="filters-more-toggle" onclick={() => (maisFiltrosAbertos = !maisFiltrosAbertos)}>
+		Mais filtros
+		{#if filtrosAtivosCount}<span class="filters-badge">{filtrosAtivosCount}</span>{/if}
+		<span class="filters-more-chevron" class:rotated={maisFiltrosAbertos}><ChevronDown size={14} /></span>
+	</button>
+	{#if filtrosAtivosCount || quickFilter !== 'all' || query}
+		<button type="button" class="btn btn-ghost sm" onclick={limparFiltros}>Limpar filtros</button>
+	{/if}
 </div>
+
+{#if maisFiltrosAbertos}
+	<div class="filters-bar filters-bar--advanced">
+		<select bind:value={monthFilter}>
+			<option value="all">Todos os meses</option>
+			{#each mesesDisponiveis as m}
+				<option value={m}>{monthLabel(m)}</option>
+			{/each}
+		</select>
+		<select bind:value={paymentFilter}>
+			<option value="all">Todos os pagamentos</option>
+			<option value="pago">Só pagos</option>
+			<option value="pendente">Só pendentes</option>
+		</select>
+		<select bind:value={seriesFilter}>
+			<option value="all">Todos os lançamentos</option>
+			<option value="parcelado">Parcelamentos</option>
+			<option value="recorrente">Recorrentes</option>
+			<option value="nenhuma">Sem série</option>
+		</select>
+		<select bind:value={statusFilter}>
+			<option value="all">Todos os status</option>
+			<option value="ativa">Ativas</option>
+			<option value="pausada">Pausadas</option>
+			<option value="cancelada">Canceladas</option>
+		</select>
+		<input type="date" bind:value={dateFilter} aria-label="Vencimento específico" />
+	</div>
+{/if}
 
 <div class="card">
 	{#if filtered.length === 0}

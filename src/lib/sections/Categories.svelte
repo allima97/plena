@@ -4,6 +4,7 @@
 		addCategory,
 		renameCategory,
 		removeCategory,
+		restoreCategory,
 		addSubcategory,
 		renameSubcategory,
 		removeSubcategory,
@@ -12,6 +13,8 @@
 	} from '$lib/fin/store.svelte.js';
 	import { monthTransactions, currentMonthKey } from '$lib/fin/derived.js';
 	import { fmtMoney } from '$lib/format.js';
+	import { showToast } from '$lib/toast.svelte.js';
+	import { page } from '$app/state';
 	import Modal from '$lib/components/Modal.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import { Plus, Tag } from 'lucide-svelte';
@@ -88,6 +91,20 @@
 		}
 		return { principal: 'Salário', secundario: 'André' };
 	});
+
+	// Vindo da busca global (?open=<id>): expande e rola até essa categoria, uma única vez.
+	let openedFromSearch = false;
+	$effect(() => {
+		if (openedFromSearch) return;
+		const id = page.url.searchParams.get('open');
+		if (!id) return;
+		const cat = appState.categories.find((c) => c.id === id || c.secundarios?.some((s) => s.id === id));
+		if (cat) {
+			openedFromSearch = true;
+			expandedId = cat.id;
+			queueMicrotask(() => document.getElementById(`cat-${cat.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+		}
+	});
 </script>
 
 <div class="page-head">
@@ -144,7 +161,7 @@
 		<div class="cat-rows">
 			{#each appState.categories as cat, i (cat.id)}
 				{@const dot = DOT_PALETTE[i % DOT_PALETTE.length]}
-				<div class="cat-row">
+				<div class="cat-row" id="cat-{cat.id}">
 					<div class="cat-row-top" onclick={() => (expandedId = expandedId === cat.id ? null : cat.id)} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && (expandedId = expandedId === cat.id ? null : cat.id)}>
 						<span class="cat-dot" style="background:{dot}"></span>
 						<div class="cat-row-main">
@@ -272,7 +289,9 @@
 	confirmLabel="Excluir"
 	onCancel={() => (deletando = null)}
 	onConfirm={() => {
+		const snapshot = { ...deletando };
 		removeCategory(deletando.id);
+		showToast({ message: `Categoria "${snapshot.nome}" excluída.`, actionLabel: 'DESFAZER', onAction: () => restoreCategory(snapshot) });
 		deletando = null;
 		expandedId = null;
 	}}

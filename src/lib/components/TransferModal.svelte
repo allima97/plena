@@ -1,7 +1,7 @@
 <script>
 	import Modal from './Modal.svelte';
-	import { appState, addTransfer } from '$lib/fin/store.svelte.js';
-	import { todayISO } from '$lib/format.js';
+	import { appState, addTransfer, removeTransfer } from '$lib/fin/store.svelte.js';
+	import { todayISO, fmtMoney } from '$lib/format.js';
 	import { showToast } from '$lib/toast.svelte.js';
 	import { ArrowLeftRight } from 'lucide-svelte';
 
@@ -28,14 +28,18 @@
 	function submit(e) {
 		e.preventDefault();
 		if (!form.valor || !Number(form.valor) || mesmaConta || !form.contaOrigemId || !form.contaDestinoId) return;
-		addTransfer({
+		const { saida } = addTransfer({
 			contaOrigemId: form.contaOrigemId,
 			contaDestinoId: form.contaDestinoId,
 			valor: Number(form.valor),
 			data: form.data,
 			descricao: form.descricao
 		});
-		showToast({ message: '✓ Transferência registrada.' });
+		showToast({
+			message: `✓ Transferência de ${fmtMoney(form.valor)} registrada.`,
+			actionLabel: 'DESFAZER',
+			onAction: () => removeTransfer(saida.transferId)
+		});
 		onClose();
 	}
 </script>

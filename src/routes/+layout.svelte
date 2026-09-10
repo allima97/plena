@@ -25,6 +25,7 @@
 	import GlobalSearch from '$lib/components/GlobalSearch.svelte';
 	import NotificationsDrawer from '$lib/components/NotificationsDrawer.svelte';
 	import QuickAddModal from '$lib/components/QuickAddModal.svelte';
+	import OnboardingModal from '$lib/components/OnboardingModal.svelte';
 	import ToastHost from '$lib/components/ToastHost.svelte';
 
 	let { children } = $props();
@@ -32,6 +33,22 @@
 	let searchOpen = $state(false);
 	let notifOpen = $state(false);
 	let showNewGlobal = $state(false);
+	let showOnboarding = $state(false);
+	let onboardingChecked = false;
+
+	// Mostra a apresentação inicial uma única vez, só para quem ainda não tem nenhuma
+	// conta cadastrada (sinal de conta nova) e ainda não viu/pulou o tour antes.
+	$effect(() => {
+		if (!appState.ready || onboardingChecked) return;
+		onboardingChecked = true;
+		try {
+			if (!localStorage.getItem('plena_onboarding_done') && appState.accounts.length === 0) {
+				showOnboarding = true;
+			}
+		} catch {
+			/* localStorage indisponível -- não mostra o onboarding automaticamente */
+		}
+	});
 
 	const navItems = [
 		{ href: '/', label: 'Visão geral', icon: LayoutDashboard },
@@ -199,6 +216,7 @@
 
 <GlobalSearch open={searchOpen} onClose={() => (searchOpen = false)} />
 <QuickAddModal open={showNewGlobal} onClose={() => (showNewGlobal = false)} />
+<OnboardingModal open={showOnboarding} onClose={() => (showOnboarding = false)} />
 <ToastHost />
 
 <nav class="bottom-nav">

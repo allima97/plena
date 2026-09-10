@@ -1,7 +1,9 @@
 <script>
-	import { appState, addAccount, updateAccount, removeAccount } from '$lib/fin/store.svelte.js';
+	import { appState, addAccount, updateAccount, removeAccount, restoreAccount } from '$lib/fin/store.svelte.js';
 	import { currentMonthKey, faturaDoCartao, nextMonthKey, saldoContaAte } from '$lib/fin/derived.js';
 	import { fmtMoney, todayISO } from '$lib/format.js';
+	import { showToast } from '$lib/toast.svelte.js';
+	import { page } from '$app/state';
 	import Modal from '$lib/components/Modal.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import RowActionsModal from '$lib/components/RowActionsModal.svelte';
@@ -71,6 +73,19 @@
 	}
 
 	const cartoes = $derived(appState.accounts.filter((a) => a.tipo === 'cartao'));
+
+	// Vindo da busca global (?open=<id>): abre direto o resumo/ações dessa conta, uma única vez.
+	let openedFromSearch = false;
+	$effect(() => {
+		if (openedFromSearch) return;
+		const id = page.url.searchParams.get('open');
+		if (!id) return;
+		const acc = appState.accounts.find((a) => a.id === id);
+		if (acc) {
+			openedFromSearch = true;
+			openAccountActions(acc);
+		}
+	});
 </script>
 
 <div class="page-head">
@@ -226,7 +241,9 @@
 	confirmLabel="Excluir"
 	onCancel={() => (deleting = null)}
 	onConfirm={() => {
+		const snapshot = { ...deleting };
 		removeAccount(deleting.id);
+		showToast({ message: `Conta "${snapshot.nome}" excluída.`, actionLabel: 'DESFAZER', onAction: () => restoreAccount(snapshot) });
 		deleting = null;
 	}}
 />
