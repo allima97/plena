@@ -87,25 +87,20 @@ export function nextScheduleDate(schedule) {
 }
 
 /**
- * Mês de fatura (YYYY-MM) de uma compra de cartão, considerando o dia de
- * fechamento: compra até o fechamento cai na fatura do mês corrente, depois
- * do fechamento cai na fatura do mês seguinte. Sem fechamento configurado
- * (cartões antigos, ainda sem esse campo), mantém o comportamento anterior
- * de agrupar pelo mês civil da compra.
+ * Mês de fatura (YYYY-MM) de um lançamento de cartão. Cada lançamento de fatura já é
+ * datado pelo dia de vencimento (não pela data de cada compra), então o mês da fatura
+ * é simplesmente o mês civil da própria data lançada -- sem reclassificar pelo dia do
+ * cartão, que hoje é só informativo (ver acc.fechamento / "Dia de vencimento").
  */
-export function faturaMonthOf(dataISO, diaFechamento) {
-	if (!diaFechamento) return dataISO.slice(0, 7);
-	const [y, m, d] = dataISO.split('-').map(Number);
-	if (d <= diaFechamento) return `${y}-${String(m).padStart(2, '0')}`;
-	const next = new Date(y, m, 1);
-	return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
+export function faturaMonthOf(dataISO) {
+	return dataISO.slice(0, 7);
 }
 
 /** Soma das despesas de um cartão que caem na fatura de um mês (default: mês atual). */
 export function faturaDoCartao(transactions, acc, mKey = currentMonthKey()) {
 	return transactions
 		.filter((t) => t.contaId === acc.id && t.tipo === 'despesa' && !t.isTransferencia)
-		.filter((t) => faturaMonthOf(t.data, acc.fechamento) === mKey)
+		.filter((t) => faturaMonthOf(t.data) === mKey)
 		.reduce((s, t) => s + (Number(t.valor) || 0), 0);
 }
 

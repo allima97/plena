@@ -169,7 +169,7 @@
 			</p>
 			{#if acc.tipo === 'cartao'}
 				<p class="account-tile-next">
-					{acc.fechamento ? `Fecha dia ${acc.fechamento} · ` : ''}Próxima fatura <span class="privacy-value">{fmtMoney(proximaFatura(acc))}</span>
+					{acc.fechamento ? `Vence dia ${acc.fechamento} · ` : ''}Próxima fatura <span class="privacy-value">{fmtMoney(proximaFatura(acc))}</span>
 				</p>
 			{/if}
 		</div>
@@ -226,8 +226,8 @@
 			<div class="form-grid">
 				<label class="field"><span>Limite</span><input class="field-input" type="number" step="0.01" bind:value={form.limite} /></label>
 				<label class="field">
-					<span>Dia de fechamento</span>
-					<input class="field-input" type="number" min="1" max="28" placeholder="ex: 5" bind:value={form.fechamento} />
+					<span>Dia de vencimento</span>
+					<input class="field-input" type="number" min="1" max="28" placeholder="ex: 21" bind:value={form.fechamento} />
 				</label>
 			</div>
 		{:else}
