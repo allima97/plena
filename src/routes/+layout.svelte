@@ -81,10 +81,6 @@
 		{
 			label: 'Análise',
 			items: [{ href: '/relatorios', label: 'Relatórios', icon: BarChart3 }]
-		},
-		{
-			label: 'Sistema',
-			items: [{ href: '/configuracoes', label: 'Configurações', icon: Settings }]
 		}
 	];
 	const navItems = navGroups.flatMap((g) => g.items);
@@ -220,6 +216,9 @@
 						</button>
 						<NotificationsDrawer open={notifOpen} onClose={() => (notifOpen = false)} />
 					</div>
+					<a class="icon-btn" href="/configuracoes" aria-label="Configurações" title="Configurações">
+						<Settings size={17} />
+					</a>
 					<button
 						class="avatar-chip"
 						onclick={handleAvatarClick}
