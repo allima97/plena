@@ -1,4 +1,4 @@
-import { upcomingDue, pausedSeries, currentMonthKey, faturaDoCartao, saldoContaAte, monthTransactions } from './derived.js';
+import { upcomingDue, pausedSeries, currentMonthKey, faturaDoCartao, limiteUtilizadoCartao, saldoContaAte, monthTransactions } from './derived.js';
 import { computeMetrics } from '../goals/metrics.js';
 
 function shiftMonthKey(mKey, delta) {
@@ -45,8 +45,10 @@ export function buildAttentionItems(
 	}
 
 	for (const acc of accounts.filter((a) => a.tipo === 'cartao')) {
-		const fatura = faturaDoCartao(transactions, acc, mKey);
-		const pct = acc.limite ? (fatura / acc.limite) * 100 : 0;
+		// % do limite usa TODAS as compras ainda não pagas (não só a fatura do mês corrente) --
+		// o limite cai no momento da compra, não só quando a fatura fecha. Ver limiteUtilizadoCartao.
+		const utilizado = limiteUtilizadoCartao(transactions, acc);
+		const pct = acc.limite ? (utilizado / acc.limite) * 100 : 0;
 		if (pct >= 70) {
 			list.push({
 				tone: pct >= 90 ? 'red' : 'orange',

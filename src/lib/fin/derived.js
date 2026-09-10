@@ -109,6 +109,21 @@ export function faturaDoCartao(transactions, acc, mKey = currentMonthKey()) {
 		.reduce((s, t) => s + (Number(t.valor) || 0), 0);
 }
 
+/**
+ * Quanto do limite do cartão já está comprometido AGORA -- diferente de faturaDoCartao (que olha
+ * só o ciclo de faturamento de um mês específico), aqui somamos TODAS as compras ainda não pagas,
+ * não importa em qual fatura (mês) elas vão cair. Isso é o que reflete a realidade de um cartão de
+ * crédito de verdade: o limite disponível cai no momento da compra, não só quando a fatura fecha.
+ * Usar faturaDoCartao aqui faria uma compra feita depois do fechamento "sumir" do limite utilizado
+ * até a fatura seguinte, quando na prática o limite já foi consumido.
+ */
+export function limiteUtilizadoCartao(transactions, acc) {
+	return transactions
+		.filter((t) => t.contaId === acc.id && t.tipo === 'despesa' && !t.isTransferencia)
+		.filter((t) => t.statusPagamento !== 'pago')
+		.reduce((s, t) => s + (Number(t.valor) || 0), 0);
+}
+
 /** Mês (YYYY-MM) seguinte ao informado. */
 export function nextMonthKey(mKey) {
 	const [y, m] = mKey.split('-').map(Number);

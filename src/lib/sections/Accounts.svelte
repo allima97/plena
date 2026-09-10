@@ -1,6 +1,6 @@
 <script>
 	import { appState, addAccount, updateAccount, removeAccount, restoreAccount } from '$lib/fin/store.svelte.js';
-	import { currentMonthKey, faturaDoCartao, nextMonthKey, saldoContaAte } from '$lib/fin/derived.js';
+	import { currentMonthKey, faturaDoCartao, limiteUtilizadoCartao, nextMonthKey, saldoContaAte } from '$lib/fin/derived.js';
 	import { fmtMoney, todayISO } from '$lib/format.js';
 	import { showToast } from '$lib/toast.svelte.js';
 	import { page } from '$app/state';
@@ -90,9 +90,13 @@
 	}
 
 	// Compra -> Fatura -> Pagamento (UX 2.0 - Fase 5): o número que o usuário realmente quer saber
-	// não é só a fatura nem só o limite, é quanto ainda dá pra usar sem estourar.
+	// não é só a fatura nem só o limite, é quanto ainda dá pra usar sem estourar. Usa TODAS as
+	// compras ainda não pagas (não só a fatura do mês corrente) -- ver limiteUtilizadoCartao.
+	function limiteUtilizado(acc) {
+		return limiteUtilizadoCartao(appState.transactions, acc);
+	}
 	function disponivelCartao(acc) {
-		return (Number(acc.limite) || 0) - faturaAtual(acc);
+		return (Number(acc.limite) || 0) - limiteUtilizado(acc);
 	}
 
 	const cartoes = $derived(appState.accounts.filter((a) => a.tipo === 'cartao'));
@@ -191,12 +195,12 @@
 		<div class="card-usage-list">
 			{#each cartoes as acc, i (acc.id)}
 				{@const grad = acc.cor || PALETTE[(appState.accounts.indexOf(acc)) % PALETTE.length]}
-				{@const pct = acc.limite ? Math.min(100, Math.round((faturaAtual(acc) / acc.limite) * 100)) : 0}
+				{@const pct = acc.limite ? Math.min(100, Math.round((limiteUtilizado(acc) / acc.limite) * 100)) : 0}
 				<div class="card-usage-item">
 					<div class="card-usage-top">
 						<span style="display:flex;align-items:center"><span class="card-usage-dot {grad}"></span>{acc.nome}</span>
 					</div>
-					<p class="card-usage-value privacy-value">{fmtMoney(faturaAtual(acc))}</p>
+					<p class="card-usage-value privacy-value">{fmtMoney(limiteUtilizado(acc))}</p>
 					<p class="card-usage-sub">de <span class="privacy-value">{fmtMoney(acc.limite)}</span></p>
 					<div class="usage-track"><div class="usage-fill {grad}" style="width:{pct}%"></div></div>
 				</div>
