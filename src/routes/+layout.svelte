@@ -140,7 +140,7 @@
 			<img src="/icons/icon-192.png" alt="Plena" class="brand-mark" />
 			<div>
 				<p class="font-display brand-name">Plena</p>
-				<p class="brand-tag">controle leve</p>
+				<p class="brand-tag">finanças pessoais</p>
 			</div>
 			<button class="icon-btn mobile-close" onclick={() => (mobileNavOpen = false)} aria-label="Fechar menu">
 				<X size={18} />
