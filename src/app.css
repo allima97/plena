@@ -3345,6 +3345,22 @@ table.list .num {
 	padding: 18px;
 	box-shadow: var(--shadow-card);
 }
+.mini-stat-clickable {
+	cursor: pointer;
+	text-align: left;
+	transition:
+		transform 0.15s ease,
+		box-shadow 0.15s ease,
+		border-color 0.15s ease;
+}
+.mini-stat-clickable:hover {
+	transform: translateY(-2px);
+	border-color: var(--border-strong);
+	box-shadow: 0 14px 28px rgba(43, 61, 70, 0.09);
+}
+.mini-stat-clickable:active {
+	transform: scale(0.98);
+}
 .mini-stat-top {
 	display: flex;
 	align-items: center;

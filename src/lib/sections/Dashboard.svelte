@@ -13,6 +13,7 @@
 	import Sparkline from '$lib/components/charts/Sparkline.svelte';
 	import { Bell, CalendarDays, CalendarRange, Plus, ArrowUpRight, ArrowDownRight, ArrowLeftRight, Sparkles, ChevronDown, Wand2 } from 'lucide-svelte';
 	import FinancialCalendarModal from '$lib/components/FinancialCalendarModal.svelte';
+	import MonthMovementsModal from '$lib/components/MonthMovementsModal.svelte';
 	import { page } from '$app/state';
 
 	const MES_ABBR = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
@@ -20,6 +21,7 @@
 
 	let showNew = $state(false);
 	let showCalendar = $state(false);
+	let monthDetailTipo = $state(null); // null | 'receita' | 'despesa' -- controla o modal de detalhes de Entradas/Saídas do mês
 	let aporteModal = $state({ open: false, resourceId: null, goalId: null, prefill: null });
 	let contaFiltro = $state('all');
 	let tipoFiltro = $state('all');
@@ -45,6 +47,11 @@
 	const prevMesTx = $derived(monthTransactions(baseTx, prevMKey));
 	const t = $derived(totals(mesTx));
 	const prevT = $derived(totals(prevMesTx));
+
+	// Mesma base de mesTx usada no total de Entradas/Saídas do mês -- alimenta o modal de
+	// detalhes aberto ao clicar nesses cards em "Seu mês".
+	const entradasMes = $derived(mesTx.filter((tr) => tr.tipo === 'receita' && !tr.isTransferencia));
+	const saidasMes = $derived(mesTx.filter((tr) => tr.tipo === 'despesa' && !tr.isTransferencia));
 
 	// Saldo real (nunca inclui lançamento com data futura, mesmo que já esteja pré-gerado como
 	// parcela/recorrência futura) -- ver saldoContaAte em derived.js. Soma só contas líquidas
@@ -569,12 +576,34 @@
 <div class="month-summary">
 	<p class="stat-label" style="margin:0 0 10px">Seu mês</p>
 	<div class="hero-side">
-		<div class="mini-stat">
+		<div
+			class="mini-stat mini-stat-clickable"
+			role="button"
+			tabindex="0"
+			onclick={() => (monthDetailTipo = 'receita')}
+			onkeydown={(e) => {
+				if (e.key === 'Enter' || e.key === ' ') {
+					e.preventDefault();
+					monthDetailTipo = 'receita';
+				}
+			}}
+		>
 			<div class="mini-stat-top"><span class="stat-label">Entradas no mês</span><span class="mini-stat-dot" style="background:var(--income)"></span></div>
 			<p class="mini-stat-value money-in font-display privacy-value">{fmtMoney(t.receitas)}</p>
 			{#if entradasDeltaPct !== null}<p class="mini-stat-delta">{entradasDeltaPct >= 0 ? '↑' : '↓'} {Math.abs(entradasDeltaPct).toFixed(1)}% vs. {monthLabel(prevMKey)}</p>{/if}
 		</div>
-		<div class="mini-stat">
+		<div
+			class="mini-stat mini-stat-clickable"
+			role="button"
+			tabindex="0"
+			onclick={() => (monthDetailTipo = 'despesa')}
+			onkeydown={(e) => {
+				if (e.key === 'Enter' || e.key === ' ') {
+					e.preventDefault();
+					monthDetailTipo = 'despesa';
+				}
+			}}
+		>
 			<div class="mini-stat-top"><span class="stat-label">Saídas no mês</span><span class="mini-stat-dot" style="background:var(--expense)"></span></div>
 			<p class="mini-stat-value money-out font-display privacy-value">{fmtMoney(t.despesas)}</p>
 			{#if saidasDeltaPct !== null}<p class="mini-stat-delta">{saidasDeltaPct >= 0 ? '↑' : '↓'} {Math.abs(saidasDeltaPct).toFixed(1)}% vs. {monthLabel(prevMKey)}</p>{/if}
@@ -930,6 +959,13 @@
 
 <FinancialCalendarModal open={showCalendar} onClose={() => (showCalendar = false)} />
 <NewMovementModal open={showNew} onClose={() => (showNew = false)} />
+<MonthMovementsModal
+	open={monthDetailTipo !== null}
+	tipo={monthDetailTipo}
+	transactions={monthDetailTipo === 'receita' ? entradasMes : saidasMes}
+	monthLabel={monthLabel(mKey)}
+	onClose={() => (monthDetailTipo = null)}
+/>
 <MoveFormModal
 	open={aporteModal.open}
 	resourceId={aporteModal.resourceId}
