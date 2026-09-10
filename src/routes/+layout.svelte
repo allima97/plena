@@ -169,12 +169,6 @@
 		</div>
 
 		<div class="sidebar-footer">
-			<div class="tip-card">
-				<p class="tip-title">Dica rápida</p>
-				<p class="tip-body">
-					Use categorias secundárias para entender exatamente onde o dinheiro está indo.
-				</p>
-			</div>
 			<div class="sync-status" class:is-error={appState.mode === 'api' && appState.syncStatus === 'error'}>
 				{#if appState.mode === 'api'}
 					{#if appState.syncStatus === 'saving'}
