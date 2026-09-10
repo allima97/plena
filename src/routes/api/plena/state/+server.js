@@ -15,9 +15,11 @@ const ARRAY_COLLECTIONS = [
 	'installments',
 	'amortizations',
 	'patrimonyItems',
-	'patrimonySnapshots'
+	'patrimonySnapshots',
+	'patrimonyItemMoves',
+	'scoreSnapshots'
 ];
-const SINGLETON_COLLECTIONS = ['reportSchedule', 'alertThresholds', 'settings'];
+const SINGLETON_COLLECTIONS = ['reportSchedule', 'alertThresholds', 'settings', 'budgetGlobal'];
 
 /** GET /api/plena/state — junta todas as coleções do usuário num só payload. */
 export async function GET({ platform }) {
@@ -45,7 +47,10 @@ export async function GET({ platform }) {
 		installments: [],
 		amortizations: [],
 		patrimonyItems: [],
-		patrimonySnapshots: []
+		patrimonySnapshots: [],
+		patrimonyItemMoves: [],
+		scoreSnapshots: [],
+		budgetGlobal: null
 	};
 
 	for (const row of results) {
