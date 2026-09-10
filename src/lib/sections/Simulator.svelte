@@ -3,7 +3,7 @@
 	import { totals, monthTransactions, currentMonthKey } from '$lib/fin/derived.js';
 	import { computeMetrics } from '$lib/goals/metrics.js';
 	import { fmtMoney } from '$lib/format.js';
-	import { Wand2, ArrowRight } from 'lucide-svelte';
+	import { Wand2 } from 'lucide-svelte';
 
 	function shiftMonthKey(mKey, delta) {
 		const [y, m] = mKey.split('-').map(Number);
@@ -42,10 +42,14 @@
 	const cenarioGastarMenos = $derived.by(() => {
 		const novaDespesa = Math.max(0, mediaDespesas3Meses - gastaMenosValor);
 		const novaTaxa = mediaReceitas3Meses > 0 ? ((mediaReceitas3Meses - novaDespesa) / mediaReceitas3Meses) * 100 : null;
+		const guardadoAnoHoje = (mediaReceitas3Meses - mediaDespesas3Meses) * 12;
+		const guardadoAnoNovo = guardadoAnoHoje + gastaMenosValor * 12;
 		return {
 			economiaAno: gastaMenosValor * 12,
 			taxaAtual: taxaPoupancaAtual,
-			taxaNova: novaTaxa
+			taxaNova: novaTaxa,
+			guardadoAnoHoje,
+			guardadoAnoNovo
 		};
 	});
 
@@ -75,7 +79,9 @@
 		const novoPace = m.combinedPace + extra;
 		const mesesNovos = novoPace > 0 ? m.remaining / novoPace : null;
 		const dataNova = mesesNovos !== null ? addMonthsF(new Date(), mesesNovos) : null;
-		return { dataAtual: m.projectedDate, dataNova, semRitmoAtual: m.combinedPace <= 0 };
+		const mesesAntes =
+			m.projectedMonths != null && mesesNovos !== null ? Math.round(m.projectedMonths - mesesNovos) : null;
+		return { dataAtual: m.projectedDate, dataNova, semRitmoAtual: m.combinedPace <= 0, mesesAntes };
 	});
 
 	// --- Cenário C: renda cai X% ---------------------------------------------
@@ -110,16 +116,21 @@
 	{#if gastaMenosValor > 0}
 		<div class="week-summary-grid" style="margin-top:14px">
 			<div class="week-summary-item">
-				<p class="week-summary-label">Você guardaria a mais por ano</p>
-				<p class="week-summary-value privacy-value">{fmtMoney(cenarioGastarMenos.economiaAno)}</p>
+				<p class="week-summary-label">Hoje</p>
+				<p class="week-summary-value privacy-value">{fmtMoney(cenarioGastarMenos.guardadoAnoHoje)}/ano</p>
 			</div>
-			{#if cenarioGastarMenos.taxaAtual !== null}
-				<div class="week-summary-item">
-					<p class="week-summary-label">Taxa de poupança</p>
-					<p class="week-summary-value">{cenarioGastarMenos.taxaAtual.toFixed(1)}% <ArrowRight size={14} style="vertical-align:-2px" /> {cenarioGastarMenos.taxaNova.toFixed(1)}%</p>
-				</div>
-			{/if}
+			<div class="week-summary-item">
+				<p class="week-summary-label">Com a decisão</p>
+				<p class="week-summary-value privacy-value">{fmtMoney(cenarioGastarMenos.guardadoAnoNovo)}/ano</p>
+			</div>
+			<div class="week-summary-item">
+				<p class="week-summary-label">Diferença</p>
+				<p class="week-summary-value money-in privacy-value">+{fmtMoney(cenarioGastarMenos.economiaAno)}/ano</p>
+			</div>
 		</div>
+		{#if cenarioGastarMenos.taxaAtual !== null}
+			<p class="sim-verdict">Sua taxa de poupança vai de <b>{cenarioGastarMenos.taxaAtual.toFixed(1)}%</b> para <b>{cenarioGastarMenos.taxaNova.toFixed(1)}%</b>.</p>
+		{/if}
 	{/if}
 </div>
 
@@ -145,14 +156,23 @@
 		{#if cenarioAporte && Number(aporteExtraInput) > 0}
 			<div class="week-summary-grid" style="margin-top:14px">
 				<div class="week-summary-item">
-					<p class="week-summary-label">Chegada na meta hoje</p>
+					<p class="week-summary-label">Hoje</p>
 					<p class="week-summary-value">{cenarioAporte.semRitmoAtual ? 'sem ritmo definido' : fmtMonthYear(cenarioAporte.dataAtual)}</p>
 				</div>
 				<div class="week-summary-item">
-					<p class="week-summary-label">Com o aporte extra</p>
+					<p class="week-summary-label">Com a decisão</p>
 					<p class="week-summary-value">{fmtMonthYear(cenarioAporte.dataNova)}</p>
 				</div>
+				{#if cenarioAporte.mesesAntes !== null && cenarioAporte.mesesAntes > 0}
+					<div class="week-summary-item">
+						<p class="week-summary-label">Diferença</p>
+						<p class="week-summary-value money-in">{cenarioAporte.mesesAntes} {cenarioAporte.mesesAntes === 1 ? 'mês' : 'meses'}</p>
+					</div>
+				{/if}
 			</div>
+			{#if cenarioAporte.mesesAntes !== null && cenarioAporte.mesesAntes > 0}
+				<p class="sim-verdict">Você chegaria <b>{cenarioAporte.mesesAntes} {cenarioAporte.mesesAntes === 1 ? 'mês' : 'meses'} antes</b> na meta "{metaSelecionada.goal.name}".</p>
+			{/if}
 		{/if}
 	{:else}
 		<p class="empty">Nenhuma meta em aberto para simular (financiamentos usam o simulador de amortização, na página do objetivo).</p>
@@ -172,16 +192,24 @@
 	{#if Number(rendaCaiInput) > 0}
 		<div class="week-summary-grid" style="margin-top:14px">
 			<div class="week-summary-item">
-				<p class="week-summary-label">Saldo mensal hoje</p>
-				<p class="week-summary-value privacy-value" class:down={cenarioRenda.saldoAtual < 0}>{fmtMoney(cenarioRenda.saldoAtual)}</p>
+				<p class="week-summary-label">Hoje</p>
+				<p class="week-summary-value privacy-value" class:down={cenarioRenda.saldoAtual < 0}>{fmtMoney(cenarioRenda.saldoAtual)}/mês</p>
 			</div>
 			<div class="week-summary-item">
-				<p class="week-summary-label">Saldo mensal com a queda</p>
-				<p class="week-summary-value privacy-value" class:down={cenarioRenda.novoSaldo < 0}>{fmtMoney(cenarioRenda.novoSaldo)}</p>
+				<p class="week-summary-label">Com a decisão</p>
+				<p class="week-summary-value privacy-value" class:down={cenarioRenda.novoSaldo < 0}>{fmtMoney(cenarioRenda.novoSaldo)}/mês</p>
+			</div>
+			<div class="week-summary-item">
+				<p class="week-summary-label">Diferença</p>
+				<p class="week-summary-value money-out privacy-value">{fmtMoney(cenarioRenda.novoSaldo - cenarioRenda.saldoAtual)}/mês</p>
 			</div>
 		</div>
 		{#if cenarioRenda.novoSaldo < 0 && cenarioRenda.saldoAtual >= 0}
-			<p class="cat-row-sub" style="margin-top:8px;color:var(--expense)">Esse cenário deixaria seu mês negativo.</p>
+			<p class="sim-verdict" style="color:var(--expense)">Esse cenário deixaria seu mês negativo.</p>
+		{:else if cenarioRenda.novoSaldo < 0}
+			<p class="sim-verdict" style="color:var(--expense)">Seu mês já ficaria ainda mais negativo.</p>
+		{:else}
+			<p class="sim-verdict">Seu mês continuaria positivo, mesmo com a queda.</p>
 		{/if}
 	{/if}
 </div>

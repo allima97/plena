@@ -19,7 +19,8 @@
 			goalCategories: appState.goalCategories,
 			installments: appState.installments,
 			amortizations: appState.amortizations,
-			alertThresholds: appState.alertThresholds
+			alertThresholds: appState.alertThresholds,
+			categories: appState.categories
 		})
 	);
 

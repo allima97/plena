@@ -13,6 +13,7 @@
 	import Sparkline from '$lib/components/charts/Sparkline.svelte';
 	import { Bell, CalendarDays, CalendarRange, Plus, ArrowUpRight, ArrowDownRight, ArrowLeftRight, Sparkles, ChevronDown, Wand2 } from 'lucide-svelte';
 	import FinancialCalendarModal from '$lib/components/FinancialCalendarModal.svelte';
+	import { page } from '$app/state';
 
 	const MES_ABBR = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 	const DOT_PALETTE = ['#e06b5f', '#e0a23f', '#8b78db', '#4a78db', '#23a768', '#2fb7c4', '#c4519a'];
@@ -363,7 +364,8 @@
 				goalCategories: appState.goalCategories,
 				installments: appState.installments,
 				amortizations: appState.amortizations,
-				alertThresholds: appState.alertThresholds
+				alertThresholds: appState.alertThresholds,
+				categories: appState.categories
 			},
 			3
 		)
@@ -435,6 +437,12 @@
 	// a primeira leitura da tela (o essencial já está no centro de controle acima).
 	let detalhesAbertos = $state(false);
 
+	// Vindo de um alerta que aponta para a camada de detalhes (ex.: projeção de saldo negativo,
+	// ?detalhes=1) -- expande automaticamente em vez de deixar o usuário procurar o toggle.
+	$effect(() => {
+		if (page.url.searchParams.get('detalhes') === '1') detalhesAbertos = true;
+	});
+
 	function futureDateISO(days) {
 		const d = new Date();
 		d.setDate(d.getDate() + days);
@@ -495,16 +503,18 @@
 	<div class="control-balance">
 		<p class="hero-balance-label">Quanto posso gastar?</p>
 		<p class="hero-balance-value privacy-value">{fmtMoney(saldoDisponivel)}</p>
+		<p class="hero-balance-sub">Depois das contas, cartões, metas e reserva de segurança.</p>
 		<p class="hero-balance-sub">
-			{saldoDisponivel > 0 ? `${fmtMoney(gastoDiario)}/dia até o fim do mês` : 'compromissos e metas superam o saldo em contas'}
+			{saldoDisponivel > 0 ? `≈ ${fmtMoney(gastoDiario)}/dia até o fim do mês` : 'Compromissos e metas superam o saldo em contas.'}
 		</p>
 		<details class="hero-breakdown">
-			<summary>Como chegamos nisso?</summary>
-			<div class="hero-breakdown-row"><span>Saldo em contas</span><span class="privacy-value">{fmtMoney(saldoContasReal)}</span></div>
+			<summary>Como calculamos?</summary>
+			<div class="hero-breakdown-row"><span><span class="money-tag real">💰 Real</span> Saldo em contas</span><span class="privacy-value">{fmtMoney(saldoContasReal)}</span></div>
 			<div class="hero-breakdown-row"><span>− Contas a vencer (30 dias)</span><span class="privacy-value">{fmtMoney(committedNext30Value)}</span></div>
 			<div class="hero-breakdown-row"><span>− Fatura de cartão</span><span class="privacy-value">{fmtMoney(faturaCartoesTotal)}</span></div>
 			<div class="hero-breakdown-row"><span>− Metas planejadas do mês</span><span class="privacy-value">{fmtMoney(metasPlanejadasMes)}</span></div>
 			<div class="hero-breakdown-row"><span>− Margem de segurança (5%)</span><span class="privacy-value">{fmtMoney(margemSeguranca)}</span></div>
+			<div class="hero-breakdown-row subtotal"><span><span class="money-tag comprometido">📌 Comprometido</span> Total comprometido</span><span class="privacy-value">{fmtMoney(committedNext30Value + faturaCartoesTotal + metasPlanejadasMes + margemSeguranca)}</span></div>
 			<div class="hero-breakdown-row total"><span>Disponível</span><span class="privacy-value">{fmtMoney(saldoDisponivel)}</span></div>
 		</details>
 	</div>
@@ -556,6 +566,33 @@
 	</div>
 </div>
 
+<div class="month-summary">
+	<p class="stat-label" style="margin:0 0 10px">Seu mês</p>
+	<div class="hero-side">
+		<div class="mini-stat">
+			<div class="mini-stat-top"><span class="stat-label">Entradas no mês</span><span class="mini-stat-dot" style="background:var(--income)"></span></div>
+			<p class="mini-stat-value money-in font-display privacy-value">{fmtMoney(t.receitas)}</p>
+			{#if entradasDeltaPct !== null}<p class="mini-stat-delta">{entradasDeltaPct >= 0 ? '↑' : '↓'} {Math.abs(entradasDeltaPct).toFixed(1)}% vs. {monthLabel(prevMKey)}</p>{/if}
+		</div>
+		<div class="mini-stat">
+			<div class="mini-stat-top"><span class="stat-label">Saídas no mês</span><span class="mini-stat-dot" style="background:var(--expense)"></span></div>
+			<p class="mini-stat-value money-out font-display privacy-value">{fmtMoney(t.despesas)}</p>
+			{#if saidasDeltaPct !== null}<p class="mini-stat-delta">{saidasDeltaPct >= 0 ? '↑' : '↓'} {Math.abs(saidasDeltaPct).toFixed(1)}% vs. {monthLabel(prevMKey)}</p>{/if}
+		</div>
+		<div class="mini-stat">
+			<div class="mini-stat-top"><span class="stat-label">Guardado no mês</span><span class="mini-stat-dot" style="background:{t.saldo >= 0 ? 'var(--income)' : 'var(--expense)'}"></span></div>
+			<p class="mini-stat-value font-display privacy-value" class:money-in={t.saldo > 0} class:money-out={t.saldo < 0}>{fmtMoney(t.saldo)}</p>
+			<p class="mini-stat-delta">{t.receitas > 0 ? Math.round((t.saldo / t.receitas) * 100) : 0}% da renda do mês</p>
+		</div>
+	</div>
+</div>
+
+<button type="button" class="details-toggle" onclick={() => (detalhesAbertos = !detalhesAbertos)}>
+	{detalhesAbertos ? 'Ocultar detalhes' : 'Ver mais detalhes'}
+	<span class="details-toggle-icon" style={detalhesAbertos ? 'transform:rotate(180deg)' : ''}><ChevronDown size={14} /></span>
+</button>
+
+{#if detalhesAbertos}
 <div class="card timeline-card">
 	<div class="feed-list-head">
 		<p class="stat-label" style="margin:0">Hoje · Próximos 30 dias</p>
@@ -581,27 +618,6 @@
 	{:else}
 		<p class="empty">Nenhum lançamento pendente nos próximos dias.</p>
 	{/if}
-</div>
-
-<div class="month-summary">
-	<p class="stat-label" style="margin:0 0 10px">Seu mês</p>
-	<div class="hero-side">
-		<div class="mini-stat">
-			<div class="mini-stat-top"><span class="stat-label">Entradas no mês</span><span class="mini-stat-dot" style="background:var(--income)"></span></div>
-			<p class="mini-stat-value money-in font-display privacy-value">{fmtMoney(t.receitas)}</p>
-			{#if entradasDeltaPct !== null}<p class="mini-stat-delta">{entradasDeltaPct >= 0 ? '↑' : '↓'} {Math.abs(entradasDeltaPct).toFixed(1)}% vs. {monthLabel(prevMKey)}</p>{/if}
-		</div>
-		<div class="mini-stat">
-			<div class="mini-stat-top"><span class="stat-label">Saídas no mês</span><span class="mini-stat-dot" style="background:var(--expense)"></span></div>
-			<p class="mini-stat-value money-out font-display privacy-value">{fmtMoney(t.despesas)}</p>
-			{#if saidasDeltaPct !== null}<p class="mini-stat-delta">{saidasDeltaPct >= 0 ? '↑' : '↓'} {Math.abs(saidasDeltaPct).toFixed(1)}% vs. {monthLabel(prevMKey)}</p>{/if}
-		</div>
-		<div class="mini-stat">
-			<div class="mini-stat-top"><span class="stat-label">Guardado no mês</span><span class="mini-stat-dot" style="background:var(--purple)"></span></div>
-			<p class="mini-stat-value font-display privacy-value" class:money-in={t.saldo > 0} class:money-out={t.saldo < 0}>{fmtMoney(t.saldo)}</p>
-			<p class="mini-stat-delta">{t.receitas > 0 ? Math.round((t.saldo / t.receitas) * 100) : 0}% da renda do mês</p>
-		</div>
-	</div>
 </div>
 
 <div class="score-row">
@@ -662,22 +678,16 @@
 	</div>
 </div>
 
-<button type="button" class="details-toggle" onclick={() => (detalhesAbertos = !detalhesAbertos)}>
-	{detalhesAbertos ? 'Ocultar detalhes' : 'Ver mais detalhes'}
-	<span class="details-toggle-icon" style={detalhesAbertos ? 'transform:rotate(180deg)' : ''}><ChevronDown size={14} /></span>
-</button>
-
-{#if detalhesAbertos}
 <div class="mini-stat" style="margin-bottom:20px">
-	<div class="mini-stat-top"><span class="stat-label">Comprometido no mês</span><span class="mini-stat-dot" style="background:var(--purple)"></span></div>
+	<div class="mini-stat-top"><span class="stat-label"><span class="money-tag comprometido">📌 Comprometido</span> no mês</span><span class="mini-stat-dot" style="background:var(--kpi-amber)"></span></div>
 	<p class="mini-stat-value font-display privacy-value">{fmtMoney(comprometido)}</p>
 	<p class="mini-stat-delta">{comprometidoPct}% das despesas do mês</p>
-	<div class="mini-progress-track"><div class="mini-progress-fill" style="width:{comprometidoPct}%;background:var(--purple)"></div></div>
+	<div class="mini-progress-track"><div class="mini-progress-fill" style="width:{comprometidoPct}%;background:var(--kpi-amber)"></div></div>
 </div>
 
 <div class="card projection-card">
 	<div class="chart-card-head">
-		<p class="stat-label" style="margin:0">Saldo projetado</p>
+		<p class="stat-label" style="margin:0"><span class="money-tag projetado">🔮 Projetado</span> Saldo projetado</p>
 		{#if projecaoAlerta}<span class="badge badge-red">⚠ fica negativo em {projecaoAlerta.label.toLowerCase()}</span>{/if}
 	</div>
 	<div class="projection-row">

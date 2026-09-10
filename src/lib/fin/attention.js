@@ -1,4 +1,4 @@
-import { upcomingDue, pausedSeries, currentMonthKey, faturaDoCartao, saldoContaAte } from './derived.js';
+import { upcomingDue, pausedSeries, currentMonthKey, faturaDoCartao, saldoContaAte, monthTransactions } from './derived.js';
 import { computeMetrics } from '../goals/metrics.js';
 
 function shiftMonthKey(mKey, delta) {
@@ -14,7 +14,7 @@ function shiftMonthKey(mKey, delta) {
  * central de notificações (lista completa) — fonte única para as duas telas.
  */
 export function buildAttentionItems(
-	{ transactions, accounts, goals, resources, resourceMoves, goalCategories, installments, amortizations, alertThresholds },
+	{ transactions, accounts, goals, resources, resourceMoves, goalCategories, installments, amortizations, alertThresholds, categories = [] },
 	limit = Infinity
 ) {
 	const list = [];
@@ -52,8 +52,26 @@ export function buildAttentionItems(
 				tone: pct >= 90 ? 'red' : 'orange',
 				text: `Cartão ${acc.nome} chega a ${Math.round(pct)}% do limite`,
 				actionLabel: 'Ver fatura',
-				href: '/contas',
+				href: `/contas?open=${acc.id}`,
 				weight: pct
+			});
+		}
+	}
+
+	// Categoria que passou do orçamento mensal (Fase 3 - UX 2.0): a regra de ouro é nunca mandar
+	// o usuário "procurar a ação" -- o link já abre e rola até a categoria exata (?open=<id>),
+	// reaproveitando o mesmo mecanismo da busca global em Categories.svelte.
+	const mesTxCategorias = monthTransactions(transactions, mKey);
+	for (const cat of categories.filter((c) => c.tipo === 'despesa' && c.orcamentoMensal > 0)) {
+		const gasto = mesTxCategorias.filter((t) => t.categoriaId === cat.id).reduce((s, t) => s + (Number(t.valor) || 0), 0);
+		const pct = (gasto / cat.orcamentoMensal) * 100;
+		if (pct >= 100) {
+			list.push({
+				tone: 'red',
+				text: `Categoria ${cat.nome} passou do orçamento (${Math.round(pct)}%)`,
+				actionLabel: `Revisar ${cat.nome}`,
+				href: `/categorias?open=${cat.id}`,
+				weight: 65
 			});
 		}
 	}
@@ -91,7 +109,7 @@ export function buildAttentionItems(
 					tone: 'red',
 					text: `Seu saldo pode ficar negativo em ${dias} dia${dias > 1 ? 's' : ''}`,
 					actionLabel: 'Ver projeção',
-					href: '/',
+					href: '/?detalhes=1',
 					weight: 95
 				});
 				break;
@@ -109,7 +127,7 @@ export function buildAttentionItems(
 				tone: 'orange',
 				text: `Fatura do cartão ${acc.nome} está ${Math.round((faturaAtual / mediaAnterior - 1) * 100)}% acima da média`,
 				actionLabel: 'Ver fatura',
-				href: '/contas',
+				href: `/contas?open=${acc.id}`,
 				weight: 55
 			});
 		}

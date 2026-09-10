@@ -16,6 +16,23 @@
 	let editing = $state(null);
 	let deleting = $state(null);
 	let rowActions = $state({ open: false, title: '', subtitle: '', actions: [] });
+	let highlightId = $state(null);
+
+	// Vindo de um alerta de cartão (?open=<id>): rola até o cartão exato e destaca por um instante,
+	// em vez de mandar o usuário procurar qual é entre vários -- mesmo padrão de Movimentações/Categorias.
+	let openedFromAlert = false;
+	$effect(() => {
+		if (openedFromAlert) return;
+		const id = page.url.searchParams.get('open');
+		if (!id) return;
+		const acc = appState.accounts.find((a) => a.id === id);
+		if (acc) {
+			openedFromAlert = true;
+			highlightId = acc.id;
+			queueMicrotask(() => document.getElementById(`acc-${acc.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+			setTimeout(() => { if (highlightId === acc.id) highlightId = null; }, 2400);
+		}
+	});
 	function openAccountActions(acc) {
 		rowActions = {
 			open: true,
@@ -72,6 +89,12 @@
 		return faturaDoCartao(appState.transactions, acc, nextMonthKey(currentMonthKey()));
 	}
 
+	// Compra -> Fatura -> Pagamento (UX 2.0 - Fase 5): o número que o usuário realmente quer saber
+	// não é só a fatura nem só o limite, é quanto ainda dá pra usar sem estourar.
+	function disponivelCartao(acc) {
+		return (Number(acc.limite) || 0) - faturaAtual(acc);
+	}
+
 	const cartoes = $derived(appState.accounts.filter((a) => a.tipo === 'cartao'));
 
 	// Vindo da busca global (?open=<id>): abre direto o resumo/ações dessa conta, uma única vez.
@@ -101,7 +124,9 @@
 	{#each appState.accounts as acc, i (acc.id)}
 		{@const grad = acc.cor || PALETTE[i % PALETTE.length]}
 		<div
+			id={`acc-${acc.id}`}
 			class="account-tile {grad}"
+			class:highlight={highlightId === acc.id}
 			role="button"
 			tabindex="0"
 			onclick={() => openAccountActions(acc)}
@@ -131,7 +156,7 @@
 			</div>
 			<p class="account-tile-foot">
 				{#if acc.tipo === 'cartao'}
-					Limite <span class="privacy-value">{fmtMoney(acc.limite)}</span> · {acc.limite ? Math.round((faturaAtual(acc) / acc.limite) * 100) : 0}% utilizado
+					Limite <span class="privacy-value">{fmtMoney(acc.limite)}</span> · Disponível <span class="privacy-value">{fmtMoney(disponivelCartao(acc))}</span>
 				{:else if i === 0}
 					Principal
 				{:else}

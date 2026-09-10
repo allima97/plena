@@ -592,6 +592,12 @@ table.list .num {
 	margin-top: 40px;
 	padding: 0 4px;
 }
+.nav-group {
+	margin-bottom: 22px;
+}
+.nav-group:last-child {
+	margin-bottom: 0;
+}
 .nav-label {
 	margin: 0 0 12px;
 	font-size: 10px;
@@ -1691,8 +1697,8 @@ table.list .num {
 	color: var(--expense);
 }
 .badge-orange {
-	background: #fff0d5;
-	color: #c38b35;
+	background: var(--kpi-amber-soft);
+	color: var(--kpi-amber);
 }
 .badge-purple {
 	background: #e8ddff;
@@ -2822,6 +2828,13 @@ table.list .num {
 .account-tile:not(.add-tile):hover {
 	transform: translateY(-2px);
 }
+.account-tile.highlight {
+	animation: account-highlight-pulse 2.2s ease;
+}
+@keyframes account-highlight-pulse {
+	0% { box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.85); }
+	100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+}
 .tile-decor-wrap {
 	position: absolute;
 	inset: 0;
@@ -3433,6 +3446,40 @@ table.list .num {
 	padding-top: 8px;
 	font-weight: 700;
 	color: var(--ink);
+}
+.hero-breakdown-row.subtotal {
+	border-top: 1px dashed var(--border-soft);
+	margin-top: 4px;
+	padding-top: 8px;
+	font-weight: 700;
+}
+
+/* ---- Vocabulário Real / Comprometido / Projetado (UX 2.0 - Fase 1) ----
+   Real: dinheiro disponível agora. Comprometido: já destinado. Projetado: cenário futuro.
+   Reaproveita os tons de KPI já existentes para manter a paleta consistente. */
+.money-tag {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	font-size: 10px;
+	font-weight: 800;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	padding: 1px 7px;
+	border-radius: 999px;
+	white-space: nowrap;
+}
+.money-tag.real {
+	color: var(--ink);
+	background: var(--border-soft);
+}
+.money-tag.comprometido {
+	color: var(--kpi-amber);
+	background: var(--kpi-amber-soft);
+}
+.money-tag.projetado {
+	color: var(--kpi-blue);
+	background: var(--kpi-blue-soft);
 }
 
 /* ---------- dashboard: novo centro de controle unificado ---------- */

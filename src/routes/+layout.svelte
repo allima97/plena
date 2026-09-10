@@ -50,16 +50,39 @@
 		}
 	});
 
-	const navItems = [
-		{ href: '/', label: 'Visão geral', icon: LayoutDashboard },
-		{ href: '/movimentacoes', label: 'Movimentações', icon: ReceiptText },
-		{ href: '/contas', label: 'Contas e cartões', icon: WalletCards },
-		{ href: '/categorias', label: 'Categorias', icon: Tags },
-		{ href: '/relatorios', label: 'Relatórios', icon: BarChart3 },
-		{ href: '/objetivos', label: 'Objetivos', icon: Target },
-		{ href: '/patrimonio', label: 'Patrimônio', icon: Landmark },
-		{ href: '/simulador', label: 'Simulador', icon: Wand2 }
+	// Navegação por intenção (UX 2.0 - Fase 4): agrupada pelo que o usuário quer fazer, não pela
+	// estrutura interna do app -- "quero organizar meu dinheiro" -> Dinheiro, "quero planejar" ->
+	// Planejamento, etc. navItems continua existindo (achatado) para isActive/activeLabel/bottom nav.
+	const navGroups = [
+		{
+			label: 'Início',
+			items: [{ href: '/', label: 'Visão geral', icon: LayoutDashboard }]
+		},
+		{
+			label: 'Dinheiro',
+			items: [
+				{ href: '/movimentacoes', label: 'Movimentações', icon: ReceiptText },
+				{ href: '/contas', label: 'Contas e cartões', icon: WalletCards },
+				{ href: '/categorias', label: 'Categorias', icon: Tags }
+			]
+		},
+		{
+			label: 'Planejamento',
+			items: [
+				{ href: '/objetivos', label: 'Objetivos', icon: Target },
+				{ href: '/simulador', label: 'E se...?', icon: Wand2 }
+			]
+		},
+		{
+			label: 'Patrimônio',
+			items: [{ href: '/patrimonio', label: 'Patrimônio', icon: Landmark }]
+		},
+		{
+			label: 'Análise',
+			items: [{ href: '/relatorios', label: 'Relatórios', icon: BarChart3 }]
+		}
 	];
+	const navItems = navGroups.flatMap((g) => g.items);
 
 	let mobileNavOpen = $state(false);
 	let hideValues = $state(false);
@@ -125,20 +148,24 @@
 		</div>
 
 		<div class="nav-block">
-			<p class="nav-label">Menu principal</p>
-			<nav>
-				{#each navItems as item (item.href)}
-					<a
-						href={item.href}
-						class="nav-item"
-						class:active={isActive(item.href)}
-						onclick={() => (mobileNavOpen = false)}
-					>
-						<item.icon size={18} strokeWidth={isActive(item.href) ? 2.2 : 1.8} />
-						<span>{item.label}</span>
-					</a>
-				{/each}
-			</nav>
+			{#each navGroups as group (group.label)}
+				<div class="nav-group">
+					<p class="nav-label">{group.label}</p>
+					<nav>
+						{#each group.items as item (item.href)}
+							<a
+								href={item.href}
+								class="nav-item"
+								class:active={isActive(item.href)}
+								onclick={() => (mobileNavOpen = false)}
+							>
+								<item.icon size={18} strokeWidth={isActive(item.href) ? 2.2 : 1.8} />
+								<span>{item.label}</span>
+							</a>
+						{/each}
+					</nav>
+				</div>
+			{/each}
 		</div>
 
 		<div class="sidebar-footer">
