@@ -989,6 +989,34 @@ table.list .num {
 	font-size: 10.5px;
 	letter-spacing: 0.06em;
 }
+.quick-add-summary {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	width: 100%;
+	background: var(--surface-3);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-md);
+	padding: 10px 12px;
+	font-size: 12.5px;
+	color: var(--ink-soft);
+	cursor: pointer;
+	text-align: left;
+}
+.quick-add-summary b {
+	color: var(--ink);
+	font-weight: 700;
+}
+.quick-add-summary-chevron {
+	display: inline-flex;
+	flex: none;
+	transition: transform 0.15s;
+	color: var(--ink-faint);
+}
+.quick-add-summary-chevron.rotated {
+	transform: rotate(180deg);
+}
 .quick-add-submit {
 	width: 100%;
 	margin-top: 4px;

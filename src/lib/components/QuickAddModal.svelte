@@ -2,26 +2,38 @@
 	import { appState, addTransaction, removeTransaction } from '$lib/fin/store.svelte.js';
 	import { todayISO, fmtMoney } from '$lib/format.js';
 	import { showToast } from '$lib/toast.svelte.js';
-	import { X, Check, Wand2 } from 'lucide-svelte';
+	import { X, Check, Wand2, ChevronDown } from 'lucide-svelte';
 
 	let { open, onClose } = $props();
+
+	// Conta default: a última usada num lançamento (mais provável de ser a certa do que sempre
+	// cair na primeira da lista) -- cai pra primeira conta cadastrada sem histórico ainda.
+	function ultimaContaUsada() {
+		const ultimo = [...appState.transactions].sort((a, b) => b.data.localeCompare(a.data))[0];
+		return ultimo?.contaId || appState.accounts[0]?.id || '';
+	}
 
 	function blank() {
 		return {
 			valor: '',
 			descricao: '',
 			tipo: 'despesa',
-			contaId: appState.accounts[0]?.id || '',
+			contaId: ultimaContaUsada(),
 			categoriaId: '',
 			subcategoriaId: ''
 		};
 	}
 	let form = $state(blank());
 	let valorEl = $state(null);
+	// Lançamento rápido (Fase 2): conta e categoria começam recolhidas atrás de um resumo --
+	// o usuário só precisa decidir valor, descrição e tipo pra salvar; ajustar conta/categoria
+	// é opcional, um toque a mais, não um campo obrigatório na tela principal.
+	let detalhesAbertos = $state(false);
 
 	$effect(() => {
 		if (open) {
 			form = blank();
+			detalhesAbertos = false;
 			queueMicrotask(() => valorEl?.focus());
 		}
 	});
@@ -82,6 +94,8 @@
 	}
 
 	const categoriasDoTipo = $derived(appState.categories.filter((c) => c.tipo === form.tipo));
+	const contaSelecionada = $derived(appState.accounts.find((a) => a.id === form.contaId));
+	const categoriaSelecionada = $derived(categoriasDoTipo.find((c) => c.id === form.categoriaId));
 
 	function submit(e) {
 		e.preventDefault();
@@ -130,19 +144,25 @@
 						<span class="quick-add-suggestion-cta">Usar</span>
 					</button>
 				{/if}
-				<div class="quick-add-row">
-					<select class="field-input" bind:value={form.contaId}>
-						{#each appState.accounts as acc (acc.id)}
-							<option value={acc.id}>{acc.nome}</option>
-						{/each}
-					</select>
-					<select class="field-input" bind:value={form.categoriaId}>
-						<option value="">Sem categoria</option>
-						{#each categoriasDoTipo as cat (cat.id)}
-							<option value={cat.id}>{cat.nome}</option>
-						{/each}
-					</select>
-				</div>
+				<button type="button" class="quick-add-summary" onclick={() => (detalhesAbertos = !detalhesAbertos)}>
+					<span>Conta: <b>{contaSelecionada?.nome || 'Escolher'}</b> · Categoria: <b>{categoriaSelecionada?.nome || 'Sem categoria'}</b></span>
+					<span class="quick-add-summary-chevron" class:rotated={detalhesAbertos}><ChevronDown size={14} /></span>
+				</button>
+				{#if detalhesAbertos}
+					<div class="quick-add-row">
+						<select class="field-input" bind:value={form.contaId}>
+							{#each appState.accounts as acc (acc.id)}
+								<option value={acc.id}>{acc.nome}</option>
+							{/each}
+						</select>
+						<select class="field-input" bind:value={form.categoriaId}>
+							<option value="">Sem categoria</option>
+							{#each categoriasDoTipo as cat (cat.id)}
+								<option value={cat.id}>{cat.nome}</option>
+							{/each}
+						</select>
+					</div>
+				{/if}
 				{#if recentes.length}
 					<div class="quick-add-recent">
 						<span>Últimos usados:</span>
