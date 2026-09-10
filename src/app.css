@@ -3068,17 +3068,6 @@ table.list .num {
 
 /* ---------- categorias: rows + tip panel ---------- */
 
-.categories-layout {
-	display: grid;
-	grid-template-columns: 1.6fr 1fr;
-	gap: 20px;
-	align-items: start;
-}
-@media (max-width: 900px) {
-	.categories-layout {
-		grid-template-columns: 1fr;
-	}
-}
 .cat-list-head {
 	display: flex;
 	align-items: center;
@@ -3150,77 +3139,100 @@ table.list .num {
 	gap: 10px;
 }
 
-.tip-panel {
-	background: var(--ink);
-	color: #fff;
+.cat-tip-banner {
+	display: flex;
+	align-items: center;
+	gap: 20px;
+	background: linear-gradient(160deg, #e9f1ff, #dce7ff);
 	border-radius: var(--radius-lg);
-	padding: 26px;
-	position: relative;
-	overflow: hidden;
+	padding: 18px 22px;
+	margin-bottom: 20px;
 }
-.tip-panel-icon {
-	width: 40px;
-	height: 40px;
+.cat-tip-icon {
+	width: 38px;
+	height: 38px;
 	border-radius: 12px;
-	background: rgba(255, 255, 255, 0.12);
+	background: rgba(255, 255, 255, 0.6);
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	margin-bottom: 20px;
-	color: var(--income-bar-hover);
+	color: var(--accent-fg);
+	flex-shrink: 0;
 }
-.tip-panel-eyebrow {
+.cat-tip-text {
+	flex: 1;
+	min-width: 0;
+}
+.cat-tip-eyebrow {
 	font-size: 10.5px;
 	text-transform: uppercase;
 	letter-spacing: 0.12em;
-	opacity: 0.6;
+	color: var(--accent-fg);
+	opacity: 0.85;
 	margin: 0;
+	font-weight: 800;
 }
-.tip-panel h3 {
-	font-size: 21px;
-	margin: 12px 0 12px;
+.cat-tip-text h3 {
+	font-size: 15px;
+	font-weight: 700;
+	margin: 4px 0 4px;
 	font-family: var(--font-display);
-	letter-spacing: -0.03em;
+	letter-spacing: -0.02em;
+	color: var(--ink);
 }
-.tip-panel p {
-	font-size: 13px;
-	opacity: 0.72;
-	line-height: 1.65;
+.cat-tip-text p {
+	font-size: 12.5px;
+	color: var(--ink-soft);
+	line-height: 1.5;
 	margin: 0;
 }
-.tip-example {
-	background: rgba(255, 255, 255, 0.07);
-	border-radius: 14px;
-	padding: 14px;
-	margin-top: 20px;
+.cat-tip-example {
+	flex-shrink: 0;
+	text-align: right;
 }
-.tip-example .ex-label {
-	font-size: 10.5px;
+.cat-tip-example .ex-label {
+	font-size: 10px;
 	text-transform: uppercase;
 	letter-spacing: 0.1em;
-	opacity: 0.55;
-	margin: 0 0 10px;
+	color: var(--ink-faint);
+	margin: 0 0 8px;
 }
 .chip-pair {
 	display: flex;
 	gap: 8px;
 	flex-wrap: wrap;
+	justify-content: flex-end;
 }
 .chip-solid {
-	background: #fff;
-	color: var(--ink);
-	border-radius: 999px;
-	padding: 6px 14px;
-	font-size: 12.5px;
-	font-weight: 700;
-}
-.chip-outline {
-	border: 1px solid rgba(255, 255, 255, 0.32);
+	background: var(--ink);
 	color: #fff;
 	border-radius: 999px;
 	padding: 6px 14px;
-	font-size: 12.5px;
+	font-size: 12px;
 	font-weight: 700;
+	white-space: nowrap;
+}
+.chip-outline {
+	border: 1px solid var(--border);
+	background: rgba(255, 255, 255, 0.6);
+	color: var(--ink-soft);
+	border-radius: 999px;
+	padding: 6px 14px;
+	font-size: 12px;
+	font-weight: 700;
+	white-space: nowrap;
+}
+@media (max-width: 720px) {
+	.cat-tip-banner {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+	.cat-tip-example {
+		text-align: left;
+	}
+	.chip-pair {
+		justify-content: flex-start;
+	}
 }
 
 /* ---------- dashboard: filters, hero, mini stats, charts, feed ---------- */

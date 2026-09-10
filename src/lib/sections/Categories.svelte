@@ -116,155 +116,125 @@
 	<button class="btn btn-primary" onclick={() => (showModal = true)}><Plus size={16} /> Nova categoria</button>
 </div>
 
-<div class="card" style="margin-bottom:16px">
-	<div class="feed-list-head">
-		<p class="stat-label" style="margin:0">Orçamento mensal total</p>
-		{#if !editandoOrcamentoGlobal}
-			<button class="btn btn-ghost sm" onclick={abrirOrcamentoGlobal}>{appState.budgetGlobal ? 'Editar' : 'Definir'}</button>
-		{/if}
+<!-- Orçamento mensal total: card removido da página de Categorias a pedido do usuário (não fazia sentido aqui). Lógica (setBudgetGlobal, appState.budgetGlobal) segue intacta no store -- o card pode voltar em outro lugar (ex.: Dashboard) mais adiante. -->
+
+<div class="cat-tip-banner">
+	<div class="cat-tip-icon"><Tag size={18} /></div>
+	<div class="cat-tip-text">
+		<p class="cat-tip-eyebrow">Dica de organização</p>
+		<h3>Detalhe hoje. Entenda amanhã.</h3>
+		<p>Use o campo secundário para diferenciar pessoas, serviços ou objetivos dentro da mesma categoria principal.</p>
 	</div>
-	{#if editandoOrcamentoGlobal}
-		<div class="report-row">
-			<input
-				class="field-input"
-				style="flex:1"
-				type="number"
-				min="0"
-				step="0.01"
-				placeholder="Ex.: 6000"
-				bind:value={orcamentoGlobalInput}
-				onkeydown={(e) => { if (e.key === 'Enter') salvarOrcamentoGlobal(); }}
-			/>
-			<button class="btn sm" onclick={salvarOrcamentoGlobal}>Salvar</button>
-			<button class="btn btn-ghost sm" onclick={() => (editandoOrcamentoGlobal = false)}>Cancelar</button>
+	<div class="cat-tip-example">
+		<p class="ex-label">Exemplo</p>
+		<div class="chip-pair">
+			<span class="chip-solid">{exemploChip.principal}</span>
+			<span class="chip-outline">{exemploChip.secundario}</span>
 		</div>
-	{:else if appState.budgetGlobal}
-		<div class="mini-progress-track" style="margin-top:8px">
-			<div class="mini-progress-fill" style={`width:${pctOrcamentoGlobal}%; background:${corOrcamento(pctOrcamentoGlobal)}`}></div>
-		</div>
-		<p class="cat-row-sub" style="margin-top:6px">{fmtMoney(gastoTotalMes)} de {fmtMoney(appState.budgetGlobal)} ({pctOrcamentoGlobal}%) -- restam {fmtMoney(Math.max(0, appState.budgetGlobal - gastoTotalMes))}</p>
-	{:else}
-		<p class="empty">Nenhum orçamento total definido ainda.</p>
-	{/if}
+	</div>
 </div>
 
-<div class="categories-layout">
-	<div class="card">
-		<div class="cat-list-head">
-			<div>
-				<p class="page-eyebrow" style="margin-bottom:2px">Estrutura atual</p>
-				<p class="font-display" style="margin:0;font-size:18px">Principal e secundária</p>
-			</div>
-			<span class="badge badge-gray">{appState.categories.length} categoria{appState.categories.length === 1 ? '' : 's'}</span>
+<div class="card">
+	<div class="cat-list-head">
+		<div>
+			<p class="page-eyebrow" style="margin-bottom:2px">Estrutura atual</p>
+			<p class="font-display" style="margin:0;font-size:18px">Principal e secundária</p>
 		</div>
+		<span class="badge badge-gray">{appState.categories.length} categoria{appState.categories.length === 1 ? '' : 's'}</span>
+	</div>
 
-		<div class="cat-rows">
-			{#each appState.categories as cat, i (cat.id)}
-				{@const dot = DOT_PALETTE[i % DOT_PALETTE.length]}
-				<div class="cat-row" id="cat-{cat.id}">
-					<div class="cat-row-top" onclick={() => (expandedId = expandedId === cat.id ? null : cat.id)} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && (expandedId = expandedId === cat.id ? null : cat.id)}>
-						<span class="cat-dot" style="background:{dot}"></span>
-						<div class="cat-row-main">
-							<span class="cat-row-name">{cat.nome}</span>
-							<span class="tag" class:receita={cat.tipo === 'receita'} class:despesa={cat.tipo === 'despesa'}>{cat.tipo}</span>
-						</div>
-						<div style="text-align:right;min-width:130px">
-							<p class="cat-row-value privacy-value" class:money-in={cat.tipo === 'receita'} class:money-out={cat.tipo === 'despesa'}>{fmtMoney(valorDoMes(cat))}</p>
-							{#if cat.tipo === 'despesa' && cat.orcamentoMensal}
-								{@const pct = pctOrcamento(cat)}
-								<div class="mini-progress-track" style="margin-top:6px">
-									<div class="mini-progress-fill" style={`width:${pct}%; background:${corOrcamento(pct)}`}></div>
-								</div>
-								<p class="cat-row-sub">{pct}% de {fmtMoney(cat.orcamentoMensal)}</p>
-							{:else}
-								<p class="cat-row-sub">{cat.secundarios?.length || 0} subitem{(cat.secundarios?.length || 0) === 1 ? '' : 'ns'} cadastrado{(cat.secundarios?.length || 0) === 1 ? '' : 's'}</p>
-							{/if}
-						</div>
+	<div class="cat-rows">
+		{#each appState.categories as cat, i (cat.id)}
+			{@const dot = DOT_PALETTE[i % DOT_PALETTE.length]}
+			<div class="cat-row" id="cat-{cat.id}">
+				<div class="cat-row-top" onclick={() => (expandedId = expandedId === cat.id ? null : cat.id)} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && (expandedId = expandedId === cat.id ? null : cat.id)}>
+					<span class="cat-dot" style="background:{dot}"></span>
+					<div class="cat-row-main">
+						<span class="cat-row-name">{cat.nome}</span>
+						<span class="tag" class:receita={cat.tipo === 'receita'} class:despesa={cat.tipo === 'despesa'}>{cat.tipo}</span>
 					</div>
-
-					{#if expandedId === cat.id}
-						<div class="cat-row-body">
-							<div class="report-row">
-								{#if renomeando === cat.id}
-									<input
-										class="field-input"
-										style="flex:1"
-										value={cat.nome}
-										onblur={(e) => { renameCategory(cat.id, e.target.value); renomeando = null; }}
-										onkeydown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
-									/>
-								{:else}
-									<button class="btn btn-ghost sm" onclick={() => (renomeando = cat.id)}>Renomear</button>
-								{/if}
-								<button class="btn btn-danger sm" onclick={() => (deletando = cat)}>Excluir categoria</button>
+					<div style="text-align:right;min-width:130px">
+						<p class="cat-row-value privacy-value" class:money-in={cat.tipo === 'receita'} class:money-out={cat.tipo === 'despesa'}>{fmtMoney(valorDoMes(cat))}</p>
+						{#if cat.tipo === 'despesa' && cat.orcamentoMensal}
+							{@const pct = pctOrcamento(cat)}
+							<div class="mini-progress-track" style="margin-top:6px">
+								<div class="mini-progress-fill" style={`width:${pct}%; background:${corOrcamento(pct)}`}></div>
 							</div>
+							<p class="cat-row-sub">{pct}% de {fmtMoney(cat.orcamentoMensal)}</p>
+						{:else}
+							<p class="cat-row-sub">{cat.secundarios?.length || 0} subitem{(cat.secundarios?.length || 0) === 1 ? '' : 'ns'} cadastrado{(cat.secundarios?.length || 0) === 1 ? '' : 's'}</p>
+						{/if}
+					</div>
+				</div>
 
-							{#if cat.tipo === 'despesa'}
-								<div class="report-row">
-									{#if editandoOrcamento === cat.id}
-										<input
-											class="field-input"
-											style="flex:1"
-											type="number"
-											min="0"
-											step="0.01"
-											placeholder="Ex.: 500"
-											bind:value={orcamentoInput}
-											onkeydown={(e) => { if (e.key === 'Enter') salvarOrcamento(cat); }}
-										/>
-										<button class="btn sm" onclick={() => salvarOrcamento(cat)}>Salvar</button>
-									{:else}
-										<span class="cat-row-sub" style="flex:1">
-											Orçamento mensal: {cat.orcamentoMensal ? fmtMoney(cat.orcamentoMensal) : 'não definido'}
-										</span>
-										<button class="btn btn-ghost sm" onclick={() => abrirOrcamento(cat)}>{cat.orcamentoMensal ? 'Editar' : 'Definir'} orçamento</button>
-									{/if}
-								</div>
-							{/if}
-
-							{#if cat.secundarios?.length}
-								<div class="sub-list">
-									{#each cat.secundarios as sub (sub.id)}
-										<span class="badge badge-gray sub-chip">
-											{sub.nome}
-											<button class="sub-remove" onclick={() => removeSubcategory(cat.id, sub.id)} aria-label="Remover subcategoria">×</button>
-										</span>
-									{/each}
-								</div>
-							{/if}
-
-							<div class="report-row">
+				{#if expandedId === cat.id}
+					<div class="cat-row-body">
+						<div class="report-row">
+							{#if renomeando === cat.id}
 								<input
 									class="field-input"
 									style="flex:1"
-									placeholder="Nova subcategoria"
-									value={novaSub[cat.id] || ''}
-									oninput={(e) => (novaSub = { ...novaSub, [cat.id]: e.target.value })}
-									onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); criarSub(cat.id); } }}
+									value={cat.nome}
+									onblur={(e) => { renameCategory(cat.id, e.target.value); renomeando = null; }}
+									onkeydown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
 								/>
-								<button class="btn sm" onclick={() => criarSub(cat.id)}>Adicionar</button>
-							</div>
+							{:else}
+								<button class="btn btn-ghost sm" onclick={() => (renomeando = cat.id)}>Renomear</button>
+							{/if}
+							<button class="btn btn-danger sm" onclick={() => (deletando = cat)}>Excluir categoria</button>
 						</div>
-					{/if}
-				</div>
-			{:else}
-				<p class="empty">Nenhuma categoria ainda.</p>
-			{/each}
-		</div>
-	</div>
 
-	<div class="tip-panel">
-		<div class="tip-panel-icon"><Tag size={18} /></div>
-		<p class="tip-panel-eyebrow">Dica de organização</p>
-		<h3>Detalhe hoje. Entenda amanhã.</h3>
-		<p>Use o campo secundário para diferenciar pessoas, serviços ou objetivos dentro da mesma categoria principal.</p>
-		<div class="tip-example">
-			<p class="ex-label">Exemplo</p>
-			<div class="chip-pair">
-				<span class="chip-solid">{exemploChip.principal}</span>
-				<span class="chip-outline">{exemploChip.secundario}</span>
+						{#if cat.tipo === 'despesa'}
+							<div class="report-row">
+								{#if editandoOrcamento === cat.id}
+									<input
+										class="field-input"
+										style="flex:1"
+										type="number"
+										min="0"
+										step="0.01"
+										placeholder="Ex.: 500"
+										bind:value={orcamentoInput}
+										onkeydown={(e) => { if (e.key === 'Enter') salvarOrcamento(cat); }}
+									/>
+									<button class="btn sm" onclick={() => salvarOrcamento(cat)}>Salvar</button>
+								{:else}
+									<span class="cat-row-sub" style="flex:1">
+										Orçamento mensal: {cat.orcamentoMensal ? fmtMoney(cat.orcamentoMensal) : 'não definido'}
+									</span>
+									<button class="btn btn-ghost sm" onclick={() => abrirOrcamento(cat)}>{cat.orcamentoMensal ? 'Editar' : 'Definir'} orçamento</button>
+								{/if}
+							</div>
+						{/if}
+
+						{#if cat.secundarios?.length}
+							<div class="sub-list">
+								{#each cat.secundarios as sub (sub.id)}
+									<span class="badge badge-gray sub-chip">
+										{sub.nome}
+										<button class="sub-remove" onclick={() => removeSubcategory(cat.id, sub.id)} aria-label="Remover subcategoria">×</button>
+									</span>
+								{/each}
+							</div>
+						{/if}
+
+						<div class="report-row">
+							<input
+								class="field-input"
+								style="flex:1"
+								placeholder="Nova subcategoria"
+								value={novaSub[cat.id] || ''}
+								oninput={(e) => (novaSub = { ...novaSub, [cat.id]: e.target.value })}
+								onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); criarSub(cat.id); } }}
+							/>
+							<button class="btn sm" onclick={() => criarSub(cat.id)}>Adicionar</button>
+						</div>
+					</div>
+				{/if}
 			</div>
-		</div>
+		{:else}
+			<p class="empty">Nenhuma categoria ainda.</p>
+		{/each}
 	</div>
 </div>
 
