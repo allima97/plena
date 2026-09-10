@@ -22,7 +22,7 @@ const dict = {
 		nav_dinheiro: 'Dinheiro',
 		nav_movimentacoes: 'Movimentações',
 		nav_contas: 'Contas e cartões',
-		nav_categorias: 'Gestão de Categorias',
+		nav_categorias: 'Categorias',
 		nav_planejamento: 'Planejamento',
 		nav_objetivos: 'Objetivos',
 		nav_simulador: 'E se...?',
