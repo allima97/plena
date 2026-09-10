@@ -1,11 +1,12 @@
-import { monthKey, todayISO } from '../format.js';
+import { monthKey, financialMonthKey, todayISO } from '../format.js';
 
-export function currentMonthKey() {
-	return monthKey(todayISO());
+/** @param {number} [startDay] Configurações > Geral > "O mês começa no dia" (1 = mês de calendário) */
+export function currentMonthKey(startDay = 1) {
+	return financialMonthKey(todayISO(), startDay);
 }
 
-export function monthTransactions(transactions, mKey = currentMonthKey()) {
-	return transactions.filter((t) => monthKey(t.data) === mKey);
+export function monthTransactions(transactions, mKey = currentMonthKey(), startDay = 1) {
+	return transactions.filter((t) => financialMonthKey(t.data, startDay) === mKey);
 }
 
 export function totals(transactions) {
@@ -38,8 +39,8 @@ export function saldoContaAte(transactions, acc, dataLimite = todayISO()) {
 }
 
 /** Soma de parcelas/recorrências ativas com vencimento no mês informado. */
-export function committedThisMonth(transactions, mKey = currentMonthKey()) {
-	return monthTransactions(transactions, mKey)
+export function committedThisMonth(transactions, mKey = currentMonthKey(), startDay = 1) {
+	return monthTransactions(transactions, mKey, startDay)
 		.filter((t) => t.seriesId && t.seriesStatus === 'ativa' && !t.isTransferencia)
 		.reduce((sum, t) => sum + (Number(t.valor) || 0), 0);
 }
@@ -89,18 +90,18 @@ export function nextScheduleDate(schedule) {
 /**
  * Mês de fatura (YYYY-MM) de um lançamento de cartão. Cada lançamento de fatura já é
  * datado pelo dia de vencimento (não pela data de cada compra), então o mês da fatura
- * é simplesmente o mês civil da própria data lançada -- sem reclassificar pelo dia do
+ * é simplesmente o mês financeiro da própria data lançada -- sem reclassificar pelo dia do
  * cartão, que hoje é só informativo (ver acc.fechamento / "Dia de vencimento").
  */
-export function faturaMonthOf(dataISO) {
-	return dataISO.slice(0, 7);
+export function faturaMonthOf(dataISO, startDay = 1) {
+	return financialMonthKey(dataISO, startDay);
 }
 
 /** Soma das despesas de um cartão que caem na fatura de um mês (default: mês atual). */
-export function faturaDoCartao(transactions, acc, mKey = currentMonthKey()) {
+export function faturaDoCartao(transactions, acc, mKey = currentMonthKey(), startDay = 1) {
 	return transactions
 		.filter((t) => t.contaId === acc.id && t.tipo === 'despesa' && !t.isTransferencia)
-		.filter((t) => faturaMonthOf(t.data) === mKey)
+		.filter((t) => faturaMonthOf(t.data, startDay) === mKey)
 		.reduce((s, t) => s + (Number(t.valor) || 0), 0);
 }
 

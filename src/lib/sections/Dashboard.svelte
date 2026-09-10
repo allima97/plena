@@ -4,7 +4,7 @@
 	import { computeMetrics } from '$lib/goals/metrics.js';
 	import { buildAttentionItems } from '$lib/fin/attention.js';
 	import { computeFinancialScore, buildInsights } from '$lib/fin/intelligence.js';
-	import { fmtMoney, fmtDate, monthLabel, monthKey, todayISO } from '$lib/format.js';
+	import { fmtMoney, fmtDate, monthLabel, financialMonthKey, todayISO } from '$lib/format.js';
 	import NewMovementModal from '$lib/components/NewMovementModal.svelte';
 	import MoveFormModal from '$lib/goals/MoveFormModal.svelte';
 	import { showToast } from '$lib/toast.svelte.js';
@@ -37,15 +37,16 @@
 		return d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).replace(', ', ' · ');
 	});
 
-	const mKey = $derived(currentMonthKey());
+	const startDay = $derived(appState.settings.monthStartDay || 1);
+	const mKey = $derived(currentMonthKey(startDay));
 	const prevMKey = $derived(shiftMonthKey(mKey, -1));
 	const moedaPadrao = $derived(appState.settings.moedaPadrao || 'BRL');
 
 	const contaTx = $derived(appState.transactions.filter((t) => contaFiltro === 'all' || t.contaId === contaFiltro));
 	const baseTx = $derived(contaTx.filter((t) => tipoFiltro === 'all' || t.tipo === tipoFiltro));
 
-	const mesTx = $derived(monthTransactions(baseTx, mKey));
-	const prevMesTx = $derived(monthTransactions(baseTx, prevMKey));
+	const mesTx = $derived(monthTransactions(baseTx, mKey, startDay));
+	const prevMesTx = $derived(monthTransactions(baseTx, prevMKey, startDay));
 	const t = $derived(totals(mesTx));
 	const prevT = $derived(totals(prevMesTx));
 
@@ -66,13 +67,13 @@
 		const out = [];
 		for (let i = 5; i >= 0; i--) {
 			const k = shiftMonthKey(mKey, -i);
-			const tt = totals(monthTransactions(appState.transactions, k));
+			const tt = totals(monthTransactions(appState.transactions, k, startDay));
 			out.push(Math.max(1, tt.receitas + tt.despesas));
 		}
 		return out;
 	});
 
-	const comprometido = $derived(committedThisMonth(baseTx, mKey));
+	const comprometido = $derived(committedThisMonth(baseTx, mKey, startDay));
 	const comprometidoPct = $derived(t.despesas > 0 ? Math.min(100, Math.round((comprometido / t.despesas) * 100)) : 0);
 	const entradasDeltaPct = $derived(prevT.receitas > 0 ? ((t.receitas - prevT.receitas) / prevT.receitas) * 100 : null);
 	const saidasDeltaPct = $derived(prevT.despesas > 0 ? ((t.despesas - prevT.despesas) / prevT.despesas) * 100 : null);
@@ -84,7 +85,7 @@
 		const out = [];
 		for (let i = 5; i >= 0; i--) {
 			const k = shiftMonthKey(mKey, -i);
-			const tt = totals(monthTransactions(contaTx, k));
+			const tt = totals(monthTransactions(contaTx, k, startDay));
 			const [, mm] = k.split('-').map(Number);
 			out.push({ label: MES_ABBR[mm - 1], a: tt.receitas, b: tt.despesas, current: k === mKey });
 		}
@@ -93,7 +94,7 @@
 
 	// distribuição: despesas do mês por categoria (respeitando conta), top 4 + outros
 	const distribuicao = $derived.by(() => {
-		const despesasMes = monthTransactions(contaTx, mKey).filter((tr) => tr.tipo === 'despesa' && !tr.isTransferencia);
+		const despesasMes = monthTransactions(contaTx, mKey, startDay).filter((tr) => tr.tipo === 'despesa' && !tr.isTransferencia);
 		const map = new Map();
 		for (const tr of despesasMes) {
 			const cat = appState.categories.find((c) => c.id === tr.categoriaId);
@@ -119,7 +120,8 @@
 		goalCategories: appState.goalCategories,
 		installments: appState.installments,
 		amortizations: appState.amortizations,
-		categories: appState.categories
+		categories: appState.categories,
+		startDay
 	}));
 	const financialScore = $derived(computeFinancialScore(intelligenceInput));
 	let scoreExpanded = $state(false);
@@ -151,11 +153,10 @@
 	// variação + mini histórico no card.
 	$effect(() => {
 		if (!appState.ready) return;
-		upsertScoreSnapshot(currentMonthKey(), { overall: financialScore.overall });
+		upsertScoreSnapshot(currentMonthKey(startDay), { overall: financialScore.overall });
 	});
 	const scoreHistory = $derived([...appState.scoreSnapshots].sort((a, b) => a.mKey.localeCompare(b.mKey)).slice(-12));
 	const scorePrevMonth = $derived.by(() => {
-		const mKey = currentMonthKey();
 		const prior = scoreHistory.filter((s) => s.mKey !== mKey);
 		return prior.length ? prior[prior.length - 1] : null;
 	});
@@ -164,7 +165,7 @@
 	// Orçamento por categoria (P2.3): categorias de despesa com orçamento mensal definido,
 	// gasto do mês corrente e % de uso -- mesma fonte de dados de Categories.svelte.
 	const categoriasComOrcamento = $derived.by(() => {
-		const mesTx = monthTransactions(appState.transactions, currentMonthKey());
+		const mesTx = monthTransactions(appState.transactions, mKey, startDay);
 		return appState.categories
 			.filter((c) => c.tipo === 'despesa' && c.orcamentoMensal)
 			.map((c) => {
@@ -179,7 +180,7 @@
 		if (pct >= 80) return 'var(--kpi-amber, #a67c1e)';
 		return 'var(--income)';
 	}
-	const gastoTotalMes = $derived(monthTransactions(appState.transactions, currentMonthKey()).filter((t) => t.tipo === 'despesa' && !t.isTransferencia).reduce((s, t) => s + (Number(t.valor) || 0), 0));
+	const gastoTotalMes = $derived(monthTransactions(appState.transactions, mKey, startDay).filter((t) => t.tipo === 'despesa' && !t.isTransferencia).reduce((s, t) => s + (Number(t.valor) || 0), 0));
 	const pctOrcamentoGlobal = $derived(appState.budgetGlobal ? Math.min(100, Math.round((gastoTotalMes / appState.budgetGlobal) * 100)) : null);
 	const insights = $derived(buildInsights(intelligenceInput, 3));
 	const INSIGHT_LABELS = { comportamento: 'Comportamento', oportunidade: 'Oportunidade', risco: 'Risco', objetivo: 'Objetivo', cartao: 'Cartão' };
@@ -207,7 +208,7 @@
 		return saldoContaAte(appState.transactions, acc, todayISO());
 	}
 	function faturaConta(acc) {
-		return faturaDoCartao(appState.transactions, acc, mKey);
+		return faturaDoCartao(appState.transactions, acc, mKey, startDay);
 	}
 
 	const saldoContasReal = $derived(contasLiquidas.reduce((s, acc) => s + saldoConta(acc), 0));
@@ -314,8 +315,8 @@
 	// (não só no dia 1) para o usuário conferir quando quiser.
 	let fechamentoAberto = $state(false);
 	const fechamentoMensal = $derived.by(() => {
-		const mesAnteriorKey = shiftMonthKey(currentMonthKey(), -1);
-		const txMesAnterior = monthTransactions(appState.transactions, mesAnteriorKey);
+		const mesAnteriorKey = shiftMonthKey(mKey, -1);
+		const txMesAnterior = monthTransactions(appState.transactions, mesAnteriorKey, startDay);
 		const tot = totals(txMesAnterior);
 		const taxaPoupanca = tot.receitas > 0 ? Math.round((tot.saldo / tot.receitas) * 1000) / 10 : null;
 
@@ -330,7 +331,7 @@
 
 		const aportesPorRecurso = new Map();
 		for (const m of appState.resourceMoves) {
-			if (monthKey(m.date) !== mesAnteriorKey) continue;
+			if (financialMonthKey(m.date, startDay) !== mesAnteriorKey) continue;
 			aportesPorRecurso.set(m.resourceId, (aportesPorRecurso.get(m.resourceId) || 0) + m.amount);
 		}
 		let melhorResultado = null;
@@ -384,7 +385,8 @@
 				installments: appState.installments,
 				amortizations: appState.amortizations,
 				alertThresholds: appState.alertThresholds,
-				categories: appState.categories
+				categories: appState.categories,
+				startDay
 			},
 			3
 		)

@@ -3,6 +3,7 @@
 :root {
 	--bg: #f6f7f3;
 	--ink: #17212b;
+	--ink-solid: #17212b;
 	--ink-soft: #53636b;
 	--ink-muted: #77848e;
 	--ink-faint: #a0abb0;
@@ -15,24 +16,25 @@
 	--border-strong: #d9e2e7;
 	--input-border: #e1e9e4;
 	--ring: #99b7a4;
+	--primary: #4a78db;
 	--income: #23a768;
-	--income-strong: #1eaa65;
-	--income-soft: #e5f8ed;
-	--income-bar: #b5ead0;
-	--income-bar-hover: #4dcc8c;
+	--income-strong: color-mix(in srgb, var(--income) 92%, black);
+	--income-soft: color-mix(in srgb, var(--income) 12%, var(--card));
+	--income-bar: color-mix(in srgb, var(--income) 42%, var(--surface-2));
+	--income-bar-hover: color-mix(in srgb, var(--income) 68%, var(--surface-2));
 	--expense: #e06b5f;
-	--expense-strong: #e66658;
-	--expense-soft: #fff0ed;
-	--expense-bar: #fac7c0;
-	--expense-bar-hover: #f18c7e;
-	--link: #4a78db;
-	--accent: #e7f1ff;
-	--accent-fg: #355f9f;
+	--expense-strong: color-mix(in srgb, var(--expense) 96%, black);
+	--expense-soft: color-mix(in srgb, var(--expense) 12%, var(--card));
+	--expense-bar: color-mix(in srgb, var(--expense) 42%, var(--surface-2));
+	--expense-bar-hover: color-mix(in srgb, var(--expense) 68%, var(--surface-2));
+	--link: var(--primary);
+	--accent: color-mix(in srgb, var(--primary) 12%, var(--card));
+	--accent-fg: color-mix(in srgb, var(--primary) 82%, black);
 	--purple: #8b78db;
-	--chip-receita-bg: #e7f8ed;
-	--chip-receita-fg: #31a369;
-	--chip-despesa-bg: #fff0ed;
-	--chip-despesa-fg: #dc766b;
+	--chip-receita-bg: color-mix(in srgb, var(--income) 10%, var(--card));
+	--chip-receita-fg: color-mix(in srgb, var(--income) 82%, black);
+	--chip-despesa-bg: color-mix(in srgb, var(--expense) 10%, var(--card));
+	--chip-despesa-fg: color-mix(in srgb, var(--expense) 82%, black);
 	--radius-sm: 12px;
 	--radius-md: 16px;
 	--radius-lg: 26px;
@@ -47,21 +49,48 @@
 
 	/* nextgoals (Rumo Financeiro) accent tokens -- Objetivos KPI tiles + encargos swatches */
 	--kpi-green: #26825c;
-	--kpi-green-soft: #e1f0e8;
+	--kpi-green-soft: color-mix(in srgb, var(--kpi-green) 16%, var(--card));
 	--kpi-amber: #a67c1e;
-	--kpi-amber-soft: #f6e6ce;
+	--kpi-amber-soft: color-mix(in srgb, var(--kpi-amber) 18%, var(--card));
 	--kpi-rose: #be4368;
-	--kpi-rose-soft: #fce7eb;
+	--kpi-rose-soft: color-mix(in srgb, var(--kpi-rose) 15%, var(--card));
 	--kpi-blue: #2e6da4;
-	--kpi-blue-soft: #e1ebf5;
+	--kpi-blue-soft: color-mix(in srgb, var(--kpi-blue) 15%, var(--card));
 	--kpi-gold: #9a7b0a;
-	--kpi-gold-soft: #f8f1d0;
+	--kpi-gold-soft: color-mix(in srgb, var(--kpi-gold) 18%, var(--card));
 	--cat-amort: #3457a6;
 	--cat-juros: #0e8a72;
 	--cat-seguros: #a8791e;
 	--cat-taxas: #8b4b8c;
 	--cat-correcao: #b5502a;
 	--cat-diferenca: #0a82a6;
+}
+
+/* Tema escuro (Configurações > Layout) -- só redefine as superfícies estruturais (fundo, texto,
+   cartões, bordas, sombras); as cores semânticas (receita/despesa, cor primária, kpis) usam
+   color-mix() com var(--card)/var(--surface-2) acima, então já se adaptam sozinhas -- não
+   precisam de um valor separado aqui. --ink-solid fica de fora de propósito: é o tom escuro
+   sólido usado em botões/pills "cheios" (ex.: .btn-primary), que devem continuar escuros com
+   texto branco nos dois temas, então não pode seguir --ink quando ele vira claro aqui. */
+[data-theme='dark'] {
+	--bg: #10151a;
+	--ink: #eef2f1;
+	--ink-soft: #b7c3c8;
+	--ink-muted: #8b98a0;
+	--ink-faint: #5e6b72;
+	--card: #1a2127;
+	--surface-2: #212a31;
+	--surface-3: #262f37;
+	--border: #2c363e;
+	--border-soft: #262f37;
+	--border-strong: #38434c;
+	--input-border: #333e47;
+	--ring: #4d6b78;
+	--shadow-card: 0 10px 30px rgba(0, 0, 0, 0.35);
+	--shadow-pill: 0 4px 12px rgba(0, 0, 0, 0.3);
+	--shadow-hero: 0 18px 40px rgba(0, 0, 0, 0.45);
+	--shadow-modal: 0 30px 80px rgba(0, 0, 0, 0.55);
+	--shadow-cta: 0 12px 24px rgba(0, 0, 0, 0.4);
 }
 
 * {
@@ -169,15 +198,15 @@ a {
 	transform: scale(0.97);
 }
 .btn-primary {
-	background: var(--ink);
-	border-color: var(--ink);
+	background: var(--ink-solid);
+	border-color: var(--ink-solid);
 	color: #fff;
 	min-height: 44px;
 	padding: 0 22px;
 	box-shadow: var(--shadow-cta);
 }
 .btn-primary:hover {
-	background: var(--ink);
+	background: var(--ink-solid);
 	transform: translateY(-2px);
 }
 .btn-primary:active {
@@ -258,7 +287,7 @@ a {
 	box-shadow: 0 4px 12px rgba(43, 61, 70, 0.06);
 }
 .pill .pill-badge {
-	background: var(--ink);
+	background: var(--ink-solid);
 	color: #fff;
 	border-radius: 999px;
 	font-size: 10px;
@@ -516,7 +545,7 @@ table.list .num {
 	width: 248px;
 	display: flex;
 	flex-direction: column;
-	background: var(--ink);
+	background: var(--ink-solid);
 	color: #fff;
 	padding: 24px 20px;
 	transform: translateX(-100%);
@@ -795,7 +824,7 @@ table.list .num {
 	width: 46px;
 	height: 46px;
 	border-radius: 50%;
-	background: var(--ink);
+	background: var(--ink-solid);
 	color: #fff;
 	border: none;
 	margin: 0 6px;
@@ -832,7 +861,7 @@ table.list .num {
 	display: flex;
 	align-items: center;
 	gap: 12px;
-	background: var(--ink);
+	background: var(--ink-solid);
 	color: #fff;
 	border-radius: 999px;
 	padding: 10px 10px 10px 18px;
@@ -902,8 +931,8 @@ table.list .num {
 	cursor: pointer;
 }
 .quick-add-type-btn.active {
-	background: var(--ink);
-	border-color: var(--ink);
+	background: var(--ink-solid);
+	border-color: var(--ink-solid);
 	color: #fff;
 }
 .quick-add-value {
@@ -1038,7 +1067,7 @@ table.list .num {
 }
 .onboarding-dot.active {
 	width: 18px;
-	background: var(--ink);
+	background: var(--ink-solid);
 }
 .onboarding-icon {
 	width: 56px;
@@ -1136,7 +1165,7 @@ table.list .num {
 	color: var(--accent-fg);
 }
 .fin-cal-cell.selected {
-	border-color: var(--ink);
+	border-color: var(--ink-solid);
 	background: var(--surface-3);
 }
 .fin-cal-dots {
@@ -2221,9 +2250,9 @@ table.list .num {
 	border-color: var(--ink-faint);
 }
 .quick-filter-chip.active {
-	background: var(--ink);
-	border-color: var(--ink);
-	color: var(--card);
+	background: var(--ink-solid);
+	border-color: var(--ink-solid);
+	color: #fff;
 }
 .filters-more-toggle {
 	display: inline-flex;
@@ -3227,7 +3256,7 @@ table.list .num {
 	justify-content: flex-end;
 }
 .chip-solid {
-	background: var(--ink);
+	background: var(--ink-solid);
 	color: #fff;
 	border-radius: 999px;
 	padding: 6px 14px;
@@ -3289,7 +3318,7 @@ table.list .num {
 	}
 }
 .balance-hero {
-	background: var(--ink);
+	background: var(--ink-solid);
 	color: #fff;
 	border-radius: var(--radius-lg);
 	padding: 22px;
@@ -3410,7 +3439,7 @@ table.list .num {
 	}
 }
 .hero-greeting {
-	background: var(--ink);
+	background: var(--ink-solid);
 	color: #fff;
 	border-radius: var(--radius-lg);
 	padding: 22px;
@@ -4270,7 +4299,7 @@ table.list .num {
 	padding: 18px 20px;
 }
 .move-summary-card.dark {
-	background: var(--ink);
+	background: var(--ink-solid);
 	color: #fff;
 }
 .move-summary-card.tint-blue {
@@ -4648,7 +4677,7 @@ table.list .num {
 	transform: scale(1.08);
 }
 .color-swatch.selected {
-	border-color: var(--ink);
+	border-color: var(--ink-solid);
 }
 
 .sim-prazo-chip {

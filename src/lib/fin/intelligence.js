@@ -12,9 +12,9 @@ function shiftMonthKey(mKey, delta) {
 	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function mediaUltimosMeses(transactions, mKey, n, campo) {
+function mediaUltimosMeses(transactions, mKey, n, campo, startDay = 1) {
 	let soma = 0;
-	for (let i = 1; i <= n; i++) soma += totals(monthTransactions(transactions, shiftMonthKey(mKey, -i)))[campo];
+	for (let i = 1; i <= n; i++) soma += totals(monthTransactions(transactions, shiftMonthKey(mKey, -i), startDay))[campo];
 	return soma / n;
 }
 
@@ -24,22 +24,22 @@ function mediaUltimosMeses(transactions, mKey, n, campo) {
  * nova): fluxo de caixa, comprometimento, uso de cartão, reserva de
  * emergência, ritmo dos objetivos e previsibilidade dos gastos.
  */
-export function computeFinancialScore({ transactions, accounts, goals, resources, resourceMoves, goalCategories, installments, amortizations }) {
-	const mKey = currentMonthKey();
-	const mesTx = monthTransactions(transactions, mKey);
+export function computeFinancialScore({ transactions, accounts, goals, resources, resourceMoves, goalCategories, installments, amortizations, startDay = 1 }) {
+	const mKey = currentMonthKey(startDay);
+	const mesTx = monthTransactions(transactions, mKey, startDay);
 	const t = totals(mesTx);
 
 	const fluxoCaixa = t.receitas > 0 ? clamp(50 + (t.saldo / t.receitas) * 50) : t.despesas === 0 ? 100 : 30;
 
-	const comprometidoMes = committedThisMonth(transactions, mKey);
+	const comprometidoMes = committedThisMonth(transactions, mKey, startDay);
 	const comprometimento = t.receitas > 0 ? clamp(100 - (comprometidoMes / t.receitas) * 100) : 60;
 
 	const cartoesComLimite = accounts.filter((a) => a.tipo === 'cartao' && a.limite);
 	const cartoesScore = cartoesComLimite.length
-		? clamp(100 - cartoesComLimite.reduce((s, acc) => s + (faturaDoCartao(transactions, acc, mKey) / acc.limite) * 100, 0) / cartoesComLimite.length)
+		? clamp(100 - cartoesComLimite.reduce((s, acc) => s + (faturaDoCartao(transactions, acc, mKey, startDay) / acc.limite) * 100, 0) / cartoesComLimite.length)
 		: 100;
 
-	const mediaDespesas3Meses = mediaUltimosMeses(transactions, mKey, 3, 'despesas');
+	const mediaDespesas3Meses = mediaUltimosMeses(transactions, mKey, 3, 'despesas', startDay);
 	const reservaTotal = resources.filter((r) => r.group === 'reserva').reduce((s, r) => s + resourceBalance(resourceMoves, r.id), 0);
 	const mesesCobertos = mediaDespesas3Meses > 0 ? reservaTotal / mediaDespesas3Meses : reservaTotal > 0 ? 6 : 0;
 	const reservaScore = clamp((mesesCobertos / 6) * 100, reservaTotal > 0 ? 15 : 0, 100);
@@ -53,7 +53,7 @@ export function computeFinancialScore({ transactions, accounts, goals, resources
 			}, 0) / ativos.length
 		: 70;
 
-	const despesasUltimos3 = [1, 2, 3].map((i) => totals(monthTransactions(transactions, shiftMonthKey(mKey, -i))).despesas);
+	const despesasUltimos3 = [1, 2, 3].map((i) => totals(monthTransactions(transactions, shiftMonthKey(mKey, -i), startDay)).despesas);
 	const previsibilidadeScore = (() => {
 		const media = despesasUltimos3.reduce((s, v) => s + v, 0) / 3;
 		if (media <= 0) return 70;
@@ -83,9 +83,9 @@ export function computeFinancialScore({ transactions, accounts, goals, resources
  * Também funciona como detecção simples de anomalia (categoria com gasto bem
  * acima da própria média).
  */
-export function buildInsights({ transactions, accounts, goals, resources, resourceMoves, goalCategories, installments, amortizations, categories }, limit = 3) {
-	const mKey = currentMonthKey();
-	const mesTx = monthTransactions(transactions, mKey);
+export function buildInsights({ transactions, accounts, goals, resources, resourceMoves, goalCategories, installments, amortizations, categories, startDay = 1 }, limit = 3) {
+	const mKey = currentMonthKey(startDay);
+	const mesTx = monthTransactions(transactions, mKey, startDay);
 	const t = totals(mesTx);
 	const insights = [];
 
@@ -94,7 +94,7 @@ export function buildInsights({ transactions, accounts, goals, resources, resour
 			.filter((tr) => tr.tipo === 'despesa' && !tr.isTransferencia && tr.categoriaId === categoriaId)
 			.reduce((s, tr) => s + (Number(tr.valor) || 0), 0);
 	}
-	const mesesAnteriores = [1, 2, 3].map((i) => monthTransactions(transactions, shiftMonthKey(mKey, -i)));
+	const mesesAnteriores = [1, 2, 3].map((i) => monthTransactions(transactions, shiftMonthKey(mKey, -i), startDay));
 
 	// Comportamento / anomalia: categoria com maior alta vs média dos últimos 3 meses.
 	let maiorAlta = null;
@@ -115,8 +115,8 @@ export function buildInsights({ transactions, accounts, goals, resources, resour
 	}
 
 	// Risco: compromissos do mês pesando muito na receita média.
-	const receitaMedia3 = mediaUltimosMeses(transactions, mKey, 3, 'receitas') || t.receitas;
-	const comprometidoMes = committedThisMonth(transactions, mKey);
+	const receitaMedia3 = mediaUltimosMeses(transactions, mKey, 3, 'receitas', startDay) || t.receitas;
+	const comprometidoMes = committedThisMonth(transactions, mKey, startDay);
 	if (receitaMedia3 > 0 && comprometidoMes / receitaMedia3 > 0.7) {
 		insights.push({
 			tipo: 'risco',
@@ -126,7 +126,7 @@ export function buildInsights({ transactions, accounts, goals, resources, resour
 	}
 
 	// Oportunidade: gastou visivelmente menos que o habitual.
-	const mediaDespesas3 = mediaUltimosMeses(transactions, mKey, 3, 'despesas');
+	const mediaDespesas3 = mediaUltimosMeses(transactions, mKey, 3, 'despesas', startDay);
 	if (mediaDespesas3 > 0 && t.despesas < mediaDespesas3 * 0.9) {
 		const economia = mediaDespesas3 - t.despesas;
 		insights.push({
@@ -138,8 +138,8 @@ export function buildInsights({ transactions, accounts, goals, resources, resour
 
 	// Cartão: fatura subindo forte vs mês anterior.
 	for (const acc of accounts.filter((a) => a.tipo === 'cartao' && a.limite)) {
-		const faturaAtualAcc = faturaDoCartao(transactions, acc, mKey);
-		const faturaAnteriorAcc = faturaDoCartao(transactions, acc, shiftMonthKey(mKey, -1));
+		const faturaAtualAcc = faturaDoCartao(transactions, acc, mKey, startDay);
+		const faturaAnteriorAcc = faturaDoCartao(transactions, acc, shiftMonthKey(mKey, -1), startDay);
 		if (faturaAnteriorAcc > 0 && faturaAtualAcc > faturaAnteriorAcc * 1.2) {
 			insights.push({
 				tipo: 'cartao',

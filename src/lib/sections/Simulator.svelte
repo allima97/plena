@@ -20,18 +20,20 @@
 		return date.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).replace('.', '');
 	}
 
+	const startDay = $derived(appState.settings.monthStartDay || 1);
+
 	// Médias dos últimos 3 meses fechados -- mesma janela usada no motor de insights, mas
 	// calculada aqui localmente pois lá é uma função privada do módulo.
 	const mediaDespesas3Meses = $derived.by(() => {
-		const mKey = currentMonthKey();
+		const mKey = currentMonthKey(startDay);
 		let soma = 0;
-		for (let i = 1; i <= 3; i++) soma += totals(monthTransactions(appState.transactions, shiftMonthKey(mKey, -i))).despesas;
+		for (let i = 1; i <= 3; i++) soma += totals(monthTransactions(appState.transactions, shiftMonthKey(mKey, -i), startDay)).despesas;
 		return soma / 3;
 	});
 	const mediaReceitas3Meses = $derived.by(() => {
-		const mKey = currentMonthKey();
+		const mKey = currentMonthKey(startDay);
 		let soma = 0;
-		for (let i = 1; i <= 3; i++) soma += totals(monthTransactions(appState.transactions, shiftMonthKey(mKey, -i))).receitas;
+		for (let i = 1; i <= 3; i++) soma += totals(monthTransactions(appState.transactions, shiftMonthKey(mKey, -i), startDay)).receitas;
 		return soma / 3;
 	});
 	const taxaPoupancaAtual = $derived(mediaReceitas3Meses > 0 ? ((mediaReceitas3Meses - mediaDespesas3Meses) / mediaReceitas3Meses) * 100 : null);

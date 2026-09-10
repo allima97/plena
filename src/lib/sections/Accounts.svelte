@@ -81,12 +81,14 @@
 		return saldoContaAte(appState.transactions, acc, todayISO());
 	}
 
+	const startDay = $derived(appState.settings.monthStartDay || 1);
+
 	function faturaAtual(acc) {
-		return faturaDoCartao(appState.transactions, acc);
+		return faturaDoCartao(appState.transactions, acc, currentMonthKey(startDay), startDay);
 	}
 
 	function proximaFatura(acc) {
-		return faturaDoCartao(appState.transactions, acc, nextMonthKey(currentMonthKey()));
+		return faturaDoCartao(appState.transactions, acc, nextMonthKey(currentMonthKey(startDay)), startDay);
 	}
 
 	// Compra -> Fatura -> Pagamento (UX 2.0 - Fase 5): o número que o usuário realmente quer saber

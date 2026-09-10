@@ -2,7 +2,7 @@
 	import { appState } from '$lib/fin/store.svelte.js';
 	import { monthTransactions, totals, byCategory, currentMonthKey, faturaDoCartao } from '$lib/fin/derived.js';
 	import { buildInsights } from '$lib/fin/intelligence.js';
-	import { fmtMoney, monthKey, monthLabel, yearKey, todayISO } from '$lib/format.js';
+	import { fmtMoney, financialMonthKey, monthLabel, yearKey, todayISO } from '$lib/format.js';
 	import ReportCenterModal from '$lib/components/ReportCenterModal.svelte';
 	import BarChart from '$lib/components/charts/BarChart.svelte';
 	import { FileBarChart, CheckCircle2, AlertTriangle, Sparkles } from 'lucide-svelte';
@@ -15,6 +15,8 @@
 	let anoSelecionado = $state(Number(yearKey(todayISO())));
 	let mesSelecionado = $state(currentMonthKey());
 	let showReport = $state(false);
+
+	const startDay = $derived(appState.settings.monthStartDay || 1);
 
 	const anosDisponiveis = $derived.by(() => {
 		const set = new Set(appState.transactions.map((t) => Number(yearKey(t.data))));
@@ -31,8 +33,8 @@
 		const out = [];
 		for (let m = 1; m <= 12; m++) {
 			const k = `${anoSelecionado}-${String(m).padStart(2, '0')}`;
-			const tt = totals(anoTx.filter((t) => monthKey(t.data) === k));
-			out.push({ label: MES_ABBR[m - 1], a: tt.receitas, b: tt.despesas, current: k === currentMonthKey() });
+			const tt = totals(anoTx.filter((t) => financialMonthKey(t.data, startDay) === k));
+			out.push({ label: MES_ABBR[m - 1], a: tt.receitas, b: tt.despesas, current: k === currentMonthKey(startDay) });
 		}
 		return out;
 	});
@@ -40,10 +42,10 @@
 	const evolucaoTrimestral = $derived.by(() => {
 		const anoTx = txDoAno(anoSelecionado);
 		const nomes = ['1º trim.', '2º trim.', '3º trim.', '4º trim.'];
-		const mesAtual = Number(currentMonthKey().split('-')[1]);
+		const mesAtual = Number(currentMonthKey(startDay).split('-')[1]);
 		return nomes.map((label, i) => {
 			const meses = [i * 3 + 1, i * 3 + 2, i * 3 + 3];
-			const tt = totals(anoTx.filter((t) => meses.includes(Number(monthKey(t.data).split('-')[1]))));
+			const tt = totals(anoTx.filter((t) => meses.includes(Number(financialMonthKey(t.data, startDay).split('-')[1]))));
 			return { label, a: tt.receitas, b: tt.despesas, current: meses.includes(mesAtual) && anoSelecionado === Number(yearKey(todayISO())) };
 		});
 	});
@@ -67,12 +69,12 @@
 	});
 
 	// leituras rápidas
-	const mesAtualTx = $derived(monthTransactions(appState.transactions, currentMonthKey()));
+	const mesAtualTx = $derived(monthTransactions(appState.transactions, currentMonthKey(startDay), startDay));
 	const totalMesAtual = $derived(totals(mesAtualTx));
 	const cartoes = $derived(appState.accounts.filter((a) => a.tipo === 'cartao'));
 	const usoCartoes = $derived.by(() => {
 		const limiteTotal = cartoes.reduce((s, a) => s + (Number(a.limite) || 0), 0);
-		const usoTotal = cartoes.reduce((s, a) => s + faturaDoCartao(appState.transactions, a, currentMonthKey()), 0);
+		const usoTotal = cartoes.reduce((s, a) => s + faturaDoCartao(appState.transactions, a, currentMonthKey(startDay), startDay), 0);
 		return limiteTotal > 0 ? Math.round((usoTotal / limiteTotal) * 100) : null;
 	});
 	const maiorReceita = $derived(byCategory(mesAtualTx, appState.categories, 'receita')[0]);
@@ -88,7 +90,8 @@
 		goalCategories: appState.goalCategories,
 		installments: appState.installments,
 		amortizations: appState.amortizations,
-		categories: appState.categories
+		categories: appState.categories,
+		startDay
 	}));
 	const insights = $derived(buildInsights(intelligenceInput, 4));
 
@@ -100,11 +103,11 @@
 		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 	}
 	const previsao3Meses = $derived.by(() => {
-		const mKey = currentMonthKey();
+		const mKey = currentMonthKey(startDay);
 		let receitas = 0;
 		let despesas = 0;
 		for (let i = 1; i <= 3; i++) {
-			const tt = totals(monthTransactions(appState.transactions, shiftMonthKey(mKey, -i)));
+			const tt = totals(monthTransactions(appState.transactions, shiftMonthKey(mKey, -i), startDay));
 			receitas += tt.receitas;
 			despesas += tt.despesas;
 		}
@@ -115,11 +118,11 @@
 
 	// detalhamento por categoria (mês específico, independente do período acima)
 	const mesesDisponiveis = $derived.by(() => {
-		const set = new Set(appState.transactions.map((t) => monthKey(t.data)));
-		set.add(currentMonthKey());
+		const set = new Set(appState.transactions.map((t) => financialMonthKey(t.data, startDay)));
+		set.add(currentMonthKey(startDay));
 		return [...set].sort().reverse();
 	});
-	const mesTx = $derived(monthTransactions(appState.transactions, mesSelecionado));
+	const mesTx = $derived(monthTransactions(appState.transactions, mesSelecionado, startDay));
 	const tMes = $derived(totals(mesTx));
 	const despesasPorCategoria = $derived(byCategory(mesTx, appState.categories, 'despesa'));
 	const receitasPorCategoria = $derived(byCategory(mesTx, appState.categories, 'receita'));

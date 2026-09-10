@@ -29,7 +29,8 @@
 	let renomeando = $state(null);
 	let deletando = $state(null);
 
-	const mesTx = $derived(monthTransactions(appState.transactions, currentMonthKey()));
+	const startDay = $derived(appState.settings.monthStartDay || 1);
+	const mesTx = $derived(monthTransactions(appState.transactions, currentMonthKey(startDay), startDay));
 
 	function valorDoMes(cat) {
 		return mesTx.filter((t) => t.categoriaId === cat.id).reduce((s, t) => s + (Number(t.valor) || 0), 0);

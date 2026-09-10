@@ -14,11 +14,11 @@ function shiftMonthKey(mKey, delta) {
  * central de notificações (lista completa) — fonte única para as duas telas.
  */
 export function buildAttentionItems(
-	{ transactions, accounts, goals, resources, resourceMoves, goalCategories, installments, amortizations, alertThresholds, categories = [] },
+	{ transactions, accounts, goals, resources, resourceMoves, goalCategories, installments, amortizations, alertThresholds, categories = [], startDay = 1 },
 	limit = Infinity
 ) {
 	const list = [];
-	const mKey = currentMonthKey();
+	const mKey = currentMonthKey(startDay);
 	const alertas = upcomingDue(transactions, alertThresholds);
 	const pausadas = pausedSeries(transactions);
 
@@ -63,7 +63,7 @@ export function buildAttentionItems(
 	// Categoria que passou do orçamento mensal (Fase 3 - UX 2.0): a regra de ouro é nunca mandar
 	// o usuário "procurar a ação" -- o link já abre e rola até a categoria exata (?open=<id>),
 	// reaproveitando o mesmo mecanismo da busca global em Categories.svelte.
-	const mesTxCategorias = monthTransactions(transactions, mKey);
+	const mesTxCategorias = monthTransactions(transactions, mKey, startDay);
 	for (const cat of categories.filter((c) => c.tipo === 'despesa' && c.orcamentoMensal > 0)) {
 		const gasto = mesTxCategorias.filter((t) => t.categoriaId === cat.id).reduce((s, t) => s + (Number(t.valor) || 0), 0);
 		const pct = (gasto / cat.orcamentoMensal) * 100;
@@ -122,8 +122,8 @@ export function buildAttentionItems(
 	// Fatura bem acima da média dos últimos 3 meses -- sinal de comportamento de gasto, diferente
 	// do alerta de "perto do limite" acima (que é sobre risco de estourar o cartão).
 	for (const acc of accounts.filter((a) => a.tipo === 'cartao')) {
-		const faturaAtual = faturaDoCartao(transactions, acc, mKey);
-		const mediaAnterior = [1, 2, 3].reduce((s, i) => s + faturaDoCartao(transactions, acc, shiftMonthKey(mKey, -i)), 0) / 3;
+		const faturaAtual = faturaDoCartao(transactions, acc, mKey, startDay);
+		const mediaAnterior = [1, 2, 3].reduce((s, i) => s + faturaDoCartao(transactions, acc, shiftMonthKey(mKey, -i), startDay), 0) / 3;
 		if (mediaAnterior >= 50 && faturaAtual > mediaAnterior * 1.25) {
 			list.push({
 				tone: 'orange',

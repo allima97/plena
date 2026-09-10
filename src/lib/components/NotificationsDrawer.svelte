@@ -20,7 +20,8 @@
 			installments: appState.installments,
 			amortizations: appState.amortizations,
 			alertThresholds: appState.alertThresholds,
-			categories: appState.categories
+			categories: appState.categories,
+			startDay: appState.settings.monthStartDay || 1
 		})
 	);
 

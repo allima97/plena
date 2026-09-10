@@ -2,7 +2,7 @@
 	import { appState, setPaymentStatus, manageSeries, removeTransaction, restoreTransaction, transferPairOf } from '$lib/fin/store.svelte.js';
 	import { committedThisMonth, currentMonthKey, monthTransactions } from '$lib/fin/derived.js';
 	import { exportCSV, exportPDF } from '$lib/fin/export.js';
-	import { fmtMoney, monthKey, monthLabel, todayISO } from '$lib/format.js';
+	import { fmtMoney, financialMonthKey, monthLabel, todayISO } from '$lib/format.js';
 	import NewMovementModal from '$lib/components/NewMovementModal.svelte';
 	import ReportCenterModal from '$lib/components/ReportCenterModal.svelte';
 import TransferModal from '$lib/components/TransferModal.svelte';
@@ -23,6 +23,8 @@ import TransferModal from '$lib/components/TransferModal.svelte';
 	let modal = $state({ open: false, mode: 'create', transaction: null });
 	let showReport = $state(false);
 	let showTransfer = $state(false);
+
+	const startDay = $derived(appState.settings.monthStartDay || 1);
 
 	// Vindo da busca global (?open=<id>): abre direto o lançamento exato, uma única vez,
 	// e amplia o filtro de mês para garantir que ele apareça mesmo fora do mês corrente.
@@ -106,7 +108,7 @@ import TransferModal from '$lib/components/TransferModal.svelte';
 	// Conta quantos filtros "avançados" (escondidos atrás de "Mais filtros") estão ativos,
 	// para mostrar o badge "Filtros · N" sem precisar abrir o painel.
 	const filtrosAtivosCount = $derived(
-		(monthFilter !== currentMonthKey() ? 1 : 0) +
+		(monthFilter !== currentMonthKey(startDay) ? 1 : 0) +
 			(seriesFilter !== 'all' ? 1 : 0) +
 			(statusFilter !== 'all' ? 1 : 0) +
 			(paymentFilter !== 'all' ? 1 : 0) +
@@ -114,8 +116,8 @@ import TransferModal from '$lib/components/TransferModal.svelte';
 	);
 
 	const mesesDisponiveis = $derived.by(() => {
-		const set = new Set(appState.transactions.map((t) => monthKey(t.data)));
-		set.add(currentMonthKey());
+		const set = new Set(appState.transactions.map((t) => financialMonthKey(t.data, startDay)));
+		set.add(currentMonthKey(startDay));
 		return [...set].sort().reverse();
 	});
 
@@ -128,7 +130,7 @@ import TransferModal from '$lib/components/TransferModal.svelte';
 					const haystack = `${t.descricao || ''} ${cat?.nome || ''} ${acc?.nome || ''}`.toLowerCase();
 					if (!haystack.includes(query.toLowerCase())) return false;
 				}
-				if (monthFilter !== 'all' && monthKey(t.data) !== monthFilter) return false;
+				if (monthFilter !== 'all' && financialMonthKey(t.data, startDay) !== monthFilter) return false;
 				if (quickFilter === 'receita' && t.tipo !== 'receita') return false;
 				if (quickFilter === 'despesa' && t.tipo !== 'despesa') return false;
 				if (quickFilter === 'pendente' && t.statusPagamento !== 'pendente') return false;
@@ -171,9 +173,9 @@ import TransferModal from '$lib/components/TransferModal.svelte';
 		return groups;
 	});
 
-	const resumoMesKey = $derived(monthFilter === 'all' ? currentMonthKey() : monthFilter);
-	const resumoMesTx = $derived(monthTransactions(appState.transactions, resumoMesKey));
-	const comprometido = $derived(committedThisMonth(appState.transactions, resumoMesKey));
+	const resumoMesKey = $derived(monthFilter === 'all' ? currentMonthKey(startDay) : monthFilter);
+	const resumoMesTx = $derived(monthTransactions(appState.transactions, resumoMesKey, startDay));
+	const comprometido = $derived(committedThisMonth(appState.transactions, resumoMesKey, startDay));
 	const parcelamentosMes = $derived(resumoMesTx.filter((t) => t.seriesKind === 'parcelado' && t.seriesStatus === 'ativa').reduce((s, t) => s + (Number(t.valor) || 0), 0));
 	const recorrenciasMes = $derived(resumoMesTx.filter((t) => t.seriesKind === 'recorrente' && t.seriesStatus === 'ativa').reduce((s, t) => s + (Number(t.valor) || 0), 0));
 

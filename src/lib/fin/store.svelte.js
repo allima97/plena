@@ -1,6 +1,22 @@
 import { loadLocal, saveLocal, fetchRemoteState, apiPut, apiRemove, fetchMe } from './persist.js';
 import { seedCategories, uid } from './seed.js';
 import { todayISO } from '../format.js';
+import { downloadBlob } from './export.js';
+
+/** Preferências gerais do sistema (Configurações) -- mesclado com o que já estiver salvo, pra
+ * qualquer campo novo (adicionado numa versão mais recente do app) sempre ter um valor padrão
+ * mesmo pra quem já tinha um `settings` salvo de antes com menos campos. */
+const DEFAULT_SETTINGS = {
+	moedaPadrao: 'BRL',
+	homePage: '/',
+	monthStartDay: 1,
+	confirmExitApp: false,
+	theme: 'light',
+	primaryColor: '',
+	incomeColor: '',
+	expenseColor: '',
+	language: 'pt-BR'
+};
 
 let accounts = $state([]);
 let categories = $state([]);
@@ -10,7 +26,7 @@ let reportHistory = $state([]);
 let reportSchedule = $state({ ativo: false, templateId: null, dia: 5, hora: '08:00' });
 let alertThresholds = $state({ um: 1, tres: 3, sete: 7 });
 let budgetGlobal = $state(null); // orçamento mensal total (P3.1), distinto do orçamento por categoria
-let settings = $state({ moedaPadrao: 'BRL' }); // preferências gerais do sistema (hoje: moeda padrão das contas/extrato)
+let settings = $state({ ...DEFAULT_SETTINGS });
 
 // ---- objetivos (mesmo modelo de dados do Rumo Financeiro / nextgoals) ----
 let goals = $state([]);
@@ -147,7 +163,7 @@ export async function boot() {
 		reportSchedule = local.reportSchedule || { ativo: false, templateId: null, dia: 5, hora: '08:00' };
 		alertThresholds = local.alertThresholds || { um: 1, tres: 3, sete: 7 };
 		budgetGlobal = local.budgetGlobal ?? null;
-		settings = local.settings || { moedaPadrao: 'BRL' };
+		settings = local.settings ? { ...DEFAULT_SETTINGS, ...local.settings } : { ...DEFAULT_SETTINGS };
 		goals = local.goals || [];
 		resources = local.resources || [];
 		resourceMoves = local.resourceMoves || [];
@@ -193,7 +209,7 @@ export async function boot() {
 	reportSchedule = remote.reportSchedule || reportSchedule;
 	alertThresholds = remote.alertThresholds || alertThresholds;
 	budgetGlobal = remote.budgetGlobal ?? budgetGlobal;
-	settings = remote.settings || settings;
+	settings = remote.settings ? { ...DEFAULT_SETTINGS, ...remote.settings } : settings;
 	goals = remote.goals || goals;
 	resources = remote.resources || resources;
 	resourceMoves = remote.resourceMoves || resourceMoves;
@@ -830,4 +846,150 @@ export function upsertScoreSnapshot(mKey, data) {
 		scoreSnapshots = scoreSnapshots.map((s, i) => (i === idx ? updated : s));
 	}
 	write('scoreSnapshots', mKey, updated);
+}
+
+// ============================================================================
+// ---- backup completo (Configurações > Exportar/Importar) -----------------
+// ============================================================================
+
+/** Baixa um .json com TODOS os dados do usuário -- pensado pra ser salvo onde ele quiser
+ * (Google Drive, Dropbox, localmente...) pelo próprio menu de compartilhar do celular/navegador,
+ * já que o Plena não integra direto com essas contas. */
+export function exportBackup() {
+	const payload = { app: 'plena', version: 1, exportedAt: new Date().toISOString(), data: snapshot() };
+	downloadBlob(JSON.stringify(payload, null, 2), `plena-backup-${todayISO()}.json`, 'application/json');
+}
+
+/** Confere se um texto lido de arquivo é um backup válido do Plena, antes de restaurar de
+ * verdade -- devolve { data } (pronto pra restoreBackup) ou { error } com o motivo. */
+export function validateBackup(raw) {
+	let parsed;
+	try {
+		parsed = JSON.parse(raw);
+	} catch {
+		return { error: 'Arquivo inválido: não é um JSON legível.' };
+	}
+	if (!parsed || typeof parsed !== 'object' || !parsed.data || typeof parsed.data !== 'object') {
+		return { error: 'Arquivo inválido: não parece ser um backup do Plena.' };
+	}
+	return { data: parsed.data };
+}
+
+/** Restaura um backup completo, substituindo TUDO que existe hoje (local e, se online, na API).
+ * Irreversível -- a tela de Configurações já sugere fazer um backup do estado atual antes. */
+export async function restoreBackup(data) {
+	accounts = data.finAccounts || [];
+	categories = data.finCategories || [];
+	transactions = data.finTransactions || [];
+	reportTemplates = data.reportTemplates || [];
+	reportHistory = data.reportHistory || [];
+	reportSchedule = data.reportSchedule || { ativo: false, templateId: null, dia: 5, hora: '08:00' };
+	alertThresholds = data.alertThresholds || { um: 1, tres: 3, sete: 7 };
+	budgetGlobal = data.budgetGlobal ?? null;
+	settings = data.settings ? { ...DEFAULT_SETTINGS, ...data.settings } : settings;
+	goals = data.goals || [];
+	resources = data.resources || [];
+	resourceMoves = data.resourceMoves || [];
+	goalCategories = data.goalCategories || [];
+	installments = data.installments || [];
+	amortizations = data.amortizations || [];
+	patrimonyItems = data.patrimonyItems || [];
+	patrimonySnapshots = data.patrimonySnapshots || [];
+	scoreSnapshots = data.scoreSnapshots || [];
+	patrimonyItemMoves = data.patrimonyItemMoves || [];
+
+	persistLocalSnapshot();
+	if (mode !== 'api') return;
+
+	await Promise.all([
+		...accounts.map((a) => apiPut('finAccounts', a.id, a)),
+		...categories.map((c) => apiPut('finCategories', c.id, c)),
+		...transactions.map((t) => apiPut('finTransactions', t.id, t)),
+		...reportTemplates.map((r) => apiPut('reportTemplates', r.id, r)),
+		...reportHistory.map((r) => apiPut('reportHistory', r.id, r)),
+		...goals.map((g) => apiPut('goals', g.id, g)),
+		...resources.map((r) => apiPut('resources', r.id, r)),
+		...resourceMoves.map((m) => apiPut('resourceMoves', m.id, m)),
+		...goalCategories.map((c) => apiPut('goalCategories', c.id, c)),
+		...installments.map((i) => apiPut('installments', i.id, i)),
+		...amortizations.map((a) => apiPut('amortizations', a.id, a)),
+		...patrimonyItems.map((p) => apiPut('patrimonyItems', p.id, p)),
+		...patrimonySnapshots.map((s) => apiPut('patrimonySnapshots', s.id, s)),
+		...patrimonyItemMoves.map((m) => apiPut('patrimonyItemMoves', m.id, m)),
+		...scoreSnapshots.map((s) => apiPut('scoreSnapshots', s.id, s)),
+		apiPut('reportSchedule', 'singleton', reportSchedule),
+		apiPut('alertThresholds', 'singleton', alertThresholds),
+		apiPut('budgetGlobal', 'singleton', budgetGlobal),
+		apiPut('settings', 'singleton', settings)
+	]);
+}
+
+// ============================================================================
+// ---- apagar dados (Configurações > Apagar dados) --------------------------
+// ============================================================================
+
+/** false se algum lançamento ainda referencia uma categoria -- apagar todas as categorias nesse
+ * caso deixaria lançamentos "órfãos" (sem categoria), então a tela de Configurações bloqueia. */
+export function canClearCategories() {
+	return !transactions.some((t) => t.categoriaId);
+}
+
+/** Apaga TODOS os lançamentos (Movimentações). Irreversível -- sugerir backup antes. */
+export function clearAllMovements() {
+	const ids = transactions.map((t) => t.id);
+	transactions = [];
+	ids.forEach((id) => erase('finTransactions', id));
+}
+
+/** Apaga TODAS as categorias -- só quando não há nenhum lançamento vinculado (ver
+ * canClearCategories). Devolve false sem fazer nada se o bloqueio se aplicar. */
+export function clearAllCategories() {
+	if (!canClearCategories()) return false;
+	const ids = categories.map((c) => c.id);
+	categories = [];
+	ids.forEach((id) => erase('finCategories', id));
+	return true;
+}
+
+/** Apaga TODOS os registros do app (contas, categorias, lançamentos, objetivos, patrimônio...) --
+ * mantém preferências/configurações (moeda, tema, etc.) como estão. Irreversível -- sugerir
+ * backup antes. */
+export function clearAllData() {
+	const ids = {
+		finAccounts: accounts.map((a) => a.id),
+		finCategories: categories.map((c) => c.id),
+		finTransactions: transactions.map((t) => t.id),
+		reportTemplates: reportTemplates.map((r) => r.id),
+		reportHistory: reportHistory.map((r) => r.id),
+		goals: goals.map((g) => g.id),
+		resources: resources.map((r) => r.id),
+		resourceMoves: resourceMoves.map((m) => m.id),
+		goalCategories: goalCategories.map((c) => c.id),
+		installments: installments.map((i) => i.id),
+		amortizations: amortizations.map((a) => a.id),
+		patrimonyItems: patrimonyItems.map((p) => p.id),
+		patrimonySnapshots: patrimonySnapshots.map((s) => s.id),
+		patrimonyItemMoves: patrimonyItemMoves.map((m) => m.id),
+		scoreSnapshots: scoreSnapshots.map((s) => s.id)
+	};
+
+	accounts = [];
+	categories = [];
+	transactions = [];
+	reportTemplates = [];
+	reportHistory = [];
+	goals = [];
+	resources = [];
+	resourceMoves = [];
+	goalCategories = [];
+	installments = [];
+	amortizations = [];
+	patrimonyItems = [];
+	patrimonySnapshots = [];
+	patrimonyItemMoves = [];
+	scoreSnapshots = [];
+
+	for (const [collection, list] of Object.entries(ids)) {
+		list.forEach((id) => erase(collection, id));
+	}
 }

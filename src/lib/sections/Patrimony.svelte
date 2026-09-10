@@ -1,7 +1,7 @@
 <script>
 	import { appState, addPatrimonyItem, updatePatrimonyItem, removePatrimonyItem, restorePatrimonyItem, restorePatrimonyItemMove, upsertPatrimonySnapshot, addPatrimonyItemMove, removePatrimonyItemMove } from '$lib/fin/store.svelte.js';
 	import { currentMonthKey, faturaDoCartao, saldoContaAte } from '$lib/fin/derived.js';
-	import { monthKey } from '$lib/format.js';
+	import { financialMonthKey } from '$lib/format.js';
 	import { fmtMoney, todayISO } from '$lib/format.js';
 	import { showToast } from '$lib/toast.svelte.js';
 	import Modal from '$lib/components/Modal.svelte';
@@ -85,12 +85,14 @@
 		return saldoContaAte(appState.transactions, acc, todayISO());
 	}
 
+	const startDay = $derived(appState.settings.monthStartDay || 1);
+
 	const contas = $derived(appState.accounts.filter((a) => a.tipo === 'conta'));
 	const cartoes = $derived(appState.accounts.filter((a) => a.tipo === 'cartao'));
 
 	const contasSaldoTotal = $derived(contas.reduce((s, a) => s + saldoConta(a), 0));
 
-	const cartaoFaturas = $derived(cartoes.map((acc) => ({ acc, valor: faturaDoCartao(appState.transactions, acc) })));
+	const cartaoFaturas = $derived(cartoes.map((acc) => ({ acc, valor: faturaDoCartao(appState.transactions, acc, currentMonthKey(startDay), startDay) })));
 	const cartaoFaturasTotal = $derived(cartaoFaturas.reduce((s, c) => s + c.valor, 0));
 
 	// Dívidas de financiamento: reaproveita o saldo devedor já rastreado nas prestações de cada
@@ -128,7 +130,7 @@
 	// histórico de evolução patrimonial organicamente, conforme o usuário usa o app.
 	$effect(() => {
 		if (!appState.ready) return;
-		upsertPatrimonySnapshot(currentMonthKey(), {
+		upsertPatrimonySnapshot(currentMonthKey(startDay), {
 			valor: patrimonioLiquido,
 			ativos: ativosTotal,
 			passivos: passivosTotal
@@ -139,7 +141,7 @@
 	const evolucaoData = $derived(
 		snapshotsOrdenados.map((s) => {
 			const [, m] = s.mKey.split('-');
-			return { label: MES_ABBR[Number(m) - 1] || s.mKey, a: s.valor, b: 0, current: s.mKey === currentMonthKey() };
+			return { label: MES_ABBR[Number(m) - 1] || s.mKey, a: s.valor, b: 0, current: s.mKey === currentMonthKey(startDay) };
 		})
 	);
 
@@ -164,8 +166,8 @@
 		const totalVariacao = ultimo.valor - primeiro.valor;
 		const reducaoDividas = primeiro.passivos - ultimo.passivos;
 
-		const aportesMetas = appState.resourceMoves.filter((m) => m.amount > 0 && monthKey(m.date) >= primeiro.mKey && monthKey(m.date) <= ultimo.mKey).reduce((s, m) => s + m.amount, 0);
-		const movesPeriodo = appState.patrimonyItemMoves.filter((m) => monthKey(m.data) >= primeiro.mKey && monthKey(m.data) <= ultimo.mKey);
+		const aportesMetas = appState.resourceMoves.filter((m) => m.amount > 0 && financialMonthKey(m.date, startDay) >= primeiro.mKey && financialMonthKey(m.date, startDay) <= ultimo.mKey).reduce((s, m) => s + m.amount, 0);
+		const movesPeriodo = appState.patrimonyItemMoves.filter((m) => financialMonthKey(m.data, startDay) >= primeiro.mKey && financialMonthKey(m.data, startDay) <= ultimo.mKey);
 		const aportesAtivos = movesPeriodo.filter((m) => m.tipo === 'aporte').reduce((s, m) => s + m.valor, 0);
 		const valorizacao = movesPeriodo.filter((m) => m.tipo === 'valorizacao').reduce((s, m) => s + m.valor, 0);
 		const aportes = aportesMetas + aportesAtivos;
