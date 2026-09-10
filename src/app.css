@@ -2357,12 +2357,12 @@ table.list .num {
 	border-color: var(--accent);
 }
 .goal-list-item.active {
-	border-color: var(--accent-fg);
-	box-shadow: 0 0 0 2px var(--accent-fg), 0 10px 24px rgba(53, 95, 159, 0.2);
-	background: var(--accent);
+	border-color: var(--kpi-green);
+	box-shadow: 0 0 0 2px var(--kpi-green), 0 10px 24px rgba(38, 130, 92, 0.2);
+	background: var(--card);
 }
 .goal-list-item.active .goal-list-type {
-	color: var(--accent-fg);
+	color: var(--kpi-green);
 }
 .goal-list-item.archived {
 	opacity: 0.65;
