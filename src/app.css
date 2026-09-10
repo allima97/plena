@@ -3059,33 +3059,34 @@ table.list .num {
 }
 .hero-balance-label {
 	margin: 0;
-	font-size: 12px;
-	opacity: 0.75;
+	font-size: 12.5px;
 	font-weight: 700;
+	color: var(--ink-muted);
 }
 .hero-balance-value {
-	font-size: 30px;
+	font-size: 40px;
 	font-weight: 700;
-	margin: 8px 0 0;
+	margin: 6px 0 0;
 	font-family: var(--font-display);
 	letter-spacing: -0.03em;
+	color: var(--ink);
 }
 .hero-balance-sub {
 	margin: 6px 0 0;
-	font-size: 11.5px;
+	font-size: 12.5px;
 	font-weight: 600;
-	opacity: 0.75;
+	color: var(--ink-muted);
 }
 .hero-breakdown {
-	border-top: 1px solid rgba(255, 255, 255, 0.15);
+	border-top: 1px solid var(--border-soft);
 	padding-top: 10px;
-	margin-top: 2px;
+	margin-top: 12px;
 }
 .hero-breakdown summary {
 	cursor: pointer;
-	font-size: 11px;
+	font-size: 11.5px;
 	font-weight: 700;
-	opacity: 0.8;
+	color: var(--accent-fg);
 	list-style: none;
 }
 .hero-breakdown summary::-webkit-details-marker {
@@ -3097,14 +3098,91 @@ table.list .num {
 	gap: 10px;
 	font-size: 12px;
 	padding: 5px 0;
-	opacity: 0.85;
+	color: var(--ink-soft);
 }
 .hero-breakdown-row.total {
-	border-top: 1px solid rgba(255, 255, 255, 0.15);
+	border-top: 1px solid var(--border-soft);
 	margin-top: 4px;
 	padding-top: 8px;
 	font-weight: 700;
-	opacity: 1;
+	color: var(--ink);
+}
+
+/* ---------- dashboard: novo centro de controle unificado ---------- */
+
+.control-center {
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-lg);
+	box-shadow: var(--shadow-card);
+	padding: 26px;
+	margin-bottom: 20px;
+}
+.control-top {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 14px;
+}
+.control-greeting {
+	margin: 0 0 8px;
+	font-size: 15px;
+	font-weight: 700;
+	color: var(--ink-soft);
+}
+.status-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	border-radius: 999px;
+	padding: 4px 12px;
+	font-size: 11.5px;
+	font-weight: 800;
+}
+.status-pill .status-dot {
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+}
+.status-pill.green {
+	background: var(--income-soft);
+	color: var(--income);
+}
+.status-pill.green .status-dot {
+	background: var(--income);
+}
+.status-pill.amber {
+	background: var(--kpi-amber-soft);
+	color: var(--kpi-amber);
+}
+.status-pill.amber .status-dot {
+	background: var(--kpi-amber);
+}
+.status-pill.red {
+	background: var(--expense-soft);
+	color: var(--expense);
+}
+.status-pill.red .status-dot {
+	background: var(--expense);
+}
+.control-balance {
+	margin-top: 18px;
+}
+.control-divider {
+	border-top: 1px solid var(--border-soft);
+	margin: 20px 0;
+}
+.control-next-step .insight-eyebrow {
+	color: var(--accent-fg);
+}
+.control-next-text {
+	font-size: 13.5px;
+	color: var(--ink-soft);
+	line-height: 1.6;
+	margin: 10px 0 14px;
+}
+.control-attention .attention-head {
+	margin-bottom: 4px;
 }
 
 .hero-side {
@@ -3523,6 +3601,72 @@ table.list .num {
 	.timeline-saldo {
 		grid-column: 2;
 	}
+}
+.timeline-card {
+	margin-bottom: 20px;
+}
+.timeline-row--hoje {
+	background: var(--surface-2);
+	border-radius: var(--radius-md);
+	padding: 10px 12px;
+	margin-bottom: 2px;
+}
+.timeline-row--hoje .timeline-date,
+.timeline-row--hoje .timeline-desc {
+	font-weight: 700;
+	color: var(--ink);
+}
+.timeline-row--hoje .timeline-saldo {
+	color: var(--ink);
+	font-weight: 700;
+}
+
+.month-summary {
+	margin-bottom: 20px;
+}
+
+/* toggle que recolhe fluxo de caixa, distribuição, resumo semanal/fechamento e
+   orçamento por padrão -- reduz a densidade da primeira leitura da tela. */
+.details-toggle {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	width: 100%;
+	background: none;
+	border: 1px dashed var(--border);
+	border-radius: var(--radius-md);
+	padding: 10px;
+	margin-bottom: 20px;
+	font-size: 12.5px;
+	font-weight: 700;
+	color: var(--ink-muted);
+	cursor: pointer;
+}
+.details-toggle:hover {
+	background: var(--surface-2);
+	color: var(--ink-soft);
+}
+.details-toggle-icon {
+	display: inline-flex;
+	transition: transform 0.15s ease;
+}
+
+.empty-state {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+	padding: 22px 0;
+	text-align: center;
+}
+.empty-state .empty {
+	padding: 0;
+}
+.empty-sub {
+	margin: 0 0 10px;
+	font-size: 12.5px;
+	color: var(--ink-muted);
 }
 .score-value {
 	font-size: 34px;

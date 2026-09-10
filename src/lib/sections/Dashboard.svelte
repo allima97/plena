@@ -11,7 +11,7 @@
 	import BarChart from '$lib/components/charts/BarChart.svelte';
 	import DonutChart from '$lib/components/charts/DonutChart.svelte';
 	import Sparkline from '$lib/components/charts/Sparkline.svelte';
-	import { Bell, CalendarDays, Plus, ArrowUpRight, ArrowDownRight, ArrowLeftRight, Sparkles } from 'lucide-svelte';
+	import { Bell, CalendarDays, Plus, ArrowUpRight, ArrowDownRight, ArrowLeftRight, Sparkles, ChevronDown } from 'lucide-svelte';
 
 	const MES_ABBR = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 	const DOT_PALETTE = ['#e06b5f', '#e0a23f', '#8b78db', '#4a78db', '#23a768', '#2fb7c4', '#c4519a'];
@@ -402,6 +402,25 @@
 		}
 	}
 
+	// Selo de status do centro de controle: vermelho quando o caixa já está negativo,
+	// amarelo quando ainda há folga mas alguma prioridade urgente (vencimento, cartão
+	// alto, meta atrasada), verde quando está tudo tranquilo.
+	const statusTone = $derived.by(() => {
+		if (saldoDisponivel <= 0) return 'red';
+		if (prioridades.some((p) => p.tone === 'red')) return 'amber';
+		return 'green';
+	});
+	const statusLabel = $derived.by(() => {
+		if (statusTone === 'red') return 'Aperto no caixa';
+		if (statusTone === 'amber') return 'Atenção';
+		return 'Caixa saudável';
+	});
+
+	// Painel "Ver mais detalhes": agrupa fluxo de caixa, distribuição, score, resumo
+	// semanal/fechamento e orçamento -- fica recolhido por padrão pra não sobrecarregar
+	// a primeira leitura da tela (o essencial já está no centro de controle acima).
+	let detalhesAbertos = $state(false);
+
 	function futureDateISO(days) {
 		const d = new Date();
 		d.setDate(d.getDate() + days);
@@ -444,21 +463,25 @@
 	</select>
 </div>
 
-<div class="hero-panel">
-	<div class="hero-greeting">
-		<p class="hero-greeting-text">{saudacao}{primeiroNome ? `, ${primeiroNome}` : ''}.</p>
-		<div class="hero-balance-row">
-			<div>
-				<p class="hero-balance-label">Disponível para gastar</p>
-				<p class="hero-balance-value privacy-value">{fmtMoney(saldoDisponivel)}</p>
-				<p class="hero-balance-sub">
-					{saldoDisponivel > 0 ? `até ${fmtMoney(gastoDiario)}/dia até o fim do mês` : 'compromissos e metas superam o saldo em contas'}
-				</p>
-			</div>
-			<Sparkline values={sparkValues} />
+<div class="control-center">
+	<div class="control-top">
+		<div>
+			<p class="control-greeting">{saudacao}{primeiroNome ? `, ${primeiroNome}` : ''}.</p>
+			<span class="status-pill" class:red={statusTone === 'red'} class:amber={statusTone === 'amber'} class:green={statusTone === 'green'}>
+				<span class="status-dot"></span>{statusLabel}
+			</span>
 		</div>
+		<Sparkline values={sparkValues} />
+	</div>
+
+	<div class="control-balance">
+		<p class="hero-balance-label">Quanto posso gastar?</p>
+		<p class="hero-balance-value privacy-value">{fmtMoney(saldoDisponivel)}</p>
+		<p class="hero-balance-sub">
+			{saldoDisponivel > 0 ? `${fmtMoney(gastoDiario)}/dia até o fim do mês` : 'compromissos e metas superam o saldo em contas'}
+		</p>
 		<details class="hero-breakdown">
-			<summary>Ver detalhamento</summary>
+			<summary>Como chegamos nisso?</summary>
 			<div class="hero-breakdown-row"><span>Saldo em contas</span><span class="privacy-value">{fmtMoney(saldoContasReal)}</span></div>
 			<div class="hero-breakdown-row"><span>− Contas a vencer (30 dias)</span><span class="privacy-value">{fmtMoney(committedNext30Value)}</span></div>
 			<div class="hero-breakdown-row"><span>− Fatura de cartão</span><span class="privacy-value">{fmtMoney(faturaCartoesTotal)}</span></div>
@@ -468,32 +491,25 @@
 		</details>
 	</div>
 
-	<div class="hero-side">
-		<div class="mini-stat">
-			<div class="mini-stat-top"><span class="stat-label">Entradas no mês</span><span class="mini-stat-dot" style="background:var(--income)"></span></div>
-			<p class="mini-stat-value money-in font-display privacy-value">{fmtMoney(t.receitas)}</p>
-			{#if entradasDeltaPct !== null}<p class="mini-stat-delta">{entradasDeltaPct >= 0 ? '↑' : '↓'} {Math.abs(entradasDeltaPct).toFixed(1)}% vs. {monthLabel(prevMKey)}</p>{/if}
-		</div>
-		<div class="mini-stat">
-			<div class="mini-stat-top"><span class="stat-label">Saídas no mês</span><span class="mini-stat-dot" style="background:var(--expense)"></span></div>
-			<p class="mini-stat-value money-out font-display privacy-value">{fmtMoney(t.despesas)}</p>
-			{#if saidasDeltaPct !== null}<p class="mini-stat-delta">{saidasDeltaPct >= 0 ? '↑' : '↓'} {Math.abs(saidasDeltaPct).toFixed(1)}% vs. {monthLabel(prevMKey)}</p>{/if}
-		</div>
-		<div class="mini-stat">
-			<div class="mini-stat-top"><span class="stat-label">Comprometido</span><span class="mini-stat-dot" style="background:var(--purple)"></span></div>
-			<p class="mini-stat-value font-display privacy-value">{fmtMoney(comprometido)}</p>
-			<p class="mini-stat-delta">{comprometidoPct}% das despesas do mês</p>
-			<div class="mini-progress-track"><div class="mini-progress-fill" style="width:{comprometidoPct}%;background:var(--purple)"></div></div>
-		</div>
-	</div>
-</div>
+	<div class="control-divider"></div>
 
-<div class="attention-row">
-	<div class="card attention-card">
+	<div class="control-next-step">
+		<p class="insight-eyebrow"><Sparkles size={13} style="vertical-align:-2px;margin-right:5px" />O que eu faria agora</p>
+		<p class="control-next-text">{proximoPasso.text}</p>
+		{#if proximoPasso.resourceId}
+			<button class="btn btn-primary sm" onclick={openAporte}>{proximoPasso.actionLabel}</button>
+		{:else}
+			<a class="btn btn-primary sm" href={proximoPasso.href}>{proximoPasso.actionLabel}</a>
+		{/if}
+	</div>
+
+	<div class="control-divider"></div>
+
+	<div class="control-attention">
 		<div class="attention-head">
-			<span class="alerts-icon" class:red={prioridades.some((p) => p.tone === 'red')}><Bell size={18} /></span>
+			<span class="alerts-icon" class:red={prioridades.some((p) => p.tone === 'red')}><Bell size={16} /></span>
 			<p class="stat-label" style="margin:0">
-				{prioridades.length ? `${prioridades.length} coisa${prioridades.length > 1 ? 's' : ''} merece${prioridades.length > 1 ? 'm' : ''} sua atenção` : 'Tudo em dia'}
+				{prioridades.length ? `${prioridades.length} coisa${prioridades.length > 1 ? 's' : ''} merece${prioridades.length > 1 ? 'm' : ''} atenção` : 'Tudo em dia'}
 			</p>
 		</div>
 		{#if prioridades.length}
@@ -509,7 +525,7 @@
 				</div>
 			{/each}
 		{:else}
-			<p class="empty">Nenhum vencimento, cartão alto ou meta atrasada no momento.</p>
+			<p class="empty">Tudo em dia — nenhum vencimento, fatura alta ou meta atrasada por agora.</p>
 		{/if}
 		<div class="alerts-thresholds">
 			<span>Alertar com antecedência:</span>
@@ -520,40 +536,20 @@
 			{/each}
 		</div>
 	</div>
-
-	<div class="insight-card">
-		<Sparkles size={20} color="var(--accent-fg)" />
-		<p class="insight-eyebrow" style="margin-top:14px">Seu próximo passo</p>
-		<p class="insight-body" style="margin:12px 0 18px">{proximoPasso.text}</p>
-		{#if proximoPasso.resourceId}
-			<button class="btn btn-primary sm" onclick={openAporte}>{proximoPasso.actionLabel}</button>
-		{:else}
-			<a class="btn btn-primary sm" href={proximoPasso.href}>{proximoPasso.actionLabel}</a>
-		{/if}
-	</div>
 </div>
 
-<div class="card projection-card">
-	<div class="chart-card-head">
-		<p class="stat-label" style="margin:0">Saldo projetado</p>
-		{#if projecaoAlerta}<span class="badge badge-red">⚠ fica negativo em {projecaoAlerta.label.toLowerCase()}</span>{/if}
+<div class="card timeline-card">
+	<div class="feed-list-head">
+		<p class="stat-label" style="margin:0">Hoje · Próximos 30 dias</p>
+		<a class="link-more" href="/movimentacoes">Ver todas ↗</a>
 	</div>
-	<div class="projection-row">
-		{#each projecao as p (p.label)}
-			<div class="projection-point">
-				<p class="projection-label">{p.label}</p>
-				<p class="projection-value privacy-value" class:down={p.valor < 0}>{fmtMoney(p.valor)}</p>
-			</div>
-		{/each}
+	<div class="timeline-row timeline-row--hoje">
+		<span class="timeline-date">Hoje</span>
+		<span class="timeline-desc">Saldo atual</span>
+		<span class="timeline-valor"></span>
+		<span class="timeline-saldo privacy-value" class:down={saldoAtualGeral < 0}>{fmtMoney(saldoAtualGeral)}</span>
 	</div>
-</div>
-
-{#if timelineFinanceira.length}
-	<div class="card">
-		<div class="feed-list-head">
-			<p class="stat-label" style="margin:0">Timeline financeira</p>
-			<a class="link-more" href="/movimentacoes">Ver todas ↗</a>
-		</div>
+	{#if timelineFinanceira.length}
 		{#each timelineFinanceira as ev (ev.id)}
 			<div class="timeline-row">
 				<span class="timeline-date">{fmtDate(ev.data)}</span>
@@ -564,65 +560,29 @@
 				<span class="timeline-saldo privacy-value" class:down={ev.saldoAcumulado < 0}>{fmtMoney(ev.saldoAcumulado)}</span>
 			</div>
 		{/each}
-	</div>
-{/if}
-
-<div class="charts-row">
-	<div class="card">
-		<div class="chart-card-head">
-			<div>
-				<p class="stat-label" style="margin:0">Fluxo de caixa</p>
-				<p class="font-display privacy-value" style="margin:6px 0 0;font-size:20px">{fmtMoney(t.receitas)}</p>
-			</div>
-			<div class="chart-legend">
-				<span><span class="legend-dot" style="background:#4dcc8c"></span>Entradas</span>
-				<span><span class="legend-dot" style="background:#f18c7e"></span>Saídas</span>
-			</div>
-		</div>
-		<BarChart data={fluxoData} />
-	</div>
-	<div class="card">
-		<div class="chart-card-head">
-			<p class="stat-label" style="margin:0">Distribuição</p>
-			<span class="page-sub" style="margin:0">Para onde vai?</span>
-		</div>
-		{#if distribuicao.length}
-			<div class="donut-wrap">
-				<DonutChart
-					slices={distribuicao.map((c, i) => ({ label: c.nome, value: c.total, color: DOT_PALETTE[i % DOT_PALETTE.length] }))}
-					centerLabel="Total"
-					centerValue={fmtMoney(distribuicaoTotal)}
-				/>
-				<div class="donut-legend">
-					{#each distribuicao as c, i (c.nome)}
-						<div class="donut-legend-row">
-							<span class="donut-legend-name"><span class="legend-dot" style="background:{DOT_PALETTE[i % DOT_PALETTE.length]}"></span>{c.nome}</span>
-							<span class="donut-legend-pct">{distribuicaoTotal ? Math.round((c.total / distribuicaoTotal) * 100) : 0}%</span>
-						</div>
-					{/each}
-				</div>
-			</div>
-		{:else}
-			<p class="empty">Sem despesas neste mês.</p>
-		{/if}
-	</div>
+	{:else}
+		<p class="empty">Nenhum lançamento pendente nos próximos dias.</p>
+	{/if}
 </div>
 
-<div class="card schedule-card" class:on={appState.reportSchedule.ativo && template}>
-	<span class="alerts-icon" class:green={appState.reportSchedule.ativo && template}><CalendarDays size={18} /></span>
-	<div>
-		<div class="schedule-head">
-			<p class="stat-label">Próxima exportação automática</p>
-			<span class="badge" class:badge-green={appState.reportSchedule.ativo && template} class:badge-gray={!(appState.reportSchedule.ativo && template)}>
-				{appState.reportSchedule.ativo && template ? 'Agendada' : 'Não configurada'}
-			</span>
+<div class="month-summary">
+	<p class="stat-label" style="margin:0 0 10px">Seu mês</p>
+	<div class="hero-side">
+		<div class="mini-stat">
+			<div class="mini-stat-top"><span class="stat-label">Entradas no mês</span><span class="mini-stat-dot" style="background:var(--income)"></span></div>
+			<p class="mini-stat-value money-in font-display privacy-value">{fmtMoney(t.receitas)}</p>
+			{#if entradasDeltaPct !== null}<p class="mini-stat-delta">{entradasDeltaPct >= 0 ? '↑' : '↓'} {Math.abs(entradasDeltaPct).toFixed(1)}% vs. {monthLabel(prevMKey)}</p>{/if}
 		</div>
-		{#if appState.reportSchedule.ativo && template}
-			<p class="alerts-summary">{nextScheduleDate(appState.reportSchedule)} às {appState.reportSchedule.hora}</p>
-			<p class="paused-list">Modelo: {template.nome} · filtros salvos serão usados na exportação.</p>
-		{:else}
-			<p class="alerts-summary">Configure um modelo mensal no centro de relatórios, em Movimentações.</p>
-		{/if}
+		<div class="mini-stat">
+			<div class="mini-stat-top"><span class="stat-label">Saídas no mês</span><span class="mini-stat-dot" style="background:var(--expense)"></span></div>
+			<p class="mini-stat-value money-out font-display privacy-value">{fmtMoney(t.despesas)}</p>
+			{#if saidasDeltaPct !== null}<p class="mini-stat-delta">{saidasDeltaPct >= 0 ? '↑' : '↓'} {Math.abs(saidasDeltaPct).toFixed(1)}% vs. {monthLabel(prevMKey)}</p>{/if}
+		</div>
+		<div class="mini-stat">
+			<div class="mini-stat-top"><span class="stat-label">Guardado no mês</span><span class="mini-stat-dot" style="background:var(--purple)"></span></div>
+			<p class="mini-stat-value font-display privacy-value" class:money-in={t.saldo > 0} class:money-out={t.saldo < 0}>{fmtMoney(t.saldo)}</p>
+			<p class="mini-stat-delta">{t.receitas > 0 ? Math.round((t.saldo / t.receitas) * 100) : 0}% da renda do mês</p>
+		</div>
 	</div>
 </div>
 
@@ -630,7 +590,7 @@
 	<div class="card score-card">
 		<div class="score-card-head">
 			<div>
-				<p class="stat-label" style="margin:0">Score financeiro</p>
+				<p class="stat-label" style="margin:0">Sua saúde financeira</p>
 				<p class="score-tone" style={`color:${scoreColor(financialScore.overall)}`}>{financialScore.label}</p>
 				{#if scoreDelta !== null && scoreDelta !== 0}
 					<p class="score-delta" class:up={scoreDelta > 0} class:down={scoreDelta < 0}>
@@ -669,6 +629,93 @@
 					<p class="score-tip-body">{scoreTip}</p>
 				</div>
 			{/if}
+		{/if}
+	</div>
+</div>
+
+<button type="button" class="details-toggle" onclick={() => (detalhesAbertos = !detalhesAbertos)}>
+	{detalhesAbertos ? 'Ocultar detalhes' : 'Ver mais detalhes'}
+	<span class="details-toggle-icon" style={detalhesAbertos ? 'transform:rotate(180deg)' : ''}><ChevronDown size={14} /></span>
+</button>
+
+{#if detalhesAbertos}
+<div class="mini-stat" style="margin-bottom:20px">
+	<div class="mini-stat-top"><span class="stat-label">Comprometido no mês</span><span class="mini-stat-dot" style="background:var(--purple)"></span></div>
+	<p class="mini-stat-value font-display privacy-value">{fmtMoney(comprometido)}</p>
+	<p class="mini-stat-delta">{comprometidoPct}% das despesas do mês</p>
+	<div class="mini-progress-track"><div class="mini-progress-fill" style="width:{comprometidoPct}%;background:var(--purple)"></div></div>
+</div>
+
+<div class="card projection-card">
+	<div class="chart-card-head">
+		<p class="stat-label" style="margin:0">Saldo projetado</p>
+		{#if projecaoAlerta}<span class="badge badge-red">⚠ fica negativo em {projecaoAlerta.label.toLowerCase()}</span>{/if}
+	</div>
+	<div class="projection-row">
+		{#each projecao as p (p.label)}
+			<div class="projection-point">
+				<p class="projection-label">{p.label}</p>
+				<p class="projection-value privacy-value" class:down={p.valor < 0}>{fmtMoney(p.valor)}</p>
+			</div>
+		{/each}
+	</div>
+</div>
+
+<div class="charts-row">
+	<div class="card">
+		<div class="chart-card-head">
+			<div>
+				<p class="stat-label" style="margin:0">Fluxo de caixa</p>
+				<p class="font-display privacy-value" style="margin:6px 0 0;font-size:20px">{fmtMoney(t.receitas)}</p>
+			</div>
+			<div class="chart-legend">
+				<span><span class="legend-dot" style="background:#4dcc8c"></span>Entradas</span>
+				<span><span class="legend-dot" style="background:#f18c7e"></span>Saídas</span>
+			</div>
+		</div>
+		<BarChart data={fluxoData} />
+	</div>
+	<div class="card">
+		<div class="chart-card-head">
+			<p class="stat-label" style="margin:0">Distribuição</p>
+			<span class="page-sub" style="margin:0">Para onde vai?</span>
+		</div>
+		{#if distribuicao.length}
+			<div class="donut-wrap">
+				<DonutChart
+					slices={distribuicao.map((c, i) => ({ label: c.nome, value: c.total, color: DOT_PALETTE[i % DOT_PALETTE.length] }))}
+					centerLabel="Total"
+					centerValue={fmtMoney(distribuicaoTotal)}
+				/>
+				<div class="donut-legend">
+					{#each distribuicao as c, i (c.nome)}
+						<div class="donut-legend-row">
+							<span class="donut-legend-name"><span class="legend-dot" style="background:{DOT_PALETTE[i % DOT_PALETTE.length]}"></span>{c.nome}</span>
+							<span class="donut-legend-pct">{distribuicaoTotal ? Math.round((c.total / distribuicaoTotal) * 100) : 0}%</span>
+						</div>
+					{/each}
+				</div>
+			</div>
+		{:else}
+			<p class="empty">Sem despesas neste mês — assim que você registrar uma, ela aparece aqui.</p>
+		{/if}
+	</div>
+</div>
+
+<div class="card schedule-card" class:on={appState.reportSchedule.ativo && template}>
+	<span class="alerts-icon" class:green={appState.reportSchedule.ativo && template}><CalendarDays size={18} /></span>
+	<div>
+		<div class="schedule-head">
+			<p class="stat-label">Próxima exportação automática</p>
+			<span class="badge" class:badge-green={appState.reportSchedule.ativo && template} class:badge-gray={!(appState.reportSchedule.ativo && template)}>
+				{appState.reportSchedule.ativo && template ? 'Agendada' : 'Não configurada'}
+			</span>
+		</div>
+		{#if appState.reportSchedule.ativo && template}
+			<p class="alerts-summary">{nextScheduleDate(appState.reportSchedule)} às {appState.reportSchedule.hora}</p>
+			<p class="paused-list">Modelo: {template.nome} · filtros salvos serão usados na exportação.</p>
+		{:else}
+			<p class="alerts-summary">Configure um modelo mensal no centro de relatórios, em Movimentações.</p>
 		{/if}
 	</div>
 </div>
@@ -812,7 +859,11 @@
 				</div>
 			{/each}
 		{:else}
-			<p class="empty">Nenhuma movimentação ainda.</p>
+			<div class="empty-state">
+				<p class="empty">Ainda não há movimentações.</p>
+				<p class="empty-sub">Comece registrando sua primeira receita ou despesa.</p>
+				<button class="btn btn-primary sm" onclick={() => (showNew = true)}><Plus size={14} /> Adicionar lançamento</button>
+			</div>
 		{/if}
 	</div>
 	<div class="insight-card">
@@ -831,10 +882,11 @@
 				{/each}
 			</div>
 		{:else}
-			<p class="empty">Sem insights por enquanto.</p>
+			<p class="empty">Sem insights por enquanto — continue registrando seus lançamentos para receber recomendações.</p>
 		{/if}
 	</div>
 </div>
+{/if}
 
 <NewMovementModal open={showNew} onClose={() => (showNew = false)} />
 <MoveFormModal
