@@ -2419,6 +2419,10 @@ table.list .num {
 .goal-list-item.archived {
 	opacity: 0.65;
 }
+.goal-list-item.paused {
+	opacity: 0.75;
+	border-style: dashed;
+}
 
 .goal-list-top {
 	display: flex;

@@ -78,7 +78,7 @@ export function buildAttentionItems(
 		}
 	}
 
-	for (const g of goals.filter((gl) => !gl.archived)) {
+	for (const g of goals.filter((gl) => !gl.archived && !gl.paused)) {
 		const m = computeMetrics(g, { resources, resourceMoves, goalCategories, installments, amortizations });
 		if (m.statusTone === 'danger') {
 			const resource = resources.find((r) => r.goalId === g.id);

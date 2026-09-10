@@ -58,7 +58,7 @@
 	// --- Cenário B: aportar mais numa meta ----------------------------------
 	const metasParaAporte = $derived(
 		appState.goals
-			.filter((g) => !g.archived && g.type !== 'financiamento')
+			.filter((g) => !g.archived && !g.paused && g.type !== 'financiamento')
 			.map((g) => ({
 				goal: g,
 				m: computeMetrics(g, {

@@ -99,7 +99,7 @@
 	// objetivo do tipo "financiamento" -- não duplica esse dado em um novo cadastro.
 	const financiamentos = $derived.by(() => {
 		return appState.goals
-			.filter((g) => g.type === 'financiamento' && !g.archived)
+			.filter((g) => g.type === 'financiamento' && !g.archived && !g.paused)
 			.map((g) => {
 				// Deduplica por número (guarda contra prestações duplicadas por um envio repetido
 				// no formulário) antes de pegar a mais recente, mesma proteção de installmentsWithDelta.

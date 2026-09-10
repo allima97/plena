@@ -25,7 +25,7 @@
 	import AmortizationFormModal from './AmortizationFormModal.svelte';
 	import RowActionsModal from '$lib/components/RowActionsModal.svelte';
 	import Modal from '$lib/components/Modal.svelte';
-	import { Plus, Archive, ArchiveRestore, Pencil, Trash2, ChevronDown, ChevronUp, Wallet, Eye, X, Minus } from 'lucide-svelte';
+	import { Plus, Archive, ArchiveRestore, Pencil, Trash2, ChevronDown, ChevronUp, Wallet, Eye, X, Minus, Pause, Play } from 'lucide-svelte';
 
 	const MONTH_ABBR = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
@@ -301,12 +301,16 @@
 	<div class="goals-list" style="--goal-cols:{Math.max(Math.min(activeGoals.length, 6), 1)}">
 		{#each activeGoals as g (g.id)}
 			{@const m = computeMetrics(g, { resources: appState.resources, resourceMoves: appState.resourceMoves, goalCategories: appState.goalCategories, installments: appState.installments, amortizations: appState.amortizations })}
-			<button class="goal-list-item" class:active={g.id === selectedGoalId} onclick={() => (selectedGoalId = g.id)}>
+			<button class="goal-list-item" class:active={g.id === selectedGoalId} class:paused={g.paused} onclick={() => (selectedGoalId = g.id)}>
 				<div class="goal-list-top">
 					<span class="goal-list-name">{g.name}</span>
-					<span class="badge" class:badge-green={m.statusTone === 'good'} class:badge-red={m.statusTone === 'danger'} class:badge-orange={m.statusTone === 'warn'} class:badge-gray={m.statusTone === 'neutral'}>
-						{m.statusLabel}
-					</span>
+					{#if g.paused}
+						<span class="badge badge-gray"><Pause size={11} style="vertical-align:-1px;margin-right:3px" />Pausado</span>
+					{:else}
+						<span class="badge" class:badge-green={m.statusTone === 'good'} class:badge-red={m.statusTone === 'danger'} class:badge-orange={m.statusTone === 'warn'} class:badge-gray={m.statusTone === 'neutral'}>
+							{m.statusLabel}
+						</span>
+					{/if}
 				</div>
 				<p class="goal-list-type">{GOAL_TYPES[g.type]?.label || 'Outro objetivo'}</p>
 				<div class="goal-progress-track" style="margin-top:8px">
@@ -344,12 +348,19 @@
 			<div class="card">
 				<div class="goal-detail-head">
 					<div>
-						<p class="stat-label">{GOAL_TYPES[selectedGoal.type]?.label || 'Outro objetivo'}</p>
+						<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+							<p class="stat-label" style="margin:0">{GOAL_TYPES[selectedGoal.type]?.label || 'Outro objetivo'}</p>
+							{#if selectedGoal.paused}<span class="badge badge-gray"><Pause size={11} style="vertical-align:-1px;margin-right:3px" />Pausado</span>{/if}
+						</div>
 						<h2 class="font-display" style="margin:4px 0 0;font-size:22px">{selectedGoal.name}</h2>
 						{#if selectedGoal.notes}<p class="movement-meta" style="margin-top:6px">{selectedGoal.notes}</p>{/if}
+						{#if selectedGoal.paused}<p class="movement-meta" style="margin-top:6px">Objetivo pausado: não entra no score financeiro, nos avisos nem nos totais da Dashboard, do Simulador ou do Patrimônio.</p>{/if}
 					</div>
 					<div class="actions-row">
 						<button class="btn btn-ghost sm" onclick={() => (goalModal = { open: true, editing: selectedGoal })}><Pencil size={14} /> Editar</button>
+						<button class="btn btn-ghost sm" onclick={() => updateGoal(selectedGoal.id, { paused: !selectedGoal.paused })}>
+							{#if selectedGoal.paused}<Play size={14} /> Retomar{:else}<Pause size={14} /> Pausar{/if}
+						</button>
 						<button class="btn btn-ghost sm" onclick={() => updateGoal(selectedGoal.id, { archived: !selectedGoal.archived })}>
 							{#if selectedGoal.archived}<ArchiveRestore size={14} /> Reativar{:else}<Archive size={14} /> Arquivar{/if}
 						</button>

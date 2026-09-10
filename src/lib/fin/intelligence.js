@@ -44,7 +44,7 @@ export function computeFinancialScore({ transactions, accounts, goals, resources
 	const mesesCobertos = mediaDespesas3Meses > 0 ? reservaTotal / mediaDespesas3Meses : reservaTotal > 0 ? 6 : 0;
 	const reservaScore = clamp((mesesCobertos / 6) * 100, reservaTotal > 0 ? 15 : 0, 100);
 
-	const ativos = goals.filter((g) => !g.archived);
+	const ativos = goals.filter((g) => !g.archived && !g.paused);
 	const TONE_SCORE = { good: 100, neutral: 70, warn: 45, danger: 20 };
 	const objetivosScore = ativos.length
 		? ativos.reduce((s, g) => {
@@ -150,7 +150,7 @@ export function buildInsights({ transactions, accounts, goals, resources, resour
 	}
 
 	// Objetivo: alguma meta ativa adiantada.
-	for (const g of goals.filter((gl) => !gl.archived)) {
+	for (const g of goals.filter((gl) => !gl.archived && !gl.paused)) {
 		const m = computeMetrics(g, { resources, resourceMoves, goalCategories, installments, amortizations });
 		if (m.statusTone === 'good' && m.percent < 1) {
 			insights.push({

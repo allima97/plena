@@ -228,7 +228,7 @@
 
 	const activeGoalsWithMetrics = $derived(
 		appState.goals
-			.filter((g) => !g.archived)
+			.filter((g) => !g.archived && !g.paused)
 			.map((g) => ({
 				goal: g,
 				m: computeMetrics(g, {
