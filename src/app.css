@@ -1192,6 +1192,20 @@ table.list .num {
 	justify-content: space-between;
 	gap: 16px;
 	margin-bottom: 28px;
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-lg);
+	box-shadow: var(--shadow-card);
+	padding: 14px 18px;
+}
+/* Dentro do card branco do topbar, os ícones precisam de um preenchimento visível
+   (fundo branco + contorno claro somem contra o próprio card branco). */
+.topbar-right .icon-btn {
+	background: var(--surface-3);
+	border-color: transparent;
+}
+.topbar-right .icon-btn:hover {
+	background: var(--border);
 }
 .topbar-left {
 	display: flex;
