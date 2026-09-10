@@ -12,6 +12,7 @@
 	--surface-3: #f3f6f4;
 	--border: #e4ebe7;
 	--border-soft: #edf0ee;
+	--border-strong: #d9e2e7;
 	--input-border: #e1e9e4;
 	--ring: #99b7a4;
 	--income: #23a768;
@@ -37,6 +38,7 @@
 	--radius-lg: 26px;
 	--radius-xl: 30px;
 	--shadow-card: 0 10px 30px rgba(43, 61, 70, 0.04);
+	--shadow-pill: 0 4px 12px rgba(43, 61, 70, 0.06);
 	--shadow-hero: 0 18px 40px rgba(23, 33, 43, 0.13);
 	--shadow-modal: 0 30px 80px rgba(23, 33, 43, 0.25);
 	--shadow-cta: 0 12px 24px rgba(23, 33, 43, 0.15);
@@ -145,7 +147,7 @@ a {
 	align-items: center;
 	justify-content: center;
 	gap: 8px;
-	border: 1px solid var(--border);
+	border: 1px solid var(--border-strong);
 	background: var(--card);
 	color: var(--ink);
 	border-radius: 999px;
@@ -154,6 +156,7 @@ a {
 	font-size: 13px;
 	font-weight: 700;
 	cursor: pointer;
+	box-shadow: var(--shadow-pill);
 	transition:
 		transform 0.15s ease,
 		background 0.15s ease,
@@ -184,6 +187,7 @@ a {
 	border-color: transparent;
 	background: transparent;
 	color: var(--ink-soft);
+	box-shadow: none;
 }
 .btn-ghost:hover {
 	background: var(--surface-3);
@@ -192,6 +196,7 @@ a {
 	color: var(--expense);
 	border-color: transparent;
 	background: transparent;
+	box-shadow: none;
 }
 .btn-danger:hover {
 	background: var(--expense-soft);
@@ -210,10 +215,11 @@ a {
 	width: 40px;
 	height: 40px;
 	border-radius: 999px;
-	border: 1px solid var(--border);
+	border: 1px solid var(--border-strong);
 	background: var(--card);
 	color: var(--ink-soft);
 	cursor: pointer;
+	box-shadow: var(--shadow-pill);
 	transition: background 0.15s ease;
 }
 .icon-btn:hover {
@@ -2158,12 +2164,13 @@ table.list .num {
 .filters-bar input {
 	height: 38px;
 	border-radius: 999px;
-	border: 1px solid var(--border);
+	border: 1px solid var(--border-strong);
 	background: var(--card);
 	padding: 0 14px;
 	font-size: 12px;
 	font-weight: 700;
 	color: var(--ink-soft);
+	box-shadow: var(--shadow-pill);
 }
 .search-input-wrap {
 	position: relative;
@@ -2174,10 +2181,11 @@ table.list .num {
 	width: 100%;
 	border-radius: 999px;
 	height: 40px;
-	border: 1px solid var(--border);
+	border: 1px solid var(--border-strong);
 	padding: 0 16px 0 38px;
 	font-size: 13px;
 	font-weight: 600;
+	box-shadow: var(--shadow-pill);
 }
 .search-icon {
 	position: absolute;
@@ -2200,12 +2208,13 @@ table.list .num {
 	height: 32px;
 	padding: 0 14px;
 	border-radius: 999px;
-	border: 1px solid var(--border);
+	border: 1px solid var(--border-strong);
 	background: var(--card);
 	font-size: 12px;
 	font-weight: 700;
 	color: var(--ink-soft);
 	cursor: pointer;
+	box-shadow: var(--shadow-pill);
 	transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
 .quick-filter-chip:hover {
@@ -3259,6 +3268,8 @@ table.list .num {
 }
 .dash-filters select {
 	height: 40px;
+	border-color: var(--border-strong);
+	box-shadow: var(--shadow-pill);
 }
 
 .hero-row {
