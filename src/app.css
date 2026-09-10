@@ -2397,6 +2397,10 @@ table.list .num {
 	text-align: left;
 	gap: 2px;
 	padding: 14px 16px;
+	/* Sem isso, o item de grid usa min-width:auto (o tamanho mínimo do conteúdo interno, como o
+	   nome do objetivo + selo "Pausado" lado a lado) e "estoura" além da coluna 1fr da grade
+	   quando o nome é comprido, em vez de deixar o nome truncar com reticências como já previsto. */
+	min-width: 0;
 	border-radius: var(--radius-lg);
 	border: 1px solid var(--border);
 	background: var(--card);
@@ -2421,7 +2425,6 @@ table.list .num {
 }
 .goal-list-item.paused {
 	opacity: 0.75;
-	border-style: dashed;
 }
 
 .goal-list-top {
@@ -2429,9 +2432,11 @@ table.list .num {
 	align-items: center;
 	justify-content: space-between;
 	gap: 8px;
+	min-width: 0;
 }
 .goal-list-top .badge {
 	flex-shrink: 0;
+	white-space: nowrap;
 }
 
 .goal-list-name {
@@ -2473,6 +2478,22 @@ table.list .num {
 	justify-content: space-between;
 	gap: 16px;
 	flex-wrap: wrap;
+}
+/* Editar / Pausar / Arquivar / Excluir sempre lado a lado numa única linha -- em telas estreitas,
+   em vez de quebrar cada botão numa linha própria (.actions-row normal usa flex-wrap:wrap), essa
+   linha específica rola na horizontal se não couber tudo de uma vez. */
+.goal-detail-head .actions-row {
+	flex-wrap: nowrap;
+	overflow-x: auto;
+	max-width: 100%;
+	-webkit-overflow-scrolling: touch;
+	scrollbar-width: none;
+}
+.goal-detail-head .actions-row::-webkit-scrollbar {
+	display: none;
+}
+.goal-detail-head .actions-row .btn {
+	flex-shrink: 0;
 }
 
 /* ---------- objetivos: tipo de meta (form) ---------- */
