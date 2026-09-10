@@ -2358,7 +2358,7 @@ table.list .num {
 }
 .goal-list-item.active {
 	border-color: var(--kpi-green);
-	box-shadow: 0 0 0 2px var(--kpi-green), 0 10px 24px rgba(38, 130, 92, 0.2);
+	box-shadow: 0 0 0 1px var(--kpi-green), 0 8px 18px rgba(38, 130, 92, 0.12);
 	background: var(--card);
 }
 .goal-list-item.active .goal-list-type {
