@@ -17,7 +17,7 @@ const ARRAY_COLLECTIONS = [
 	'patrimonyItems',
 	'patrimonySnapshots'
 ];
-const SINGLETON_COLLECTIONS = ['reportSchedule', 'alertThresholds'];
+const SINGLETON_COLLECTIONS = ['reportSchedule', 'alertThresholds', 'settings'];
 
 /** GET /api/plena/state — junta todas as coleções do usuário num só payload. */
 export async function GET({ platform }) {
@@ -37,6 +37,7 @@ export async function GET({ platform }) {
 		reportHistory: [],
 		reportSchedule: null,
 		alertThresholds: null,
+		settings: null,
 		goals: [],
 		resources: [],
 		resourceMoves: [],

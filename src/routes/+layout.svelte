@@ -19,7 +19,8 @@
 		Eye,
 		EyeOff,
 		Plus,
-		Wand2
+		Wand2,
+		Settings
 	} from 'lucide-svelte';
 	import { upcomingDue } from '$lib/fin/derived.js';
 	import GlobalSearch from '$lib/components/GlobalSearch.svelte';
@@ -80,6 +81,10 @@
 		{
 			label: 'Análise',
 			items: [{ href: '/relatorios', label: 'Relatórios', icon: BarChart3 }]
+		},
+		{
+			label: 'Sistema',
+			items: [{ href: '/configuracoes', label: 'Configurações', icon: Settings }]
 		}
 	];
 	const navItems = navGroups.flatMap((g) => g.items);

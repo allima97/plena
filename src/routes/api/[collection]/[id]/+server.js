@@ -10,6 +10,7 @@ const KNOWN_COLLECTIONS = [
 	'reportHistory',
 	'reportSchedule',
 	'alertThresholds',
+	'settings',
 	'goals',
 	'resources',
 	'resourceMoves',

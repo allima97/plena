@@ -86,6 +86,9 @@
 	});
 
 	const selectedGoal = $derived(appState.goals.find((g) => g.id === selectedGoalId) || null);
+	// Objetivo pode ser numa moeda diferente da padrão do sistema (ver GoalFormModal) -- os
+	// valores do próprio objetivo (meta, acumulado, aportes) mostram nessa moeda.
+	const moeda = $derived(selectedGoal?.currency || 'BRL');
 	const metrics = $derived(
 		selectedGoal
 			? computeMetrics(selectedGoal, {
@@ -309,7 +312,7 @@
 				<div class="goal-progress-track" style="margin-top:8px">
 					<div class="goal-progress-fill" style="width:{m.percent * 100}%;background:{progressColor(m.percent)}"></div>
 				</div>
-				<p class="goal-list-values"><span class="privacy-value">{fmtMoney(m.totalAccumulated)}</span> de <span class="privacy-value">{fmtMoney(m.effectiveTarget)}</span></p>
+				<p class="goal-list-values"><span class="privacy-value">{fmtMoney(m.totalAccumulated, g.currency)}</span> de <span class="privacy-value">{fmtMoney(m.effectiveTarget, g.currency)}</span></p>
 				{#if m.status !== 'concluido' && m.targetDate && m.projectedDate}
 					<p class="goal-list-pace">Previsão: {m.projectedDate.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}</p>
 				{/if}
@@ -364,7 +367,7 @@
 				<div class="grid-cards" style="margin-top:18px">
 					<div class="stat-card kpi-green">
 						<p class="stat-label">Objetivo</p>
-						<p class="font-display stat-value privacy-value">{fmtMoney(metrics.effectiveTarget)}</p>
+						<p class="font-display stat-value privacy-value">{fmtMoney(metrics.effectiveTarget, moeda)}</p>
 						{#if selectedGoal.linkToBalance}
 							<p class="stat-sub">
 								vinculado ao saldo devedor
@@ -376,15 +379,15 @@
 					</div>
 					<div class="stat-card kpi-amber">
 						<p class="stat-label">Acumulado</p>
-						<p class="font-display stat-value privacy-value">{fmtMoney(metrics.totalAccumulated)}</p>
+						<p class="font-display stat-value privacy-value">{fmtMoney(metrics.totalAccumulated, moeda)}</p>
 					</div>
 					<div class="stat-card" class:kpi-green={metrics.remaining <= 0} class:kpi-rose={metrics.remaining > 0}>
 						<p class="stat-label">Falta arrecadar</p>
-						<p class="font-display stat-value privacy-value">{fmtMoney(metrics.remaining)}</p>
+						<p class="font-display stat-value privacy-value">{fmtMoney(metrics.remaining, moeda)}</p>
 					</div>
 					<div class="stat-card kpi-blue">
 						<p class="stat-label">Recomendado/mês</p>
-						<p class="font-display stat-value privacy-value">{fmtMoney(metrics.recommendedMonthly)}</p>
+						<p class="font-display stat-value privacy-value">{fmtMoney(metrics.recommendedMonthly, moeda)}</p>
 						<p class="stat-sub">{metrics.monthsLeft != null ? `${metrics.monthsLeft} meses restantes` : 'sem prazo definido'}</p>
 					</div>
 				</div>
@@ -392,7 +395,7 @@
 				<div class="goal-pace-row">
 					<div class="stat-card kpi-gold">
 						<p class="stat-label">Média Geral</p>
-						<p class="font-display stat-value privacy-value">{metrics.generalAveragePace > 0 ? fmtMoney(metrics.generalAveragePace) : '—'}</p>
+						<p class="font-display stat-value privacy-value">{metrics.generalAveragePace > 0 ? fmtMoney(metrics.generalAveragePace, moeda) : '—'}</p>
 						<p class="stat-sub">média mensal desde o início do objetivo</p>
 					</div>
 					<div class="stat-card">
@@ -421,7 +424,7 @@
 						<button class="resource-head" onclick={() => (expandedResource = { ...expandedResource, [r.id]: !expandedResource[r.id] })}>
 							<span class="type-icon income"><Wallet size={15} /></span>
 							<span class="resource-name">{r.name}</span>
-							<span class="font-display resource-balance privacy-value">{fmtMoney(resourceBalanceOf(r.id))}</span>
+							<span class="font-display resource-balance privacy-value">{fmtMoney(resourceBalanceOf(r.id), moeda)}</span>
 							{#if expandedResource[r.id]}<ChevronUp size={16} />{:else}<ChevronDown size={16} />{/if}
 						</button>
 						{#if expandedResource[r.id]}
@@ -455,7 +458,8 @@
 											<p class="movement-meta">{fmtDate(mv.date)}</p>
 										</div>
 										<div class="movement-amount">
-											<p class="font-display privacy-value" class:money-in={mv.amount >= 0} class:money-out={mv.amount < 0}>{fmtMoney(mv.amount)}</p>
+											<p class="font-display privacy-value" class:money-in={mv.amount >= 0} class:money-out={mv.amount < 0}>{fmtMoney(mv.amount, moeda)}</p>
+											{#if mv.baseAmount}<p class="movement-date privacy-value">≈ {fmtMoney(mv.baseAmount, appState.settings.moedaPadrao)}</p>{/if}
 										</div>
 									</div>
 								{:else}

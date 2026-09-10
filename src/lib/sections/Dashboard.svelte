@@ -39,6 +39,7 @@
 
 	const mKey = $derived(currentMonthKey());
 	const prevMKey = $derived(shiftMonthKey(mKey, -1));
+	const moedaPadrao = $derived(appState.settings.moedaPadrao || 'BRL');
 
 	const contaTx = $derived(appState.transactions.filter((t) => contaFiltro === 'all' || t.contaId === contaFiltro));
 	const baseTx = $derived(contaTx.filter((t) => tipoFiltro === 'all' || t.tipo === tipoFiltro));
@@ -238,8 +239,19 @@
 				})
 			}))
 	);
+	// Objetivos numa moeda diferente da padrão do sistema (ex.: EUR) entram aqui convertidos pelo
+	// câmbio de referência cadastrado no objetivo (ver GoalFormModal) -- sem isso, R$/EUR/USD
+	// somados direto dariam um total sem sentido. Sem câmbio de referência cadastrado, o objetivo
+	// fica de fora da soma (metasSemCambio) em vez de entrar errado.
+	const metasPlanejadasAtivas = $derived(activeGoalsWithMetrics.filter(({ m }) => m.percent < 1 && m.recommendedMonthly > 0));
+	const metasSemCambio = $derived(metasPlanejadasAtivas.filter(({ goal }) => goal.currency && goal.currency !== moedaPadrao && !goal.referenceRate));
 	const metasPlanejadasMes = $derived(
-		activeGoalsWithMetrics.filter(({ m }) => m.percent < 1 && m.recommendedMonthly > 0).reduce((s, { m }) => s + m.recommendedMonthly, 0)
+		metasPlanejadasAtivas.reduce((s, { goal, m }) => {
+			const estrangeira = goal.currency && goal.currency !== moedaPadrao;
+			if (estrangeira && !goal.referenceRate) return s; // sem câmbio de referência -- fica de fora, não soma errado
+			const valor = estrangeira ? m.recommendedMonthly * Number(goal.referenceRate) : m.recommendedMonthly;
+			return s + valor;
+		}, 0)
 	);
 
 	const margemSeguranca = $derived(Math.max(0, Math.round((saldoContasReal * 0.05) / 10) * 10));
@@ -380,15 +392,18 @@
 
 	const proximoPasso = $derived.by(() => {
 		if (saldoDisponivel > 0) {
+			// Só considera aqui objetivos na moeda padrão do sistema -- comparar/misturar
+			// saldoDisponivel (moeda padrão) com a meta mensal de um objetivo em moeda
+			// estrangeira (ex.: EUR) direto, sem câmbio, daria uma sugestão sem sentido.
 			const candidatos = activeGoalsWithMetrics
-				.filter(({ m }) => m.percent < 1 && m.recommendedMonthly > 0)
+				.filter(({ goal, m }) => (!goal.currency || goal.currency === moedaPadrao) && m.percent < 1 && m.recommendedMonthly > 0)
 				.sort((a, b) => (a.m.statusTone === 'danger' ? 0 : 1) - (b.m.statusTone === 'danger' ? 0 : 1));
 			const candidato = candidatos[0];
 			if (candidato) {
 				const valor = Math.min(saldoDisponivel, candidato.m.recommendedMonthly);
 				const resource = appState.resources.find((r) => r.goalId === candidato.goal.id);
 				return {
-					text: `Você pode aportar ${fmtMoney(valor)} na meta "${candidato.goal.name}" este mês sem comprometer seu caixa.`,
+					text: `Você pode aportar ${fmtMoney(valor, moedaPadrao)} na meta "${candidato.goal.name}" este mês sem comprometer seu caixa.`,
 					actionLabel: 'Fazer aporte',
 					href: '/objetivos',
 					goalId: candidato.goal.id,
@@ -396,7 +411,7 @@
 					valor
 				};
 			}
-			return { text: `Seu caixa está tranquilo este mês: ${fmtMoney(saldoDisponivel)} disponíveis além dos compromissos e metas.`, actionLabel: 'Ver objetivos', href: '/objetivos' };
+			return { text: `Seu caixa está tranquilo este mês: ${fmtMoney(saldoDisponivel, moedaPadrao)} disponíveis além dos compromissos e metas.`, actionLabel: 'Ver objetivos', href: '/objetivos' };
 		}
 		return { text: 'Seus compromissos e metas deste mês superam o saldo disponível em contas. Vale revisar despesas em Relatórios.', actionLabel: 'Ver relatório', href: '/relatorios' };
 	});
@@ -519,7 +534,13 @@
 			<div class="hero-breakdown-row"><span><span class="money-tag real">💰 Real</span> Saldo em contas</span><span class="privacy-value">{fmtMoney(saldoContasReal)}</span></div>
 			<div class="hero-breakdown-row"><span>− Contas a vencer (30 dias)</span><span class="privacy-value">{fmtMoney(committedNext30Value)}</span></div>
 			<div class="hero-breakdown-row"><span>− Fatura de cartão</span><span class="privacy-value">{fmtMoney(faturaCartoesTotal)}</span></div>
-			<div class="hero-breakdown-row"><span>− Metas planejadas do mês</span><span class="privacy-value">{fmtMoney(metasPlanejadasMes)}</span></div>
+			<div class="hero-breakdown-row"><span>− Metas planejadas do mês</span><span class="privacy-value">{fmtMoney(metasPlanejadasMes, moedaPadrao)}</span></div>
+			{#if metasSemCambio.length}
+				<p class="field-hint" style="margin:-4px 0 6px">
+					{metasSemCambio.map(({ goal }) => goal.name).join(', ')} {metasSemCambio.length > 1 ? 'estão' : 'está'} numa moeda diferente e {metasSemCambio.length > 1 ? 'não entram' : 'não entra'} nessa soma até você
+					cadastrar um câmbio de referência (editar objetivo, em Objetivos).
+				</p>
+			{/if}
 			<div class="hero-breakdown-row"><span>− Margem de segurança (5%)</span><span class="privacy-value">{fmtMoney(margemSeguranca)}</span></div>
 			<div class="hero-breakdown-row subtotal"><span><span class="money-tag comprometido">📌 Comprometido</span> Total comprometido</span><span class="privacy-value">{fmtMoney(committedNext30Value + faturaCartoesTotal + metasPlanejadasMes + margemSeguranca)}</span></div>
 			<div class="hero-breakdown-row total"><span>Disponível</span><span class="privacy-value">{fmtMoney(saldoDisponivel)}</span></div>

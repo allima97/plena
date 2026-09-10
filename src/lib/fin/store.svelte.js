@@ -10,6 +10,7 @@ let reportHistory = $state([]);
 let reportSchedule = $state({ ativo: false, templateId: null, dia: 5, hora: '08:00' });
 let alertThresholds = $state({ um: 1, tres: 3, sete: 7 });
 let budgetGlobal = $state(null); // orçamento mensal total (P3.1), distinto do orçamento por categoria
+let settings = $state({ moedaPadrao: 'BRL' }); // preferências gerais do sistema (hoje: moeda padrão das contas/extrato)
 
 // ---- objetivos (mesmo modelo de dados do Rumo Financeiro / nextgoals) ----
 let goals = $state([]);
@@ -58,6 +59,9 @@ export const appState = {
 	},
 	get budgetGlobal() {
 		return budgetGlobal;
+	},
+	get settings() {
+		return settings;
 	},
 	get goals() {
 		return goals;
@@ -113,6 +117,7 @@ function snapshot() {
 		reportSchedule,
 		alertThresholds,
 		budgetGlobal,
+		settings,
 		goals,
 		resources,
 		resourceMoves,
@@ -142,6 +147,7 @@ export async function boot() {
 		reportSchedule = local.reportSchedule || { ativo: false, templateId: null, dia: 5, hora: '08:00' };
 		alertThresholds = local.alertThresholds || { um: 1, tres: 3, sete: 7 };
 		budgetGlobal = local.budgetGlobal ?? null;
+		settings = local.settings || { moedaPadrao: 'BRL' };
 		goals = local.goals || [];
 		resources = local.resources || [];
 		resourceMoves = local.resourceMoves || [];
@@ -187,6 +193,7 @@ export async function boot() {
 	reportSchedule = remote.reportSchedule || reportSchedule;
 	alertThresholds = remote.alertThresholds || alertThresholds;
 	budgetGlobal = remote.budgetGlobal ?? budgetGlobal;
+	settings = remote.settings || settings;
 	goals = remote.goals || goals;
 	resources = remote.resources || resources;
 	resourceMoves = remote.resourceMoves || resourceMoves;
@@ -521,6 +528,14 @@ export function setBudgetGlobal(valor) {
 	budgetGlobal = n > 0 ? n : null;
 	persistLocalSnapshot();
 	if (mode === 'api') apiPut('budgetGlobal', 'singleton', budgetGlobal);
+}
+
+/** Preferências gerais do sistema -- hoje só a moeda padrão (contas, extrato, cálculos gerais);
+ * objetivos individuais podem divergir dela (ver goal.currency em GoalFormModal.svelte). */
+export function setSettings(patch) {
+	settings = { ...settings, ...patch };
+	persistLocalSnapshot();
+	if (mode === 'api') apiPut('settings', 'singleton', settings);
 }
 
 // ============================================================================
