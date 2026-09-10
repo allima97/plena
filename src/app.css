@@ -2357,9 +2357,12 @@ table.list .num {
 	border-color: var(--accent);
 }
 .goal-list-item.active {
-	border-color: var(--accent);
-	box-shadow: 0 0 0 1px var(--accent);
-	background: var(--surface-2);
+	border-color: var(--accent-fg);
+	box-shadow: 0 0 0 2px var(--accent-fg), 0 10px 24px rgba(53, 95, 159, 0.2);
+	background: var(--accent);
+}
+.goal-list-item.active .goal-list-type {
+	color: var(--accent-fg);
 }
 .goal-list-item.archived {
 	opacity: 0.65;
