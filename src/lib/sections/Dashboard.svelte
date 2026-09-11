@@ -497,20 +497,19 @@
 		<button class="btn" onclick={() => (showCalendar = true)}><CalendarRange size={16} /> Calendário</button>
 		<button class="btn btn-primary" onclick={() => (showNew = true)}><Plus size={16} /> Novo lançamento</button>
 	</div>
-</div>
-
-<div class="dash-filters">
-	<select class="field-input" style="height:40px;width:auto" bind:value={contaFiltro}>
-		<option value="all">Todas as contas</option>
-		{#each appState.accounts as acc (acc.id)}
-			<option value={acc.id}>{acc.nome}</option>
-		{/each}
-	</select>
-	<select class="field-input" style="height:40px;width:auto" bind:value={tipoFiltro}>
-		<option value="all">Receitas e despesas</option>
-		<option value="receita">Só receitas</option>
-		<option value="despesa">Só despesas</option>
-	</select>
+	<div class="dash-filters">
+		<select class="field-input" style="height:40px;width:auto" bind:value={contaFiltro}>
+			<option value="all">Todas as contas</option>
+			{#each appState.accounts as acc (acc.id)}
+				<option value={acc.id}>{acc.nome}</option>
+			{/each}
+		</select>
+		<select class="field-input" style="height:40px;width:auto" bind:value={tipoFiltro}>
+			<option value="all">Receitas e despesas</option>
+			<option value="receita">Só receitas</option>
+			<option value="despesa">Só despesas</option>
+		</select>
+	</div>
 </div>
 
 <div class="control-center">

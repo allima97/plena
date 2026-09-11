@@ -188,7 +188,7 @@
 
 {#if cartoes.length}
 	<div class="card">
-		<div class="page-head" style="margin-bottom:16px">
+		<div class="page-head page-head--flat" style="margin-bottom:16px">
 			<div>
 				<p class="page-eyebrow" style="margin-bottom:2px">Resumo dos cartões</p>
 				<p class="font-display" style="margin:0;font-size:18px">Limite utilizado</p>

@@ -424,7 +424,7 @@
 			</div>
 
 			<div class="card" style="margin-top:16px">
-				<div class="page-head" style="margin-bottom:14px">
+				<div class="page-head page-head--flat" style="margin-bottom:14px">
 					<p class="stat-label" style="margin:0">Recursos</p>
 					<button class="btn sm" onclick={() => (resourceModal = { open: true, goalId: selectedGoal.id, editing: null })}><Plus size={14} /> Novo recurso</button>
 				</div>
