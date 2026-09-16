@@ -89,11 +89,19 @@
 	const navItems = $derived(navGroups.flatMap((g) => g.items));
 
 	let mobileNavOpen = $state(false);
-	let hideValues = $state(false);
+	// Por padrão o app abre com os valores ocultos (privacidade em tela pública/compartilhada) --
+	// só fica visível se o usuário clicar no ícone do olho. Não é lembrado entre sessões de
+	// propósito: cada vez que o Plena é aberto, os valores começam ocultos de novo.
+	let hideValues = $state(true);
+
+	// Aplica a classe no <body> sempre que hideValues mudar -- incluindo a primeira renderização,
+	// já que o valor inicial agora é `true` (antes só o clique no botão aplicava a classe).
+	$effect(() => {
+		if (typeof document !== 'undefined') document.body.classList.toggle('values-hidden', hideValues);
+	});
 
 	function toggleHideValues() {
 		hideValues = !hideValues;
-		if (typeof document !== 'undefined') document.body.classList.toggle('values-hidden', hideValues);
 	}
 
 	const alertCount = $derived(upcomingDue(appState.transactions, appState.alertThresholds).total);
