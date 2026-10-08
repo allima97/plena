@@ -44,6 +44,9 @@ let patrimonyItemMoves = $state([]); // P4.4: historico de aportes/valorizacao p
 // ---- score financeiro: historico mensal (fase P2.6) ----
 let scoreSnapshots = $state([]);
 
+// ---- parcelamentos de compras (controle sem impacto no movimento) ----
+let purchaseInstallments = $state([]);
+
 let mode = $state(/** @type {'loading'|'api'|'local'} */ ('loading'));
 let syncStatus = $state(/** @type {'synced'|'saving'|'error'} */ ('synced'));
 let pendingWrites = 0;
@@ -109,6 +112,9 @@ export const appState = {
 	get patrimonyItemMoves() {
 		return patrimonyItemMoves;
 	},
+	get purchaseInstallments() {
+		return purchaseInstallments;
+	},
 	get mode() {
 		return mode;
 	},
@@ -143,7 +149,8 @@ function snapshot() {
 		patrimonyItems,
 		patrimonySnapshots,
 		scoreSnapshots,
-		patrimonyItemMoves
+		patrimonyItemMoves,
+		purchaseInstallments
 	};
 }
 
@@ -174,6 +181,7 @@ export async function boot() {
 		patrimonySnapshots = local.patrimonySnapshots || [];
 		scoreSnapshots = local.scoreSnapshots || [];
 		patrimonyItemMoves = local.patrimonyItemMoves || [];
+		purchaseInstallments = local.purchaseInstallments || [];
 	}
 	ready = true;
 
@@ -220,6 +228,7 @@ export async function boot() {
 	patrimonySnapshots = remote.patrimonySnapshots || patrimonySnapshots;
 	scoreSnapshots = remote.scoreSnapshots || scoreSnapshots;
 	patrimonyItemMoves = remote.patrimonyItemMoves || patrimonyItemMoves;
+	purchaseInstallments = remote.purchaseInstallments || purchaseInstallments;
 	mode = 'api';
 	persistLocalSnapshot();
 }
@@ -849,6 +858,36 @@ export function upsertScoreSnapshot(mKey, data) {
 }
 
 // ============================================================================
+// ---- parcelamentos de compras (controle sem impacto no movimento) ---------
+// ============================================================================
+
+export function addPurchaseInstallment(data) {
+	const p = { id: uid(), createdAt: new Date().toISOString(), ...data };
+	purchaseInstallments = [...purchaseInstallments, p];
+	write('purchaseInstallments', p.id, p);
+	return p;
+}
+
+export function updatePurchaseInstallment(id, patch) {
+	const idx = purchaseInstallments.findIndex((p) => p.id === id);
+	if (idx === -1) return;
+	const updated = { ...purchaseInstallments[idx], ...patch, id };
+	purchaseInstallments = purchaseInstallments.map((p, i) => (i === idx ? updated : p));
+	write('purchaseInstallments', id, updated);
+}
+
+export function removePurchaseInstallment(id) {
+	purchaseInstallments = purchaseInstallments.filter((p) => p.id !== id);
+	erase('purchaseInstallments', id);
+}
+
+/** Reinsere um parcelamento removido (mesmo id e dados), usado pelo "desfazer" do toast de exclusão. */
+export function restorePurchaseInstallment(p) {
+	purchaseInstallments = [...purchaseInstallments, p];
+	write('purchaseInstallments', p.id, p);
+}
+
+// ============================================================================
 // ---- backup completo (Configurações > Exportar/Importar) -----------------
 // ============================================================================
 
@@ -897,6 +936,7 @@ export async function restoreBackup(data) {
 	patrimonySnapshots = data.patrimonySnapshots || [];
 	scoreSnapshots = data.scoreSnapshots || [];
 	patrimonyItemMoves = data.patrimonyItemMoves || [];
+	purchaseInstallments = data.purchaseInstallments || [];
 
 	persistLocalSnapshot();
 	if (mode !== 'api') return;
@@ -917,6 +957,7 @@ export async function restoreBackup(data) {
 		...patrimonySnapshots.map((s) => apiPut('patrimonySnapshots', s.id, s)),
 		...patrimonyItemMoves.map((m) => apiPut('patrimonyItemMoves', m.id, m)),
 		...scoreSnapshots.map((s) => apiPut('scoreSnapshots', s.id, s)),
+		...purchaseInstallments.map((p) => apiPut('purchaseInstallments', p.id, p)),
 		apiPut('reportSchedule', 'singleton', reportSchedule),
 		apiPut('alertThresholds', 'singleton', alertThresholds),
 		apiPut('budgetGlobal', 'singleton', budgetGlobal),
@@ -970,7 +1011,8 @@ export function clearAllData() {
 		patrimonyItems: patrimonyItems.map((p) => p.id),
 		patrimonySnapshots: patrimonySnapshots.map((s) => s.id),
 		patrimonyItemMoves: patrimonyItemMoves.map((m) => m.id),
-		scoreSnapshots: scoreSnapshots.map((s) => s.id)
+		scoreSnapshots: scoreSnapshots.map((s) => s.id),
+		purchaseInstallments: purchaseInstallments.map((p) => p.id)
 	};
 
 	accounts = [];
@@ -988,6 +1030,7 @@ export function clearAllData() {
 	patrimonySnapshots = [];
 	patrimonyItemMoves = [];
 	scoreSnapshots = [];
+	purchaseInstallments = [];
 
 	for (const [collection, list] of Object.entries(ids)) {
 		list.forEach((id) => erase(collection, id));

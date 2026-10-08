@@ -22,7 +22,7 @@ export function saveLocal(data) {
 	}
 }
 
-/** @returns {Promise<{finAccounts:any[], finCategories:any[], finTransactions:any[], goals:any[], reportTemplates:any[], reportHistory:any[], reportSchedule:any, alertThresholds:any}|null>} */
+/** @returns {Promise<{finAccounts:any[], finCategories:any[], finTransactions:any[], goals:any[], reportTemplates:any[], reportHistory:any[], reportSchedule:any, alertThresholds:any, purchaseInstallments:any[]}|null>} */
 export async function fetchRemoteState() {
 	try {
 		const res = await fetch('/api/plena/state', { headers: { accept: 'application/json' } });

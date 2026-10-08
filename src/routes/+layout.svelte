@@ -21,7 +21,8 @@
 		EyeOff,
 		Plus,
 		Wand2,
-		Settings
+		Settings,
+		CreditCard
 	} from 'lucide-svelte';
 	import { upcomingDue } from '$lib/fin/derived.js';
 	import GlobalSearch from '$lib/components/GlobalSearch.svelte';
@@ -67,7 +68,8 @@
 			items: [
 				{ href: '/movimentacoes', label: t('nav_movimentacoes'), icon: ReceiptText },
 				{ href: '/contas', label: t('nav_contas'), icon: WalletCards },
-				{ href: '/categorias', label: t('nav_categorias'), icon: Tags }
+				{ href: '/categorias', label: t('nav_categorias'), icon: Tags },
+				{ href: '/parcelamentos', label: t('nav_parcelamentos'), icon: CreditCard }
 			]
 		},
 		{
