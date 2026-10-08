@@ -1,0 +1,16 @@
+# Permite acesso público ao manifest e outros arquivos estáticos necessários
+/manifest.webmanifest
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=86400
+
+/icons/*
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=31536000
+
+/*.css
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=86400
+
+/*.js
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=86400
