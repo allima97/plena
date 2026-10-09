@@ -17,7 +17,8 @@ const ARRAY_COLLECTIONS = [
 	'patrimonyItems',
 	'patrimonySnapshots',
 	'patrimonyItemMoves',
-	'scoreSnapshots'
+	'scoreSnapshots',
+	'purchaseInstallments'
 ];
 const SINGLETON_COLLECTIONS = ['reportSchedule', 'alertThresholds', 'settings', 'budgetGlobal'];
 
@@ -50,6 +51,7 @@ export async function GET({ platform }) {
 		patrimonySnapshots: [],
 		patrimonyItemMoves: [],
 		scoreSnapshots: [],
+		purchaseInstallments: [],
 		budgetGlobal: null
 	};
 
