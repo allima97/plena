@@ -4,12 +4,14 @@
 	import { showToast } from '$lib/toast.svelte.js';
 	import PurchaseInstallmentModal from '$lib/components/PurchaseInstallmentModal.svelte';
 	import InstallmentPaymentModal from '$lib/components/InstallmentPaymentModal.svelte';
-	import { Plus, Trash2, Pencil, Calendar, CreditCard, CheckCircle2, Circle, ChevronDown, ChevronUp } from 'lucide-svelte';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import { Plus, Trash2, Pencil, Calendar, CreditCard, CheckCircle2, Circle, ChevronDown, ChevronUp, Archive, ArchiveRestore } from 'lucide-svelte';
 
 	let modal = $state({ open: false, editing: null });
 	let paymentModal = $state({ open: false, installment: null, installmentNumber: null });
-	let deleting = $state(null);
+	let confirmDelete = $state({ open: false, target: null });
 	let expanded = $state({}); // installmentId -> expanded?
+	let showArchived = $state(false);
 
 	const MONTH_ABBR = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
@@ -25,27 +27,37 @@
 		return dates;
 	}
 
-	// Agrupa parcelas por mês (apenas pendentes)
+	// Verifica se todas as parcelas estão pagas
+	function isCompleted(inst) {
+		return (inst.payments || []).length >= inst.installmentCount;
+	}
+
+	// Agrupa parcelas por mês (apenas pendentes, apenas não-arquivadas)
 	function groupByMonth(installments) {
 		const groups = {};
-		installments.forEach((inst) => {
-			const dates = generateInstallmentDates(inst.firstDate, inst.installmentCount);
-			dates.forEach((date, idx) => {
-				const payment = inst.payments?.find((p) => p.installmentNumber === idx + 1);
-				if (payment) return; // já paga
-				const monthKey = date.substring(0, 7); // YYYY-MM
-				if (!groups[monthKey]) groups[monthKey] = [];
-				const installmentValue = inst.totalValue / inst.installmentCount;
-				groups[monthKey].push({
-					...inst,
-					installmentNumber: idx + 1,
-					installmentDate: date,
-					installmentValue
+		installments
+			.filter((inst) => !inst.archived)
+			.forEach((inst) => {
+				const dates = generateInstallmentDates(inst.firstDate, inst.installmentCount);
+				dates.forEach((date, idx) => {
+					const payment = inst.payments?.find((p) => p.installmentNumber === idx + 1);
+					if (payment) return; // já paga
+					const monthKey = date.substring(0, 7); // YYYY-MM
+					if (!groups[monthKey]) groups[monthKey] = [];
+					const installmentValue = inst.totalValue / inst.installmentCount;
+					groups[monthKey].push({
+						...inst,
+						installmentNumber: idx + 1,
+						installmentDate: date,
+						installmentValue
+					});
 				});
 			});
-		});
 		return groups;
 	}
+
+	const activeInstallments = $derived(appState.purchaseInstallments.filter((i) => !i.archived));
+	const archivedInstallments = $derived(appState.purchaseInstallments.filter((i) => i.archived));
 
 	const monthlyGroups = $derived.by(() => {
 		return groupByMonth(appState.purchaseInstallments);
@@ -68,7 +80,16 @@
 		modal = { open: true, editing: inst };
 	}
 
+	// Abre confirmação antes de excluir
 	function handleDelete(inst) {
+		confirmDelete = { open: true, target: inst };
+	}
+
+	// Executa a exclusão após confirmação
+	function confirmDeleteNow() {
+		const inst = confirmDelete.target;
+		confirmDelete = { open: false, target: null };
+		if (!inst) return;
 		const snapshot = { ...inst };
 		removePurchaseInstallment(inst.id);
 		showToast({
@@ -76,6 +97,22 @@
 			actionLabel: 'DESFAZER',
 			onAction: () => restorePurchaseInstallment(snapshot)
 		});
+	}
+
+	// Arquiva um parcelamento finalizado
+	function handleArchive(inst) {
+		updatePurchaseInstallment(inst.id, { archived: true });
+		showToast({
+			message: `"${inst.description || 'Parcelamento'}" arquivado.`,
+			actionLabel: 'DESFAZER',
+			onAction: () => updatePurchaseInstallment(inst.id, { archived: false })
+		});
+	}
+
+	// Desarquiva um parcelamento
+	function handleUnarchive(inst) {
+		updatePurchaseInstallment(inst.id, { archived: false });
+		showToast({ message: `"${inst.description || 'Parcelamento'}" restaurado.` });
 	}
 
 	function toggleExpand(instId) {
@@ -113,12 +150,12 @@
 		modal = { ...modal, open: false };
 	}
 
-	// Calcula estatísticas
+	// Calcula estatísticas (apenas ativos)
 	const stats = $derived.by(() => {
 		let total = 0;
 		let paid = 0;
 		let pending = 0;
-		appState.purchaseInstallments.forEach((inst) => {
+		activeInstallments.forEach((inst) => {
 			const count = inst.installmentCount;
 			const paidCount = (inst.payments || []).length;
 			total += count;
@@ -138,7 +175,7 @@
 </div>
 
 <!-- Resumo geral -->
-{#if appState.purchaseInstallments.length > 0}
+{#if activeInstallments.length > 0}
 	<div class="stats-row">
 		<div class="stat-card">
 			<p class="stat-label">Total de parcelas</p>
@@ -155,93 +192,111 @@
 	</div>
 {/if}
 
-{#if appState.purchaseInstallments.length === 0}
+{#if activeInstallments.length === 0 && archivedInstallments.length === 0}
 	<div class="empty-state">
 		<CreditCard size={48} style="opacity:0.3;margin-bottom:16px" />
 		<p>Nenhum parcelamento cadastrado.</p>
 		<p class="empty-sub">Use o botão acima para adicionar suas compras parceladas.</p>
 	</div>
 {:else}
-	<!-- Lista de todos os parcelamentos -->
-	<section class="card" style="margin-bottom:24px">
-		<h3 style="margin:0 0 16px 0;font-size:16px">Todos os parcelamentos</h3>
-		<div class="installments-list">
-			{#each appState.purchaseInstallments as inst (inst.id)}
-				{@const dates = generateInstallmentDates(inst.firstDate, inst.installmentCount)}
-				{@const isExpanded = expanded[inst.id]}
-				<div class="installment-item">
-					<div class="installment-main">
-						<div class="installment-header">
-							<span class="installment-desc">{inst.description || 'Sem descrição'}</span>
-							<span class="badge">{inst.installmentCount}x</span>
-						</div>
-						<p class="installment-meta">
-							{inst.paymentMethod}
-						</p>
-						<div class="installment-values">
-							<span class="privacy-value">{fmtMoney(inst.totalValue)}</span>
-							<span class="installment-unit">({fmtMoney(inst.totalValue / inst.installmentCount)}/mês)</span>
-						</div>
-						<p class="installment-dates">
-							<Calendar size={12} style="vertical-align:-1px;margin-right:4px" />
-							{fmtDate(inst.firstDate)} – {fmtDate(dates[inst.installmentCount - 1])}
-						</p>
-						<p class="installment-progress">
-							{(inst.payments || []).length} de {inst.installmentCount} parcelas pagas
-						</p>
-					</div>
-					<div class="installment-actions">
-						<button class="btn btn-ghost sm" onclick={() => toggleExpand(inst.id)} title="Ver parcelas">
-							{#if isExpanded}<ChevronUp size={14} />{:else}<ChevronDown size={14} />{/if}
-						</button>
-						<button class="btn btn-ghost sm" onclick={() => openEdit(inst)} title="Editar"><Pencil size={14} /></button>
-						<button class="btn btn-danger sm" onclick={() => handleDelete(inst)} title="Excluir"><Trash2 size={14} /></button>
-					</div>
-				</div>
-
-				{#if isExpanded}
-					<div class="installment-details">
-						{#each dates as date, idx (idx)}
-							{@const installmentNumber = idx + 1}
-							{@const payment = inst.payments?.find((p) => p.installmentNumber === installmentNumber)}
-							{@const installmentValue = inst.totalValue / inst.installmentCount}
-							<div class="installment-row" class:paid={payment}>
-								<div class="installment-row-main">
-									<span class="installment-number">{installmentNumber}/{inst.installmentCount}</span>
-									<span class="installment-row-date">{fmtDate(date)}</span>
-									<span class="installment-row-value privacy-value">{fmtMoney(installmentValue)}</span>
-								</div>
-								<div class="installment-row-info">
-									{#if payment}
-										<span class="badge badge-green">
-											<CheckCircle2 size={11} style="vertical-align:-1px;margin-right:3px" />
-											Pago em {fmtDate(payment.paymentDate)}
-										</span>
-										<span class="payment-method">{payment.paymentMethod}</span>
-										<button class="btn btn-ghost sm" onclick={() => unmarkAsPaid(inst, installmentNumber)} title="Desmarcar como pago">
-											<Circle size={12} />
-										</button>
-									{:else}
-										<button class="btn btn-sm" onclick={() => openPaymentModal(inst, installmentNumber)}>
-											<CheckCircle2 size={12} style="vertical-align:-1px;margin-right:4px" />
-											Marcar como pago
-										</button>
-									{/if}
-								</div>
+	<!-- Lista de parcelamentos ativos -->
+	{#if activeInstallments.length > 0}
+		<section class="card" style="margin-bottom:24px">
+			<h3 style="margin:0 0 16px 0;font-size:16px">Todos os parcelamentos</h3>
+			<div class="installments-list">
+				{#each activeInstallments as inst (inst.id)}
+					{@const dates = generateInstallmentDates(inst.firstDate, inst.installmentCount)}
+					{@const isExpanded = expanded[inst.id]}
+					{@const completed = isCompleted(inst)}
+					<div class="installment-item" class:completed>
+						<div class="installment-main">
+							<div class="installment-header">
+								<span class="installment-desc">{inst.description || 'Sem descrição'}</span>
+								<span class="badge">{inst.installmentCount}x</span>
+								{#if completed}
+									<span class="badge badge-green" style="font-size:11px">
+										<CheckCircle2 size={11} style="vertical-align:-1px;margin-right:3px" />
+										Finalizado
+									</span>
+								{/if}
 							</div>
-						{/each}
+							<p class="installment-meta">
+								{inst.paymentMethod}
+							</p>
+							<div class="installment-values">
+								<span class="privacy-value">{fmtMoney(inst.totalValue)}</span>
+								<span class="installment-unit">({fmtMoney(inst.totalValue / inst.installmentCount)}/mês)</span>
+							</div>
+							<p class="installment-dates">
+								<Calendar size={12} style="vertical-align:-1px;margin-right:4px" />
+								{fmtDate(inst.firstDate)} – {fmtDate(dates[inst.installmentCount - 1])}
+							</p>
+							<p class="installment-progress">
+								{(inst.payments || []).length} de {inst.installmentCount} parcelas pagas
+							</p>
+						</div>
+						<div class="installment-actions">
+							<button class="btn btn-ghost sm" onclick={() => toggleExpand(inst.id)} title="Ver parcelas">
+								{#if isExpanded}<ChevronUp size={14} />{:else}<ChevronDown size={14} />{/if}
+							</button>
+							<button class="btn btn-ghost sm" onclick={() => openEdit(inst)} title="Editar"><Pencil size={14} /></button>
+							{#if completed}
+								<button class="btn btn-ghost sm" onclick={() => handleArchive(inst)} title="Arquivar parcelamento finalizado" style="color:var(--text-muted)">
+									<Archive size={14} />
+								</button>
+							{/if}
+							<button class="btn btn-danger sm" onclick={() => handleDelete(inst)} title="Excluir"><Trash2 size={14} /></button>
+						</div>
 					</div>
-				{/if}
-			{/each}
+
+					{#if isExpanded}
+						<div class="installment-details">
+							{#each dates as date, idx (idx)}
+								{@const installmentNumber = idx + 1}
+								{@const payment = inst.payments?.find((p) => p.installmentNumber === installmentNumber)}
+								{@const installmentValue = inst.totalValue / inst.installmentCount}
+								<div class="installment-row" class:paid={payment}>
+									<div class="installment-row-main">
+										<span class="installment-number">{installmentNumber}/{inst.installmentCount}</span>
+										<span class="installment-row-date">{fmtDate(date)}</span>
+										<span class="installment-row-value privacy-value">{fmtMoney(installmentValue)}</span>
+									</div>
+									<div class="installment-row-info">
+										{#if payment}
+											<span class="badge badge-green">
+												<CheckCircle2 size={11} style="vertical-align:-1px;margin-right:3px" />
+												Pago em {fmtDate(payment.paymentDate)}
+											</span>
+											<span class="payment-method">{payment.paymentMethod}</span>
+											<button class="btn btn-ghost sm" onclick={() => unmarkAsPaid(inst, installmentNumber)} title="Desmarcar como pago">
+												<Circle size={12} />
+											</button>
+										{:else}
+											<button class="btn btn-sm" onclick={() => openPaymentModal(inst, installmentNumber)}>
+												<CheckCircle2 size={12} style="vertical-align:-1px;margin-right:4px" />
+												Marcar como pago
+											</button>
+										{/if}
+									</div>
+								</div>
+							{/each}
+						</div>
+					{/if}
+				{/each}
+			</div>
+		</section>
+	{:else if archivedInstallments.length > 0}
+		<div class="empty-state" style="padding:32px 24px">
+			<CheckCircle2 size={40} style="opacity:0.3;margin-bottom:12px" />
+			<p>Todos os parcelamentos foram finalizados e arquivados.</p>
+			<p class="empty-sub">Adicione novos ou confira os arquivados abaixo.</p>
 		</div>
-	</section>
+	{/if}
 
 	<!-- Resumo mês a mês -->
-	<section class="card">
-		<h3 style="margin:0 0 16px 0;font-size:16px">Compromissos por mês</h3>
-		{#if sortedMonths.length === 0}
-			<p class="empty">Nenhuma parcela pendente.</p>
-		{:else}
+	{#if sortedMonths.length > 0}
+		<section class="card" style="margin-bottom:24px">
+			<h3 style="margin:0 0 16px 0;font-size:16px">Compromissos por mês</h3>
 			<div class="monthly-summary">
 				{#each sortedMonths as month (month)}
 					{@const items = monthlyGroups[month]}
@@ -262,12 +317,99 @@
 					</div>
 				{/each}
 			</div>
-		{/if}
-	</section>
+		</section>
+	{/if}
+
+	<!-- Seção de arquivados -->
+	{#if archivedInstallments.length > 0}
+		<section class="card archived-section">
+			<button class="archived-toggle" onclick={() => (showArchived = !showArchived)}>
+				<span style="display:flex;align-items:center;gap:8px">
+					<Archive size={15} style="opacity:0.6" />
+					<span>Arquivados</span>
+					<span class="badge">{archivedInstallments.length}</span>
+				</span>
+				{#if showArchived}<ChevronUp size={16} />{:else}<ChevronDown size={16} />{/if}
+			</button>
+
+			{#if showArchived}
+				<div class="installments-list" style="margin-top:16px">
+					{#each archivedInstallments as inst (inst.id)}
+						{@const dates = generateInstallmentDates(inst.firstDate, inst.installmentCount)}
+						{@const isExpanded = expanded[inst.id]}
+						<div class="installment-item archived-item">
+							<div class="installment-main">
+								<div class="installment-header">
+									<span class="installment-desc">{inst.description || 'Sem descrição'}</span>
+									<span class="badge">{inst.installmentCount}x</span>
+									<span class="badge badge-green" style="font-size:11px">
+										<CheckCircle2 size={11} style="vertical-align:-1px;margin-right:3px" />
+										Finalizado
+									</span>
+								</div>
+								<p class="installment-meta">{inst.paymentMethod}</p>
+								<div class="installment-values">
+									<span class="privacy-value">{fmtMoney(inst.totalValue)}</span>
+									<span class="installment-unit">({fmtMoney(inst.totalValue / inst.installmentCount)}/mês)</span>
+								</div>
+								<p class="installment-dates">
+									<Calendar size={12} style="vertical-align:-1px;margin-right:4px" />
+									{fmtDate(inst.firstDate)} – {fmtDate(dates[inst.installmentCount - 1])}
+								</p>
+							</div>
+							<div class="installment-actions">
+								<button class="btn btn-ghost sm" onclick={() => toggleExpand(inst.id)} title="Ver parcelas">
+									{#if isExpanded}<ChevronUp size={14} />{:else}<ChevronDown size={14} />{/if}
+								</button>
+								<button class="btn btn-ghost sm" onclick={() => handleUnarchive(inst)} title="Restaurar" style="color:var(--text-muted)">
+									<ArchiveRestore size={14} />
+								</button>
+								<button class="btn btn-danger sm" onclick={() => handleDelete(inst)} title="Excluir"><Trash2 size={14} /></button>
+							</div>
+						</div>
+
+						{#if isExpanded}
+							<div class="installment-details">
+								{#each dates as date, idx (idx)}
+									{@const installmentNumber = idx + 1}
+									{@const payment = inst.payments?.find((p) => p.installmentNumber === installmentNumber)}
+									{@const installmentValue = inst.totalValue / inst.installmentCount}
+									<div class="installment-row" class:paid={payment}>
+										<div class="installment-row-main">
+											<span class="installment-number">{installmentNumber}/{inst.installmentCount}</span>
+											<span class="installment-row-date">{fmtDate(date)}</span>
+											<span class="installment-row-value privacy-value">{fmtMoney(installmentValue)}</span>
+										</div>
+										<div class="installment-row-info">
+											{#if payment}
+												<span class="badge badge-green">
+													<CheckCircle2 size={11} style="vertical-align:-1px;margin-right:3px" />
+													Pago em {fmtDate(payment.paymentDate)}
+												</span>
+												<span class="payment-method">{payment.paymentMethod}</span>
+											{/if}
+										</div>
+									</div>
+								{/each}
+							</div>
+						{/if}
+					{/each}
+				</div>
+			{/if}
+		</section>
+	{/if}
 {/if}
 
 <PurchaseInstallmentModal open={modal.open} editing={modal.editing} onClose={() => (modal = { ...modal, open: false })} onSaved={handleSaved} />
 <InstallmentPaymentModal open={paymentModal.open} installment={paymentModal.installment} installmentNumber={paymentModal.installmentNumber} onClose={() => (paymentModal = { ...paymentModal, open: false })} onPaid={markAsPaid} />
+<ConfirmDialog
+	open={confirmDelete.open}
+	title="Excluir parcelamento"
+	message={confirmDelete.target ? `Tem certeza que deseja excluir "${confirmDelete.target.description || 'este parcelamento'}"? Esta ação não pode ser desfeita.` : ''}
+	confirmLabel="Excluir"
+	onConfirm={confirmDeleteNow}
+	onCancel={() => (confirmDelete = { open: false, target: null })}
+/>
 
 <style>
 	.stats-row {
@@ -294,6 +436,15 @@
 		background: var(--card-bg);
 	}
 
+	.installment-item.completed {
+		border-color: var(--color-green, #16a34a);
+		border-left-width: 3px;
+	}
+
+	.installment-item.archived-item {
+		opacity: 0.75;
+	}
+
 	.installment-main {
 		flex: 1;
 		min-width: 0;
@@ -304,6 +455,7 @@
 		align-items: center;
 		gap: 8px;
 		margin-bottom: 4px;
+		flex-wrap: wrap;
 	}
 
 	.installment-desc {
@@ -466,6 +618,28 @@
 
 	.detail-value {
 		font-weight: 600;
+	}
+
+	.archived-section {
+		opacity: 0.9;
+	}
+
+	.archived-toggle {
+		width: 100%;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		background: none;
+		border: none;
+		padding: 0;
+		cursor: pointer;
+		font-size: 16px;
+		font-weight: 500;
+		color: var(--text);
+	}
+
+	.archived-toggle:hover {
+		color: var(--accent);
 	}
 
 	.empty-state {
