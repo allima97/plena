@@ -231,6 +231,26 @@ export async function boot() {
 	purchaseInstallments = remote.purchaseInstallments || purchaseInstallments;
 	mode = 'api';
 	persistLocalSnapshot();
+
+	// Reconcilia dados locais com o D1: envia ao servidor qualquer item que exista
+	// no localStorage mas ainda não esteja no D1 (ex.: parcelamentos criados antes
+	// da coleção ser reconhecida pela API, quando apiPut retornava 400 silencioso).
+	if (local) {
+		const SYNC_KEYS = [
+			'finAccounts', 'finCategories', 'finTransactions', 'reportTemplates', 'reportHistory',
+			'goals', 'resources', 'resourceMoves', 'goalCategories', 'installments', 'amortizations',
+			'patrimonyItems', 'patrimonySnapshots', 'patrimonyItemMoves', 'scoreSnapshots',
+			'purchaseInstallments'
+		];
+		const pushOps = [];
+		for (const key of SYNC_KEYS) {
+			const remoteIds = new Set((remote[key] || []).map((i) => i.id));
+			for (const item of local[key] || []) {
+				if (!remoteIds.has(item.id)) pushOps.push(apiPut(key, item.id, item));
+			}
+		}
+		if (pushOps.length > 0) await Promise.all(pushOps);
+	}
 }
 
 function afterSync(ok, opIfFailed) {
