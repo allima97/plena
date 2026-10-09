@@ -862,7 +862,7 @@ export function upsertScoreSnapshot(mKey, data) {
 // ============================================================================
 
 export function addPurchaseInstallment(data) {
-	const p = { id: uid(), createdAt: new Date().toISOString(), ...data };
+	const p = { id: uid(), createdAt: new Date().toISOString(), payments: [], ...data };
 	purchaseInstallments = [...purchaseInstallments, p];
 	write('purchaseInstallments', p.id, p);
 	return p;

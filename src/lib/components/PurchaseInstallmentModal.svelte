@@ -11,8 +11,7 @@
 			totalValue: '',
 			installmentCount: '',
 			firstDate: todayISO(),
-			paymentMethod: '',
-			paidUpTo: null
+			paymentMethod: ''
 		};
 	}
 
@@ -26,8 +25,7 @@
 					totalValue: editing.totalValue,
 					installmentCount: editing.installmentCount,
 					firstDate: editing.firstDate,
-					paymentMethod: editing.paymentMethod || '',
-					paidUpTo: editing.paidUpTo || null
+					paymentMethod: editing.paymentMethod || ''
 				}
 			: blank();
 	});
@@ -41,8 +39,7 @@
 			totalValue: Number(form.totalValue) || 0,
 			installmentCount: Number(form.installmentCount) || 1,
 			firstDate: form.firstDate,
-			paymentMethod: form.paymentMethod.trim(),
-			paidUpTo: form.paidUpTo ? Number(form.paidUpTo) : null
+			paymentMethod: form.paymentMethod.trim()
 		};
 
 		let installment;
@@ -116,16 +113,6 @@
 				</div>
 				<p class="preview-value">Valor de cada parcela: <strong>R$ {installmentValue.toFixed(2)}</strong></p>
 			</div>
-		{/if}
-
-		{#if editing}
-			<label class="field checkbox-field">
-				<span>&nbsp;</span>
-				<label class="checkbox-row">
-					<input type="checkbox" bind:checked={form.paidUpTo} />
-					Marcar como quitado (todas as parcelas já foram pagas)
-				</label>
-			</label>
 		{/if}
 
 		<div class="modal-footer">
