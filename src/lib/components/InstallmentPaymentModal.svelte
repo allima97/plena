@@ -7,6 +7,8 @@
 	let paymentDate = $state(todayISO());
 	let paymentMethod = $state('');
 
+	const existingPayment = $derived(installment?.payments?.find((p) => p.installmentNumber === installmentNumber));
+
 	// Calcula a data de vencimento da parcela
 	const dueDate = $derived.by(() => {
 		if (!installment || !installment.firstDate) return '';
@@ -23,14 +25,14 @@
 	}
 
 	$effect(() => {
-		if (!open) {
-			paymentDate = todayISO();
-			paymentMethod = '';
+		if (open) {
+			paymentDate = existingPayment?.paymentDate || todayISO();
+			paymentMethod = existingPayment?.paymentMethod || '';
 		}
 	});
 </script>
 
-<Modal {open} {onClose} title="Marcar parcela como paga" maxWidth="400px">
+<Modal {open} {onClose} title={existingPayment ? 'Editar pagamento' : 'Marcar parcela como paga'} maxWidth="400px">
 	<form onsubmit={submit} class="movement-form">
 		<p style="margin:0 0 16px 0;color:var(--text-muted)">
 			Parcela {installmentNumber}/{installment?.installmentCount} de <strong>{installment?.description || 'sem descrição'}</strong>
@@ -53,8 +55,28 @@
 		</label>
 
 		<div class="modal-footer">
-			<button type="submit" class="btn btn-primary">Marcar como pago</button>
+			<button type="submit" class="btn btn-primary">{existingPayment ? 'Salvar alterações' : 'Marcar como paga'}</button>
 			<button type="button" class="btn btn-ghost" onclick={onClose}>Cancelar</button>
 		</div>
 	</form>
 </Modal>
+
+<style>
+	.movement-form {
+		min-width: 0;
+		overflow-wrap: anywhere;
+	}
+	.field, .field-input {
+		min-width: 0;
+		max-width: 100%;
+	}
+	@media (max-width: 480px) {
+		.modal-footer {
+			flex-direction: column;
+		}
+		.modal-footer .btn {
+			width: 100%;
+			white-space: normal;
+		}
+	}
+</style>

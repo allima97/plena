@@ -1,6 +1,6 @@
 <script>
 	import { appState, addPurchaseInstallment, updatePurchaseInstallment, removePurchaseInstallment, restorePurchaseInstallment } from '$lib/fin/store.svelte.js';
-	import { fmtMoney, fmtDate, todayISO } from '$lib/format.js';
+	import { fmtMoney, fmtDate } from '$lib/format.js';
 	import { showToast } from '$lib/toast.svelte.js';
 	import PurchaseInstallmentModal from '$lib/components/PurchaseInstallmentModal.svelte';
 	import InstallmentPaymentModal from '$lib/components/InstallmentPaymentModal.svelte';
@@ -126,7 +126,7 @@
 	function markAsPaid(inst, installmentNumber, paymentDate, paymentMethod) {
 		const payments = inst.payments || [];
 		const existingIndex = payments.findIndex((p) => p.installmentNumber === installmentNumber);
-		const payment = { installmentNumber, paymentDate, paymentMethod };
+		const payment = { ...payments[existingIndex], installmentNumber, paymentDate, paymentMethod };
 
 		let newPayments;
 		if (existingIndex >= 0) {
@@ -137,7 +137,7 @@
 
 		updatePurchaseInstallment(inst.id, { payments: newPayments });
 		paymentModal = { ...paymentModal, open: false };
-		showToast({ message: `Parcela ${installmentNumber}/${inst.installmentCount} marcada como paga.` });
+		showToast({ message: `Parcela ${installmentNumber}/${inst.installmentCount} ${existingIndex >= 0 ? 'atualizada' : 'marcada como paga'}.` });
 	}
 
 	function unmarkAsPaid(inst, installmentNumber) {
@@ -268,13 +268,16 @@
 												Pago em {fmtDate(payment.paymentDate)}
 											</span>
 											<span class="payment-method">{payment.paymentMethod}</span>
+											<button class="btn btn-ghost sm" onclick={() => openPaymentModal(inst, installmentNumber)} title="Editar pagamento">
+												<Pencil size={12} /> Editar pagamento
+											</button>
 											<button class="btn btn-ghost sm" onclick={() => unmarkAsPaid(inst, installmentNumber)} title="Desmarcar como pago">
 												<Circle size={12} />
 											</button>
 										{:else}
 											<button class="btn btn-sm" onclick={() => openPaymentModal(inst, installmentNumber)}>
 												<CheckCircle2 size={12} style="vertical-align:-1px;margin-right:4px" />
-												Marcar como pago
+												Marcar como paga
 											</button>
 										{/if}
 									</div>
@@ -387,6 +390,9 @@
 													Pago em {fmtDate(payment.paymentDate)}
 												</span>
 												<span class="payment-method">{payment.paymentMethod}</span>
+												<button class="btn btn-ghost sm" onclick={() => openPaymentModal(inst, installmentNumber)} title="Editar pagamento">
+													<Pencil size={12} /> Editar pagamento
+												</button>
 											{/if}
 										</div>
 									</div>
@@ -511,6 +517,8 @@
 	}
 
 	.installment-row {
+		flex-wrap: wrap;
+		min-width: 0;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
@@ -527,6 +535,8 @@
 	}
 
 	.installment-row-main {
+		flex-wrap: wrap;
+		min-width: 0;
 		display: flex;
 		align-items: center;
 		gap: 12px;
@@ -550,13 +560,16 @@
 	}
 
 	.installment-row-info {
+		flex-wrap: wrap;
+		min-width: 0;
+		max-width: 100%;
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		flex-shrink: 0;
 	}
 
 	.payment-method {
+		overflow-wrap: anywhere;
 		font-size: 12px;
 		color: var(--text-muted);
 	}
@@ -651,5 +664,40 @@
 	.empty-sub {
 		font-size: 14px;
 		margin-top: 8px;
+	}
+	@media (max-width: 640px) {
+		.installment-item {
+			flex-wrap: wrap;
+		}
+		.installment-actions {
+			flex-wrap: wrap;
+		}
+		.installment-values {
+			flex-wrap: wrap;
+		}
+		.installment-row {
+			flex-direction: column;
+			align-items: stretch;
+		}
+		.installment-row-main {
+			gap: 8px;
+		}
+		.installment-row-info .btn {
+			white-space: normal;
+			max-width: 100%;
+		}
+		.installment-row-info {
+			width: 100%;
+		}
+		.month-detail-item {
+			grid-template-columns: minmax(0, 1fr) auto;
+		}
+		.detail-meta {
+			grid-column: 1 / -1;
+			white-space: normal;
+		}
+		.detail-desc, .installment-desc {
+			overflow-wrap: anywhere;
+		}
 	}
 </style>
