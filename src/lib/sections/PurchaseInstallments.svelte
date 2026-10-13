@@ -265,7 +265,7 @@
 										{#if payment}
 											<span class="badge badge-green">
 												<CheckCircle2 size={11} style="vertical-align:-1px;margin-right:3px" />
-												Pago em {fmtDate(payment.paymentDate)}
+												<span>Pago em {fmtDate(payment.paymentDate)}</span>
 											</span>
 											<span class="payment-method">{payment.paymentMethod}</span>
 											<button class="btn btn-ghost sm" onclick={() => openPaymentModal(inst, installmentNumber)} title="Editar pagamento">
@@ -277,7 +277,7 @@
 										{:else}
 											<button class="btn btn-sm" onclick={() => openPaymentModal(inst, installmentNumber)}>
 												<CheckCircle2 size={12} style="vertical-align:-1px;margin-right:4px" />
-												Marcar como paga
+												<span>Marcar como paga</span>
 											</button>
 										{/if}
 									</div>
@@ -387,7 +387,7 @@
 											{#if payment}
 												<span class="badge badge-green">
 													<CheckCircle2 size={11} style="vertical-align:-1px;margin-right:3px" />
-													Pago em {fmtDate(payment.paymentDate)}
+													<span>Pago em {fmtDate(payment.paymentDate)}</span>
 												</span>
 												<span class="payment-method">{payment.paymentMethod}</span>
 												<button class="btn btn-ghost sm" onclick={() => openPaymentModal(inst, installmentNumber)} title="Editar pagamento">
@@ -507,6 +507,8 @@
 	}
 
 	.installment-details {
+		min-width: 0;
+		max-width: 100%;
 		display: flex;
 		flex-direction: column;
 		gap: 8px;
@@ -566,6 +568,22 @@
 		display: flex;
 		align-items: center;
 		gap: 8px;
+	}
+
+	.installment-row-info .badge,
+	.installment-row-info .btn {
+		min-width: 0;
+		max-width: 100%;
+		white-space: normal;
+		overflow-wrap: anywhere;
+	}
+
+	.installment-row-info :global(svg) {
+		flex-shrink: 0;
+	}
+
+	.installment-row-info span {
+		min-width: 0;
 	}
 
 	.payment-method {
@@ -682,12 +700,26 @@
 		.installment-row-main {
 			gap: 8px;
 		}
-		.installment-row-info .btn {
-			white-space: normal;
-			max-width: 100%;
+		.installment-details {
+			padding: 8px;
 		}
 		.installment-row-info {
+			display: grid;
+			grid-template-columns: minmax(0, 1fr);
 			width: 100%;
+		}
+		.installment-row-info .badge {
+			justify-self: start;
+		}
+		.installment-row-info .btn {
+			width: 100%;
+			min-height: 40px;
+			height: auto;
+			padding: 8px 10px;
+		}
+		.installment-row-info .btn[title="Desmarcar como pago"] {
+			width: auto;
+			justify-self: end;
 		}
 		.month-detail-item {
 			grid-template-columns: minmax(0, 1fr) auto;
