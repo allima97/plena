@@ -676,13 +676,14 @@
 
 	.month-detail-item {
 		display: grid;
-		grid-template-columns: auto 1fr auto;
+		grid-template-columns: minmax(0, 1fr) auto;
 		gap: 8px;
 		align-items: center;
 		font-size: 13px;
 	}
 
 	.detail-meta {
+		grid-column: 1 / -1;
 		font-weight: 700;
 		color: var(--ink);
 		white-space: nowrap;
