@@ -198,7 +198,7 @@
 			<p class="stat-amount privacy-value">{fmtMoney(stats.pendingAmount)}</p>
 		</div>
 		<div class="stat-card remaining-months">
-			<p class="stat-label">Meses com parcelas pendentes</p>
+			<p class="stat-label">Meses</p>
 			<p class="font-display stat-value">{sortedMonths.length}</p>
 			{#if sortedMonths.length > 0}
 				<p class="stat-month">Próxima: <strong>{formatMonthLabel(sortedMonths[0])}</strong> - Última: <strong>{formatMonthLabel(sortedMonths[sortedMonths.length - 1])}</strong></p>
