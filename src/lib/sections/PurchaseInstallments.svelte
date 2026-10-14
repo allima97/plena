@@ -277,7 +277,7 @@
 											</span>
 											<span class="payment-method">{payment.paymentMethod}</span>
 											<button class="btn btn-ghost sm" onclick={() => openPaymentModal(inst, installmentNumber)} title="Editar pagamento">
-												<Pencil size={12} /> Editar pagamento
+												<Pencil size={12} />
 											</button>
 											<button class="btn btn-ghost sm" onclick={() => unmarkAsPaid(inst, installmentNumber)} title="Desmarcar como pago">
 												<Circle size={12} />
@@ -763,6 +763,7 @@
 			height: auto;
 			padding: 8px 10px;
 		}
+		.installment-row-info .btn[title="Editar pagamento"],
 		.installment-row-info .btn[title="Desmarcar como pago"] {
 			width: auto;
 			justify-self: end;
