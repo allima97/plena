@@ -535,7 +535,8 @@
 
 	.installment-progress {
 		font-size: 13px;
-		color: var(--text-muted);
+		font-weight: 700;
+		color: var(--ink);
 		margin: 0;
 	}
 
@@ -669,7 +670,7 @@
 	.month-details {
 		display: flex;
 		flex-direction: column;
-		gap: 8px;
+		gap: 24px;
 		padding: 12px;
 	}
 
@@ -682,7 +683,8 @@
 	}
 
 	.detail-meta {
-		color: var(--text-muted);
+		font-weight: 700;
+		color: var(--ink);
 		white-space: nowrap;
 	}
 
