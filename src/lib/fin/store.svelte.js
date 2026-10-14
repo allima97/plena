@@ -1,3 +1,4 @@
+import { validateSale, validatePlan } from '$lib/goals/sales.js';
 import { loadLocal, saveLocal, fetchRemoteState, apiPut, apiRemove, fetchMe } from './persist.js';
 import { seedCategories, uid } from './seed.js';
 import { todayISO } from '../format.js';
@@ -46,6 +47,8 @@ let scoreSnapshots = $state([]);
 
 // ---- parcelamentos de compras (controle sem impacto no movimento) ----
 let purchaseInstallments = $state([]);
+let sales = $state([]);
+let salesPlans = $state([]);
 
 let mode = $state(/** @type {'loading'|'api'|'local'} */ ('loading'));
 let syncStatus = $state(/** @type {'synced'|'saving'|'error'} */ ('synced'));
@@ -55,6 +58,8 @@ let ready = $state(false);
 let user = $state(/** @type {{email:string,name:string|null,logoutUrl:string|null}|null} */ (null));
 
 export const appState = {
+	get sales() { return sales; },
+	get salesPlans() { return salesPlans; },
 	get accounts() {
 		return accounts;
 	},
@@ -150,7 +155,9 @@ function snapshot() {
 		patrimonySnapshots,
 		scoreSnapshots,
 		patrimonyItemMoves,
-		purchaseInstallments
+		purchaseInstallments,
+		sales,
+		salesPlans
 	};
 }
 
@@ -182,6 +189,8 @@ export async function boot() {
 		scoreSnapshots = local.scoreSnapshots || [];
 		patrimonyItemMoves = local.patrimonyItemMoves || [];
 		purchaseInstallments = local.purchaseInstallments || [];
+		sales = local.sales || [];
+		salesPlans = local.salesPlans || [];
 	}
 	ready = true;
 
@@ -229,6 +238,8 @@ export async function boot() {
 	scoreSnapshots = remote.scoreSnapshots || scoreSnapshots;
 	patrimonyItemMoves = remote.patrimonyItemMoves || patrimonyItemMoves;
 	purchaseInstallments = remote.purchaseInstallments || purchaseInstallments;
+	sales = remote.sales || sales;
+	salesPlans = remote.salesPlans || salesPlans;
 	mode = 'api';
 	persistLocalSnapshot();
 
@@ -240,7 +251,7 @@ export async function boot() {
 			'finAccounts', 'finCategories', 'finTransactions', 'reportTemplates', 'reportHistory',
 			'goals', 'resources', 'resourceMoves', 'goalCategories', 'installments', 'amortizations',
 			'patrimonyItems', 'patrimonySnapshots', 'patrimonyItemMoves', 'scoreSnapshots',
-			'purchaseInstallments'
+			'purchaseInstallments', 'sales', 'salesPlans'
 		];
 		const pushOps = [];
 		for (const key of SYNC_KEYS) {
@@ -957,6 +968,8 @@ export async function restoreBackup(data) {
 	scoreSnapshots = data.scoreSnapshots || [];
 	patrimonyItemMoves = data.patrimonyItemMoves || [];
 	purchaseInstallments = data.purchaseInstallments || [];
+	sales = data.sales || [];
+	salesPlans = data.salesPlans || [];
 
 	persistLocalSnapshot();
 	if (mode !== 'api') return;
@@ -978,6 +991,8 @@ export async function restoreBackup(data) {
 		...patrimonyItemMoves.map((m) => apiPut('patrimonyItemMoves', m.id, m)),
 		...scoreSnapshots.map((s) => apiPut('scoreSnapshots', s.id, s)),
 		...purchaseInstallments.map((p) => apiPut('purchaseInstallments', p.id, p)),
+		...sales.map((p) => apiPut('sales', p.id, p)),
+		...salesPlans.map((p) => apiPut('salesPlans', p.id, p)),
 		apiPut('reportSchedule', 'singleton', reportSchedule),
 		apiPut('alertThresholds', 'singleton', alertThresholds),
 		apiPut('budgetGlobal', 'singleton', budgetGlobal),
@@ -1032,7 +1047,9 @@ export function clearAllData() {
 		patrimonySnapshots: patrimonySnapshots.map((s) => s.id),
 		patrimonyItemMoves: patrimonyItemMoves.map((m) => m.id),
 		scoreSnapshots: scoreSnapshots.map((s) => s.id),
-		purchaseInstallments: purchaseInstallments.map((p) => p.id)
+		purchaseInstallments: purchaseInstallments.map((p) => p.id),
+		sales: sales.map((p) => p.id),
+		salesPlans: salesPlans.map((p) => p.id)
 	};
 
 	accounts = [];
@@ -1051,8 +1068,26 @@ export function clearAllData() {
 	patrimonyItemMoves = [];
 	scoreSnapshots = [];
 	purchaseInstallments = [];
+	sales = [];
+	salesPlans = [];
 
 	for (const [collection, list] of Object.entries(ids)) {
 		list.forEach((id) => erase(collection, id));
 	}
+}
+
+export function saveSale(data) {
+ validateSale(data);
+ const sale = { ...data, id: data.id || uid() };
+ sales = [...sales.filter((s) => s.id !== sale.id), sale];
+ write('sales', sale.id, sale);
+}
+export function removeSale(id) {
+ sales = sales.filter((s) => s.id !== id);
+ erase('sales', id);
+}
+export function saveSalesPlan(data) {
+ validatePlan(data);
+ salesPlans = [...salesPlans.filter((p) => p.id !== data.id), data];
+ write('salesPlans', data.id, data);
 }

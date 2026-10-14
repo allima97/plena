@@ -1,3 +1,4 @@
+import { validateSale, validatePlan } from '$lib/goals/sales.js';
 import { json } from '@sveltejs/kit';
 
 export const prerender = false;
@@ -22,7 +23,7 @@ const KNOWN_COLLECTIONS = [
 	'patrimonyItemMoves',
 	'scoreSnapshots',
 	'budgetGlobal',
-	'purchaseInstallments'
+	'purchaseInstallments', 'sales', 'salesPlans'
 ];
 
 function checkCollection(collection) {
@@ -35,7 +36,17 @@ export async function PUT({ platform, params, request }) {
 	if (!db) return json({ error: 'D1 não configurado' }, { status: 503 });
 	if (!checkCollection(params.collection)) return json({ error: 'Coleção desconhecida' }, { status: 400 });
 
-	const data = await request.json();
+	let data;
+ try {
+  data = await request.json();
+  if (params.collection === 'sales') validateSale(data);
+  if (params.collection === 'salesPlans') {
+   validatePlan(data);
+   if (data.id !== params.id) throw new Error('Mês da configuração inválido.');
+  }
+ } catch (error) {
+  return json({ error: error.message || 'Dados inválidos.' }, { status: 400 });
+ }
 	await db
 		.prepare(
 			'INSERT INTO documents (collection, id, data, updated_at) VALUES (?, ?, ?, ?) ' +
