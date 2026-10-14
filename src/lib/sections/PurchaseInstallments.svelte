@@ -519,9 +519,9 @@
 	}
 
 	.installment-row {
-		flex-wrap: wrap;
 		min-width: 0;
-		display: flex;
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
 		align-items: center;
 		justify-content: space-between;
 		gap: 12px;
@@ -694,7 +694,7 @@
 			flex-wrap: wrap;
 		}
 		.installment-row {
-			flex-direction: column;
+			grid-template-columns: minmax(0, 1fr);
 			align-items: stretch;
 		}
 		.installment-row-main {
