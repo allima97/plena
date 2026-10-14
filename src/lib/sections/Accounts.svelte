@@ -7,7 +7,7 @@
 	import Modal from '$lib/components/Modal.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import RowActionsModal from '$lib/components/RowActionsModal.svelte';
-	import { Plus, Wallet, CreditCard, Landmark, Pencil, Trash2 } from 'lucide-svelte';
+	import { Plus, Wallet, CreditCard, Landmark, Pencil, Trash2, Archive, ArchiveRestore } from 'lucide-svelte';
 
 	const PALETTE = ['grad-red', 'grad-purple', 'grad-blue', 'grad-dark', 'grad-orange', 'grad-green'];
 	const PALETTE_LABELS = { 'grad-red': 'Vermelho', 'grad-purple': 'Roxo', 'grad-blue': 'Azul', 'grad-dark': 'Escuro', 'grad-orange': 'Laranja', 'grad-green': 'Verde' };
@@ -17,6 +17,17 @@
 	let deleting = $state(null);
 	let rowActions = $state({ open: false, title: '', subtitle: '', actions: [] });
 	let highlightId = $state(null);
+	const activeAccounts = $derived(appState.accounts.filter((a) => !a.archived));
+	const archivedAccounts = $derived(appState.accounts.filter((a) => a.archived));
+
+	function setArchived(acc, archived) {
+		updateAccount(acc.id, { archived });
+		showToast({
+			message: `"${acc.nome}" ${archived ? 'arquivada' : 'restaurada'}.`,
+			actionLabel: 'DESFAZER',
+			onAction: () => updateAccount(acc.id, { archived: !archived })
+		});
+	}
 
 	// Vindo de um alerta de cartão (?open=<id>): rola até o cartão exato e destaca por um instante,
 	// em vez de mandar o usuário procurar qual é entre vários -- mesmo padrão de Movimentações/Categorias.
@@ -40,6 +51,7 @@
 			subtitle: acc.tipo === 'cartao' ? 'Cartão de crédito' : 'Conta corrente',
 			actions: [
 				{ label: 'Editar', icon: Pencil, onClick: () => openEdit(acc) },
+				{ label: acc.archived ? 'Restaurar conta' : 'Arquivar conta', icon: acc.archived ? ArchiveRestore : Archive, onClick: () => setArchived(acc, !acc.archived) },
 				{ label: 'Excluir', icon: Trash2, variant: 'danger', onClick: () => (deleting = acc) }
 			]
 		};
@@ -101,7 +113,7 @@
 		return (Number(acc.limite) || 0) - limiteUtilizado(acc);
 	}
 
-	const cartoes = $derived(appState.accounts.filter((a) => a.tipo === 'cartao'));
+	const cartoes = $derived(activeAccounts.filter((a) => a.tipo === 'cartao'));
 
 	// Vindo da busca global (?open=<id>): abre direto o resumo/ações dessa conta, uma única vez.
 	let openedFromSearch = false;
@@ -127,8 +139,8 @@
 </div>
 
 <div class="account-grid">
-	{#each appState.accounts as acc, i (acc.id)}
-		{@const grad = acc.cor || PALETTE[i % PALETTE.length]}
+	{#each activeAccounts as acc, i (acc.id)}
+		{@const grad = acc.cor || PALETTE[appState.accounts.indexOf(acc) % PALETTE.length]}
 		<div
 			id={`acc-${acc.id}`}
 			class="account-tile {grad}"
@@ -211,6 +223,19 @@
 	</div>
 {/if}
 
+{#if archivedAccounts.length}
+	<details class="card archived-accounts">
+		<summary>Contas arquivadas ({archivedAccounts.length})</summary>
+		<p class="archived-hint">Ocultas desta seção. O histórico e os lançamentos são preservados.</p>
+		{#each archivedAccounts as acc (acc.id)}
+			<div class="archived-account">
+				<div><strong>{acc.nome}</strong><p>{acc.tipo === 'cartao' ? 'Cartão de crédito' : 'Conta corrente'}</p></div>
+				<button type="button" class="btn btn-ghost" onclick={() => setArchived(acc, false)} aria-label={`Restaurar ${acc.nome}`}><ArchiveRestore size={16} /> Restaurar</button>
+			</div>
+		{/each}
+	</details>
+{/if}
+
 <Modal open={showModal} onClose={() => (showModal = false)} title={editing ? 'Editar conta' : 'Nova conta'} maxWidth="480px">
 	<form onsubmit={submit} class="movement-form">
 		<label class="field"><span>Nome</span><input class="field-input" required bind:value={form.nome} /></label>
@@ -278,3 +303,12 @@
 		deleting = null;
 	}}
 />
+
+<style>
+	.archived-accounts { margin-top: 24px; }
+	.archived-accounts summary { cursor: pointer; font-weight: 700; }
+	.archived-hint, .archived-account p { font-size: 13px; color: var(--ink-muted); }
+	.archived-account { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); }
+	.archived-account div { min-width: 0; overflow-wrap: anywhere; }
+	.archived-account p { margin: 4px 0 0; }
+</style>

@@ -155,14 +155,19 @@
 		let total = 0;
 		let paid = 0;
 		let pending = 0;
+		let totalAmount = 0;
+		let paidAmount = 0;
 		activeInstallments.forEach((inst) => {
 			const count = inst.installmentCount;
 			const paidCount = (inst.payments || []).length;
 			total += count;
 			paid += paidCount;
 			pending += count - paidCount;
+			const value = Number(inst.totalValue) || 0;
+			totalAmount += value;
+			paidAmount += count > 0 ? value * paidCount / count : 0;
 		});
-		return { total, paid, pending };
+		return { total, paid, pending, totalAmount, paidAmount, pendingAmount: totalAmount - paidAmount };
 	});
 </script>
 
@@ -180,14 +185,17 @@
 		<div class="stat-card">
 			<p class="stat-label">Total de parcelas</p>
 			<p class="font-display stat-value">{stats.total}</p>
+			<p class="stat-amount privacy-value">{fmtMoney(stats.totalAmount)}</p>
 		</div>
 		<div class="stat-card kpi-green">
 			<p class="stat-label">Pagas</p>
 			<p class="font-display stat-value">{stats.paid}</p>
+			<p class="stat-amount privacy-value">{fmtMoney(stats.paidAmount)}</p>
 		</div>
 		<div class="stat-card kpi-amber">
 			<p class="stat-label">Pendentes</p>
 			<p class="font-display stat-value">{stats.pending}</p>
+			<p class="stat-amount privacy-value">{fmtMoney(stats.pendingAmount)}</p>
 		</div>
 	</div>
 {/if}
@@ -201,8 +209,8 @@
 {:else}
 	<!-- Lista de parcelamentos ativos -->
 	{#if activeInstallments.length > 0}
-		<section class="card" style="margin-bottom:24px">
-			<h3 style="margin:0 0 16px 0;font-size:16px">Todos os parcelamentos</h3>
+		<section class="installment-section">
+			<h3 class="card section-heading">Todos os parcelamentos</h3>
 			<div class="installments-list">
 				{#each activeInstallments as inst (inst.id)}
 					{@const dates = generateInstallmentDates(inst.firstDate, inst.installmentCount)}
@@ -298,12 +306,13 @@
 
 	<!-- Resumo mês a mês -->
 	{#if sortedMonths.length > 0}
-		<section class="card" style="margin-bottom:24px">
-			<h3 style="margin:0 0 16px 0;font-size:16px">Compromissos por mês</h3>
+		<section class="installment-section">
+			<h3 class="card section-heading">Compromissos por mês</h3>
 			<div class="monthly-summary">
 				{#each sortedMonths as month (month)}
 					{@const items = monthlyGroups[month]}
 					{@const total = items.reduce((sum, item) => sum + item.installmentValue, 0)}
+					<div class="month-group">
 					<div class="month-row">
 						<div class="month-label">{formatMonthLabel(month)}</div>
 						<div class="month-value privacy-value">{fmtMoney(total)}</div>
@@ -317,6 +326,7 @@
 								<span class="detail-value privacy-value">{fmtMoney(item.installmentValue)}</span>
 							</div>
 						{/each}
+					</div>
 					</div>
 				{/each}
 			</div>
@@ -418,6 +428,31 @@
 />
 
 <style>
+	.installment-section {
+		margin-bottom: 24px;
+		min-width: 0;
+	}
+
+	.section-heading {
+		margin: 0 0 16px;
+		padding: 16px 20px;
+		font-size: 16px;
+	}
+
+	.month-group {
+		min-width: 0;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--card);
+	}
+
+	.stat-amount {
+		margin: 8px 0 0;
+		font-size: 16px;
+		font-weight: 700;
+		overflow-wrap: anywhere;
+	}
+
 	.stats-row {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -439,7 +474,7 @@
 		padding: 12px;
 		border: 1px solid var(--border);
 		border-radius: 8px;
-		background: var(--card-bg);
+		background: var(--card);
 	}
 
 	.installment-item.completed {
@@ -526,7 +561,7 @@
 		justify-content: space-between;
 		gap: 12px;
 		padding: 8px;
-		background: var(--card-bg);
+		background: var(--card);
 		border-radius: 4px;
 		border: 1px solid var(--border);
 	}
@@ -600,24 +635,29 @@
 
 	.month-row {
 		display: grid;
-		grid-template-columns: auto 1fr auto;
-		gap: 12px;
+		grid-template-columns: minmax(0, 1fr) auto;
+		gap: 4px 12px;
 		align-items: center;
-		padding: 8px 12px;
-		background: var(--bg-muted);
-		border-radius: 6px;
+		padding: 14px 12px;
+		background: var(--surface-2);
+		border-radius: 8px 8px 0 0;
+		border-bottom: 1px solid var(--border);
 	}
 
 	.month-label {
-		font-weight: 500;
+		font-size: 17px;
+		font-weight: 800;
 	}
 
 	.month-value {
-		font-weight: 600;
+		font-size: 17px;
+		font-weight: 800;
 		text-align: right;
 	}
 
 	.month-count {
+		grid-column: 1 / -1;
+		text-align: right;
 		font-size: 13px;
 		color: var(--text-muted);
 	}
@@ -626,8 +666,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 8px;
-		padding-left: 12px;
-		border-left: 2px solid var(--border);
+		padding: 12px;
 	}
 
 	.month-detail-item {
