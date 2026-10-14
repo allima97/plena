@@ -233,7 +233,7 @@
 							</p>
 							<div class="installment-values">
 								<span class="privacy-value">{fmtMoney(inst.totalValue)}</span>
-								<span class="installment-unit">({fmtMoney(inst.totalValue / inst.installmentCount)}/mês)</span>
+								<span class="installment-unit privacy-value">({fmtMoney(inst.totalValue / inst.installmentCount)}/mês)</span>
 							</div>
 							<p class="installment-dates">
 								<Calendar size={12} style="vertical-align:-1px;margin-right:4px" />
@@ -363,7 +363,7 @@
 								<p class="installment-meta">{inst.paymentMethod}</p>
 								<div class="installment-values">
 									<span class="privacy-value">{fmtMoney(inst.totalValue)}</span>
-									<span class="installment-unit">({fmtMoney(inst.totalValue / inst.installmentCount)}/mês)</span>
+									<span class="installment-unit privacy-value">({fmtMoney(inst.totalValue / inst.installmentCount)}/mês)</span>
 								</div>
 								<p class="installment-dates">
 									<Calendar size={12} style="vertical-align:-1px;margin-right:4px" />
