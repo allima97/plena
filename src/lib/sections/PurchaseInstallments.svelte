@@ -500,7 +500,11 @@
 	}
 
 	.installment-desc {
-		font-weight: 500;
+		font-size: 17px;
+		font-weight: 800;
+		line-height: 1.4;
+		color: var(--ink);
+		overflow-wrap: anywhere;
 	}
 
 	.installment-meta {
