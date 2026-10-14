@@ -197,6 +197,16 @@
 			<p class="font-display stat-value">{stats.pending}</p>
 			<p class="stat-amount privacy-value">{fmtMoney(stats.pendingAmount)}</p>
 		</div>
+		<div class="stat-card remaining-months">
+			<p class="stat-label">Meses com parcelas pendentes</p>
+			<p class="font-display stat-value">{sortedMonths.length}</p>
+			{#if sortedMonths.length > 0}
+				<p class="stat-month">Próximo vencimento: <strong>{formatMonthLabel(sortedMonths[0])}</strong></p>
+				<p class="stat-month">Último vencimento: <strong>{formatMonthLabel(sortedMonths[sortedMonths.length - 1])}</strong></p>
+			{:else}
+				<p class="stat-month">Nenhuma parcela pendente</p>
+			{/if}
+		</div>
 	</div>
 {/if}
 
@@ -454,6 +464,13 @@
 		margin: 8px 0 0;
 		font-size: 16px;
 		font-weight: 700;
+		overflow-wrap: anywhere;
+	}
+
+	.stat-month {
+		margin: 6px 0 0;
+		font-size: 13px;
+		line-height: 1.5;
 		overflow-wrap: anywhere;
 	}
 
