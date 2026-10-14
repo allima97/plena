@@ -183,7 +183,7 @@
 {#if activeInstallments.length > 0}
 	<div class="stats-row">
 		<div class="stat-card">
-			<p class="stat-label">Total de parcelas</p>
+			<p class="stat-label">Parcelas</p>
 			<p class="font-display stat-value">{stats.total}</p>
 			<p class="stat-amount privacy-value">{fmtMoney(stats.totalAmount)}</p>
 		</div>
