@@ -740,33 +740,46 @@
 			flex-wrap: wrap;
 		}
 		.installment-row {
-			grid-template-columns: minmax(0, 1fr);
-			align-items: stretch;
+			grid-template-columns: minmax(0, 1fr) auto auto;
+			align-items: center;
 		}
 		.installment-row-main {
+			grid-column: 1;
+			grid-row: 1;
 			gap: 8px;
 		}
 		.installment-details {
 			padding: 8px;
 		}
 		.installment-row-info {
-			display: grid;
-			grid-template-columns: minmax(0, 1fr);
-			width: 100%;
+			display: contents;
 		}
 		.installment-row-info .badge {
+			grid-column: 1 / -1;
+			grid-row: 2;
 			justify-self: start;
 		}
+		.installment-row-info .payment-method {
+			grid-column: 1 / -1;
+			grid-row: 3;
+		}
 		.installment-row-info .btn {
-			width: 100%;
 			min-height: 40px;
 			height: auto;
 			padding: 8px 10px;
 		}
-		.installment-row-info .btn[title="Editar pagamento"],
+		.installment-row-info .btn:not([title]) {
+			grid-column: 1 / -1;
+			grid-row: 2;
+			width: 100%;
+		}
+		.installment-row-info .btn[title="Editar pagamento"] {
+			grid-column: 2;
+			grid-row: 1;
+		}
 		.installment-row-info .btn[title="Desmarcar como pago"] {
-			width: auto;
-			justify-self: end;
+			grid-column: 3;
+			grid-row: 1;
 		}
 		.month-detail-item {
 			grid-template-columns: minmax(0, 1fr) auto;
