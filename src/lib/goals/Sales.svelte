@@ -33,6 +33,10 @@
  let deleting = $state(null);
  const plan = $derived(appState.salesPlans.find(p => p.id === month));
  const summary = $derived(monthSummary(appState.sales, month, plan));
+ const goalPercent = $derived(plan?.target > 0 ? Math.max(0, summary.net / plan.target * 100) : 0);
+ const goalFill = $derived(Math.min(100, goalPercent));
+ const goalColor = $derived(`hsl(${goalFill * 1.2} 65% 38%)`);
+ const percentLabel = $derived(new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1, roundingMode: 'floor' }).format(goalPercent));
  function submitSale(e) {
   e.preventDefault();
   try { saveSale(editing); editing = null; error = ''; showToast({ message: 'Venda salva.' }); } catch(e) { error = e.message; }
@@ -103,7 +107,18 @@
 <div class="totals">
  {#each [['Total vendido', summary.total], ['Taxas', summary.fees], ['Vendas líquidas', summary.net], ['Comissão mês', summary.commission]] as [label, value]}<div class="stat-card"><p class="stat-label">{label}</p><strong class="font-display stat-value privacy-value">{value === null ? 'A configurar' : fmtMoney(value)}</strong></div>{/each}
 </div>
-{#if plan}<p><strong>{TIERS[summary.tier]}</strong> · Meta: {fmtMoney(plan.target)} · Supermeta: {fmtMoney(plan.superTarget)}</p>{/if}
+{#if plan}
+ <section class="card sales-goal" aria-label="Atingimento da meta mensal">
+  <div class="sales-goal-head">
+   <div><p class="stat-label">Meta do mês</p><p class="sales-goal-value privacy-value">{fmtMoney(plan.target)}</p></div>
+   <div class="sales-goal-percent"><strong style:color={goalColor}>{percentLabel}%</strong><span class="field-hint">{goalPercent >= 100 ? 'Meta atingida' : 'da meta atingida'}</span></div>
+  </div>
+  <div class="goal-progress-track" role="progressbar" aria-label="Atingimento da meta" aria-valuemin="0" aria-valuemax="100" aria-valuenow={goalFill} aria-valuetext={`${percentLabel}% da meta atingida`}>
+   <div class="goal-progress-fill" style:width={`${goalFill}%`} style:background={goalColor}></div>
+  </div>
+  <p class="stat-sub">Vendas líquidas: <span class="privacy-value">{fmtMoney(summary.net)}</span>{#if goalPercent < 100} · Faltam <span class="privacy-value">{fmtMoney(Math.max(0, plan.target - summary.net))}</span>{/if}</p>
+ </section>
+{/if}
 <div class="card sales-list"><div class="table-wrap"><table class="list"><thead><tr><th>Data venda</th><th>Tipo</th><th>Valor total</th><th>Taxas</th><th>Líquido</th><th>Comissão (%)</th><th>Comissão mês</th><th>Ações</th></tr></thead><tbody>
  {#each [...summary.items].sort((a,b) => b.date.localeCompare(a.date)) as sale (sale.id)}
  <tr><td data-label="Data venda">{fmtDate(sale.date)}</td><td data-label="Tipo">{typeName(sale.type)}</td><td data-label="Valor total" class="num privacy-value">{fmtMoney(sale.total)}</td><td data-label="Taxas" class="num privacy-value">{fmtMoney(sale.fees)}</td><td data-label="Líquido" class="num privacy-value">{fmtMoney(sale.total-sale.fees)}</td><td data-label="Comissão (%)" class="num">{sale.rate === null ? '—' : `${sale.rate}%`}</td><td data-label="Comissão mês" class="num privacy-value">{sale.commission === null ? '—' : fmtMoney(sale.commission)}</td><td class="actions-cell"><div class="actions-row"><button class="btn btn-ghost sm" disabled={managingTypes} onclick={() => { editing = { id: sale.id, date: sale.date, total: sale.total, fees: sale.fees, type: sale.type }; error = ''; }}>Editar</button><button class="btn btn-ghost sm" onclick={() => deleting = sale.id}>Excluir</button></div></td></tr>
@@ -112,6 +127,13 @@
 <ConfirmDialog open={!!deleting} title="Excluir venda?" message="A venda será excluída e a comissão do mês será recalculada." confirmLabel="Excluir venda" onCancel={() => deleting = null} onConfirm={() => { removeSale(deleting); deleting = null; showToast({ message: 'Venda excluída.' }); }} />
 <ConfirmDialog open={!!deletingType} title="Excluir tipo de venda?" message={`O tipo “${deletingType?.name || ''}” deixará de aparecer em novas vendas. O histórico e as comissões serão preservados.`} confirmLabel="Excluir tipo" onCancel={() => deletingType = null} onConfirm={() => { saveSaleType({ ...deletingType, deleted: true }); deletingType = null; typeDraft = { name: '' }; showToast({ message: 'Tipo excluído. Histórico preservado.' }); }} />
 <style>
+ .sales-goal { padding:20px; margin:20px 0; }
+ .sales-goal-head { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:16px; }
+ .sales-goal-value { font-size:20px; font-weight:700; margin:8px 0 0; overflow-wrap:anywhere; }
+ .sales-goal-percent { display:flex; flex-direction:column; text-align:right; gap:4px; }
+ .sales-goal-percent strong { font-size:24px; font-variant-numeric:tabular-nums; }
+ .sales-goal .goal-progress-track { height:10px; }
+
  .toolbar { display:flex; flex-wrap:wrap; gap:12px; align-items:end; margin:16px 0; }
  .toolbar .field { flex:1; min-width:160px; }
  .editor { padding:20px; margin:16px 0; }
