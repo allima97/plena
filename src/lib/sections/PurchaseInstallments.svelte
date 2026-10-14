@@ -758,6 +758,9 @@
 		margin-top: 8px;
 	}
 	@media (max-width: 640px) {
+		.stats-row {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
 		.installment-item {
 			flex-wrap: wrap;
 		}
