@@ -1,4 +1,4 @@
-import { validateSale, validatePlan } from '$lib/goals/sales.js';
+import { validateSale, validatePlan, validateSaleType } from '$lib/goals/sales.js';
 import { json } from '@sveltejs/kit';
 
 export const prerender = false;
@@ -23,7 +23,7 @@ const KNOWN_COLLECTIONS = [
 	'patrimonyItemMoves',
 	'scoreSnapshots',
 	'budgetGlobal',
-	'purchaseInstallments', 'sales', 'salesPlans'
+	'purchaseInstallments', 'sales', 'salesPlans', 'salesTypes'
 ];
 
 function checkCollection(collection) {
@@ -40,6 +40,10 @@ export async function PUT({ platform, params, request }) {
  try {
   data = await request.json();
   if (params.collection === 'sales') validateSale(data);
+  if (params.collection === 'salesTypes') {
+   validateSaleType(data);
+   if (data.id !== params.id) throw new Error('Tipo inválido.');
+  }
   if (params.collection === 'salesPlans') {
    validatePlan(data);
    if (data.id !== params.id) throw new Error('Mês da configuração inválido.');

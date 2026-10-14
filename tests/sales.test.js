@@ -19,7 +19,39 @@ test('different product rates and cent rounding', () => {
 });
 test('reject invalid dates, money, thresholds and rates', () => {
  validateSale(sale); validatePlan(plan);
- for (const patch of [{date:'2026-02-30'},{fees:1101},{total:0},{total:NaN},{type:'Outro'}]) assert.throws(() => validateSale({...sale,...patch}));
+ for (const patch of [{date:'2026-02-30'},{fees:1101},{total:0},{total:NaN},{type:''}]) assert.throws(() => validateSale({...sale,...patch}));
  assert.throws(() => validatePlan({...plan,superTarget:1000}));
  const p=structuredClone(plan); p.rates.Hotel.target=101; assert.throws(() => validatePlan(p));
+});
+
+test('custom types, renaming and deletion preserve historical commissions', async () => {
+ const { saleTypesCatalog, validateSaleType } = await import('../src/lib/goals/sales.js');
+ const custom = { id: 'custom-1', name: 'Roupas', deleted: false };
+ validateSaleType(custom);
+ validateSale({ ...sale, type: custom.id });
+ const p = { ...plan, rates: { [custom.id]: { below: 1, target: 4, super: 6 } } };
+ validatePlan(p);
+ const rows = [{ ...sale, type: custom.id }];
+ assert.equal(monthSummary(rows, '2026-10', p).commission, 40);
+ const catalog = saleTypesCatalog([{ ...custom, name: 'Vestuário', deleted: true }], rows, [p]);
+ assert.equal(catalog.find(t => t.id === custom.id).name, 'Vestuário');
+ assert.equal(catalog.find(t => t.id === custom.id).deleted, true);
+ assert.equal(monthSummary(rows, '2026-10', p).commission, 40);
+ assert.equal(monthSummary(rows, '2026-10', plan).commission, null);
+ assert.throws(() => validateSaleType({ ...custom, name: '  ' }));
+});
+
+test('commission basis is independent of net goal achievement and persists in plans', () => {
+ const gross = JSON.parse(JSON.stringify({ ...plan, commissionBase: 'gross' }));
+ validatePlan(gross);
+ assert.equal(monthSummary([sale], '2026-10', gross).commission, 22);
+ assert.equal(monthSummary([sale], '2026-10', plan).commission, 20);
+ const below = { ...sale, total: 1100, fees: 200 };
+ assert.equal(monthSummary([below], '2026-10', gross).tier, 'below');
+ assert.equal(monthSummary([below], '2026-10', gross).commission, 11);
+ assert.equal(monthSummary([below], '2026-10', plan).commission, 9);
+ const legacy = { ...plan }; delete legacy.commissionBase;
+ validatePlan(legacy);
+ assert.equal(monthSummary([sale], '2026-10', legacy).commission, 20);
+ assert.throws(() => validatePlan({ ...plan, commissionBase: 'invalid' }));
 });

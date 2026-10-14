@@ -1,4 +1,4 @@
-import { validateSale, validatePlan } from '$lib/goals/sales.js';
+import { validateSale, validatePlan, validateSaleType, saleTypesCatalog } from '$lib/goals/sales.js';
 import { loadLocal, saveLocal, fetchRemoteState, apiPut, apiRemove, fetchMe } from './persist.js';
 import { seedCategories, uid } from './seed.js';
 import { todayISO } from '../format.js';
@@ -49,6 +49,7 @@ let scoreSnapshots = $state([]);
 let purchaseInstallments = $state([]);
 let sales = $state([]);
 let salesPlans = $state([]);
+let salesTypes = $state([]);
 
 let mode = $state(/** @type {'loading'|'api'|'local'} */ ('loading'));
 let syncStatus = $state(/** @type {'synced'|'saving'|'error'} */ ('synced'));
@@ -60,6 +61,7 @@ let user = $state(/** @type {{email:string,name:string|null,logoutUrl:string|nul
 export const appState = {
 	get sales() { return sales; },
 	get salesPlans() { return salesPlans; },
+	get salesTypes() { return salesTypes; },
 	get accounts() {
 		return accounts;
 	},
@@ -157,7 +159,8 @@ function snapshot() {
 		patrimonyItemMoves,
 		purchaseInstallments,
 		sales,
-		salesPlans
+		salesPlans,
+		salesTypes
 	};
 }
 
@@ -191,6 +194,7 @@ export async function boot() {
 		purchaseInstallments = local.purchaseInstallments || [];
 		sales = local.sales || [];
 		salesPlans = local.salesPlans || [];
+		salesTypes = local.salesTypes || [];
 	}
 	ready = true;
 
@@ -240,6 +244,7 @@ export async function boot() {
 	purchaseInstallments = remote.purchaseInstallments || purchaseInstallments;
 	sales = remote.sales || sales;
 	salesPlans = remote.salesPlans || salesPlans;
+	salesTypes = remote.salesTypes || salesTypes;
 	mode = 'api';
 	persistLocalSnapshot();
 
@@ -251,7 +256,7 @@ export async function boot() {
 			'finAccounts', 'finCategories', 'finTransactions', 'reportTemplates', 'reportHistory',
 			'goals', 'resources', 'resourceMoves', 'goalCategories', 'installments', 'amortizations',
 			'patrimonyItems', 'patrimonySnapshots', 'patrimonyItemMoves', 'scoreSnapshots',
-			'purchaseInstallments', 'sales', 'salesPlans'
+			'purchaseInstallments', 'sales', 'salesPlans', 'salesTypes'
 		];
 		const pushOps = [];
 		for (const key of SYNC_KEYS) {
@@ -970,6 +975,7 @@ export async function restoreBackup(data) {
 	purchaseInstallments = data.purchaseInstallments || [];
 	sales = data.sales || [];
 	salesPlans = data.salesPlans || [];
+	salesTypes = data.salesTypes || [];
 
 	persistLocalSnapshot();
 	if (mode !== 'api') return;
@@ -993,6 +999,7 @@ export async function restoreBackup(data) {
 		...purchaseInstallments.map((p) => apiPut('purchaseInstallments', p.id, p)),
 		...sales.map((p) => apiPut('sales', p.id, p)),
 		...salesPlans.map((p) => apiPut('salesPlans', p.id, p)),
+		...salesTypes.map((p) => apiPut('salesTypes', p.id, p)),
 		apiPut('reportSchedule', 'singleton', reportSchedule),
 		apiPut('alertThresholds', 'singleton', alertThresholds),
 		apiPut('budgetGlobal', 'singleton', budgetGlobal),
@@ -1049,7 +1056,8 @@ export function clearAllData() {
 		scoreSnapshots: scoreSnapshots.map((s) => s.id),
 		purchaseInstallments: purchaseInstallments.map((p) => p.id),
 		sales: sales.map((p) => p.id),
-		salesPlans: salesPlans.map((p) => p.id)
+		salesPlans: salesPlans.map((p) => p.id),
+		salesTypes: salesTypes.map((p) => p.id)
 	};
 
 	accounts = [];
@@ -1070,6 +1078,7 @@ export function clearAllData() {
 	purchaseInstallments = [];
 	sales = [];
 	salesPlans = [];
+	salesTypes = [];
 
 	for (const [collection, list] of Object.entries(ids)) {
 		list.forEach((id) => erase(collection, id));
@@ -1090,4 +1099,12 @@ export function saveSalesPlan(data) {
  validatePlan(data);
  salesPlans = [...salesPlans.filter((p) => p.id !== data.id), data];
  write('salesPlans', data.id, data);
+}
+
+export function saveSaleType(data) {
+ const type = { ...data, id: data.id || uid(), name: data.name.trim(), deleted: !!data.deleted };
+ validateSaleType(type);
+ if (!type.deleted && saleTypesCatalog(salesTypes, sales, salesPlans).some(t => !t.deleted && t.id !== type.id && t.name.toLocaleLowerCase('pt-BR') === type.name.toLocaleLowerCase('pt-BR'))) throw new Error('Já existe um tipo com esse nome.');
+ salesTypes = [...salesTypes.filter(t => t.id !== type.id), type];
+ write('salesTypes', type.id, type);
 }
