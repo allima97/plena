@@ -271,11 +271,13 @@
 									</div>
 									<div class="installment-row-info">
 										{#if payment}
-											<span class="badge badge-green">
-												<CheckCircle2 size={11} style="vertical-align:-1px;margin-right:3px" />
-												<span>Pago em {fmtDate(payment.paymentDate)}</span>
-											</span>
-											<span class="payment-method">{payment.paymentMethod}</span>
+											<div class="payment-info">
+												<span class="badge badge-green">
+													<CheckCircle2 size={11} style="vertical-align:-1px;margin-right:3px" />
+													<span>Pago em {fmtDate(payment.paymentDate)}</span>
+												</span>
+												<span class="payment-method">{payment.paymentMethod}</span>
+											</div>
 											<button class="btn btn-ghost sm" onclick={() => openPaymentModal(inst, installmentNumber)} title="Editar pagamento">
 												<Pencil size={12} />
 											</button>
@@ -395,13 +397,15 @@
 										</div>
 										<div class="installment-row-info">
 											{#if payment}
-												<span class="badge badge-green">
-													<CheckCircle2 size={11} style="vertical-align:-1px;margin-right:3px" />
-													<span>Pago em {fmtDate(payment.paymentDate)}</span>
-												</span>
-												<span class="payment-method">{payment.paymentMethod}</span>
+												<div class="payment-info">
+													<span class="badge badge-green">
+														<CheckCircle2 size={11} style="vertical-align:-1px;margin-right:3px" />
+														<span>Pago em {fmtDate(payment.paymentDate)}</span>
+													</span>
+													<span class="payment-method">{payment.paymentMethod}</span>
+												</div>
 												<button class="btn btn-ghost sm" onclick={() => openPaymentModal(inst, installmentNumber)} title="Editar pagamento">
-													<Pencil size={12} /> Editar pagamento
+													<Pencil size={12} />
 												</button>
 											{/if}
 										</div>
@@ -626,6 +630,14 @@
 		min-width: 0;
 	}
 
+	.payment-info {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		flex-wrap: wrap;
+		min-width: 0;
+	}
+
 	.payment-method {
 		overflow-wrap: anywhere;
 		font-size: 12px;
@@ -754,14 +766,13 @@
 		.installment-row-info {
 			display: contents;
 		}
-		.installment-row-info .badge {
+		.installment-row-info .payment-info {
 			grid-column: 1 / -1;
 			grid-row: 2;
-			justify-self: start;
 		}
-		.installment-row-info .payment-method {
-			grid-column: 1 / -1;
-			grid-row: 3;
+		.installment-row-info .payment-method::before {
+			content: '-';
+			margin-right: 8px;
 		}
 		.installment-row-info .btn {
 			min-height: 40px;
