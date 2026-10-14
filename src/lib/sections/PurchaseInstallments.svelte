@@ -201,8 +201,7 @@
 			<p class="stat-label">Meses com parcelas pendentes</p>
 			<p class="font-display stat-value">{sortedMonths.length}</p>
 			{#if sortedMonths.length > 0}
-				<p class="stat-month">Próximo vencimento: <strong>{formatMonthLabel(sortedMonths[0])}</strong></p>
-				<p class="stat-month">Último vencimento: <strong>{formatMonthLabel(sortedMonths[sortedMonths.length - 1])}</strong></p>
+				<p class="stat-month">Próxima: <strong>{formatMonthLabel(sortedMonths[0])}</strong> - <strong></strong>Última: <strong>{formatMonthLabel(sortedMonths[sortedMonths.length - 1])}</strong></p>
 			{:else}
 				<p class="stat-month">Nenhuma parcela pendente</p>
 			{/if}
