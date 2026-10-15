@@ -165,11 +165,17 @@
  .types-table .actions-row { justify-content:flex-end; flex-wrap:nowrap; gap:8px; }
  .types-table .editing-type { background:var(--surface-3); }
  @media(max-width:760px) {
-  .types-table .type-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:6px 10px; padding:12px; }
-  .types-table .type-row::before { content:'Tipo de venda'; grid-column:1 / -1; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; color:var(--ink-faint); }
-  .types-table .type-name { display:block; align-self:center; min-width:0; padding:0; border:0; text-align:left; }
-  .types-table .type-name::before { display:none; }
-  .types-table .actions-cell { padding:0; border:0; align-self:center; }
+  .types-table { display:table; width:100%; }
+  .types-table thead { display:table-header-group; }
+  .types-table tbody { display:table-row-group; }
+  .types-table tr { display:table-row; margin:0; padding:0; border:0; border-radius:0; background:transparent; }
+  .types-table th { padding:10px 6px; }
+  .types-table .types-actions-heading { width:128px; }
+  .types-table td { display:table-cell; padding:10px 6px; border-bottom:1px solid var(--border-soft); vertical-align:middle; }
+  .types-table tr:last-child td { border-bottom:0; }
+  .types-table td::before { display:none; }
+  .types-table .type-name { text-align:left; }
+  .types-table .actions-cell { display:table-cell; padding:10px 6px; }
   .types-table .actions-row { gap:4px; }
   .types-table .actions-row .btn { min-height:40px; padding:8px; font-size:11px; flex:0 0 auto; }
   .types-table .actions-row :global(svg) { display:none; }
