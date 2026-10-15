@@ -8,6 +8,7 @@ export function validateSale(s) {
  if (!/^\d{4}-\d{2}-\d{2}$/.test(s.date) || !Number.isFinite(Date.parse(s.date)) || new Date(s.date).toISOString().slice(0,10) !== s.date) throw new Error('Informe uma data válida.');
  if (typeof s.type !== 'string' || !s.type.trim() || s.type.length > 120) throw new Error('Selecione um tipo válido.');
  if (!Number.isFinite(s.total) || !Number.isFinite(s.fees) || cents(s.total) <= 0 || s.fees < 0 || cents(s.fees) > cents(s.total)) throw new Error('O total deve ser positivo e as taxas devem estar entre zero e o total.');
+ if (s.orderNumber !== undefined && s.orderNumber !== null && (typeof s.orderNumber !== 'string' || s.orderNumber.length > 80)) throw new Error('Número do pedido inválido (máx. 80 caracteres).');
 }
 export function validatePlan(p) {
  if (p.commissionBase !== undefined && !['net', 'gross'].includes(p.commissionBase)) throw new Error('Selecione a base da comissão: com taxas ou sem taxas.');
