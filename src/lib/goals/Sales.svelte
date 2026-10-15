@@ -2,7 +2,7 @@
  import Modal from '$lib/components/Modal.svelte';
  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
  import { showToast } from '$lib/toast.svelte.js';
- import { Plus, Settings2, Tags } from 'lucide-svelte';
+ import { Plus, Settings2, Tags, Pencil, Trash2 } from 'lucide-svelte';
  import { appState, saveSale, removeSale, saveSalesPlan, saveSaleType } from '$lib/fin/store.svelte.js';
  import { todayISO, fmtMoney, fmtDate } from '$lib/format.js';
  import { saleTypesCatalog, TIERS, emptyPlan, monthSummary } from './sales.js';
@@ -62,9 +62,23 @@
    <button class="btn btn-primary">{typeDraft.id ? 'Salvar nome' : 'Incluir tipo'}</button>
    {#if typeDraft.id}<button type="button" class="btn btn-ghost" onclick={() => typeDraft = { name: '' }}>Cancelar edição</button>{/if}
   </form>
-  {#each activeTypes as type (type.id)}
-   <div class="toolbar"><span>{type.name}</span><button class="btn btn-ghost sm" onclick={() => typeDraft = { ...type }}>Editar</button><button class="btn btn-ghost sm" onclick={() => deletingType = type}>Excluir</button></div>
-  {:else}<p>Nenhum tipo disponível. Inclua um tipo para cadastrar vendas.</p>{/each}
+  <div class="types-list-head"><h3>Tipos cadastrados</h3><span class="badge badge-gray">{activeTypes.length}</span></div>
+  <div class="table-wrap types-table-wrap">
+   <table class="list types-table" aria-label="Tipos de venda cadastrados">
+    <thead><tr><th scope="col">Tipo de venda</th><th scope="col" class="types-actions-heading">Ações</th></tr></thead>
+    <tbody>
+     {#each [...activeTypes].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')) as type (type.id)}
+      <tr class:editing-type={typeDraft.id === type.id}>
+       <td data-label="Tipo de venda" class="type-name">{type.name}</td>
+       <td class="actions-cell"><div class="actions-row">
+        <button class="btn btn-ghost sm" aria-label={`Editar tipo ${type.name}`} onclick={() => { typeDraft = { ...type }; error = ''; }}><Pencil size={14} /> Editar</button>
+        <button class="btn btn-danger sm" aria-label={`Excluir tipo ${type.name}`} onclick={() => deletingType = type}><Trash2 size={14} /> Excluir</button>
+       </div></td>
+      </tr>
+     {:else}<tr><td colspan="2" class="empty">Nenhum tipo cadastrado. Inclua um tipo acima para começar.</td></tr>{/each}
+    </tbody>
+   </table>
+  </div>
  </Modal>
 {/if}
 <p class="field-hint sales-explanation">Meta calculada sobre o valor líquido das vendas do mês. Comissão = {plan?.commissionBase === 'gross' ? 'valor total (com taxas)' : '(valor total − taxas)'} × percentual do tipo na faixa atingida.</p>
@@ -127,6 +141,19 @@
 <ConfirmDialog open={!!deleting} title="Excluir venda?" message="A venda será excluída e a comissão do mês será recalculada." confirmLabel="Excluir venda" onCancel={() => deleting = null} onConfirm={() => { removeSale(deleting); deleting = null; showToast({ message: 'Venda excluída.' }); }} />
 <ConfirmDialog open={!!deletingType} title="Excluir tipo de venda?" message={`O tipo “${deletingType?.name || ''}” deixará de aparecer em novas vendas. O histórico e as comissões serão preservados.`} confirmLabel="Excluir tipo" onCancel={() => deletingType = null} onConfirm={() => { saveSaleType({ ...deletingType, deleted: true }); deletingType = null; typeDraft = { name: '' }; showToast({ message: 'Tipo excluído. Histórico preservado.' }); }} />
 <style>
+ .types-list-head { display:flex; align-items:center; gap:10px; margin:24px 0 12px; }
+ .types-list-head h3 { margin:0; font-size:14px; font-weight:700; }
+ .types-table { min-width:0; table-layout:fixed; }
+ .types-table th { background:var(--surface-3); }
+ .types-table .types-actions-heading { width:200px; text-align:right; }
+ .types-table .type-name { font-weight:600; overflow-wrap:anywhere; }
+ .types-table .actions-row { justify-content:flex-end; flex-wrap:nowrap; gap:8px; }
+ .types-table .editing-type { background:var(--surface-3); }
+ @media(max-width:760px) {
+  .types-table .type-name { text-align:right; }
+  .types-table .actions-row .btn { min-height:40px; flex:1; }
+ }
+
  .sales-goal { padding:20px; margin:20px 0; }
  .sales-goal-head { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:16px; }
  .sales-goal-value { font-size:20px; font-weight:700; margin:8px 0 0; overflow-wrap:anywhere; }
