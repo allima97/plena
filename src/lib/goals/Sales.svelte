@@ -160,9 +160,9 @@
  .types-list-head h3 { margin:0; font-size:14px; font-weight:700; }
  .types-table { min-width:0; table-layout:fixed; }
  .types-table th { background:var(--surface-3); }
- .types-table .types-actions-heading { width:200px; text-align:right; }
+ .types-table .types-actions-heading { width:200px; text-align:center; }
  .types-table .type-name { font-weight:600; overflow-wrap:anywhere; }
- .types-table .actions-row { justify-content:flex-end; flex-wrap:nowrap; gap:8px; }
+ .types-table .actions-row { justify-content:center; flex-wrap:nowrap; gap:8px; }
  .types-table .editing-type { background:var(--surface-3); }
  @media(max-width:760px) {
   .types-table { display:table; width:100%; }
