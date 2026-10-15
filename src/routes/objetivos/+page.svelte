@@ -5,7 +5,7 @@
 </script>
 <nav aria-label="Seções de objetivos" class="segmented goals-sections">
  <button class:active={section === 'goals'} aria-pressed={section === 'goals'} onclick={() => section = 'goals'}>Objetivos</button>
- <button class:active={section === 'sales'} aria-pressed={section === 'sales'} onclick={() => section = 'sales'}>Controle de Vendas</button>
+ <button class:active={section === 'sales'} aria-pressed={section === 'sales'} onclick={() => section = 'sales'}>Vendas</button>
 </nav>
 {#if section === 'sales'}<Sales />{:else}<Goals />{/if}
 
