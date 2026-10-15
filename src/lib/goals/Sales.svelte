@@ -145,6 +145,10 @@
  .rates-table { min-width:0; }
  @media(max-width:760px) {
   .totals { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .totals .stat-card { min-width:0; padding:16px; }
+  .totals .stat-value { font-size:18px; line-height:1.25; margin-top:8px; }
+  .sales-goal-value { font-size:18px; }
+  .sales-goal-percent strong { font-size:20px; }
   .sales-list { padding:0; background:transparent; border:0; box-shadow:none; }
   .rates-table input { width:110px; flex-shrink:0; }
   .toolbar .btn { flex:1; }
