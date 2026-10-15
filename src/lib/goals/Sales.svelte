@@ -47,12 +47,15 @@
  }
 </script>
 <div class="page-head"><div><p class="page-eyebrow">Objetivos</p><h1 class="font-display page-title">Controle de Vendas</h1><p class="page-sub">Acompanhe suas vendas, metas e comissão mensal.</p></div></div>
-<div class="toolbar">
+<div class="sales-primary-actions">
  <label class="field"><span>Mês </span><input class="field-input" type="month" bind:value={month} required disabled={!!editing || !!config} /></label>
- <button class="btn btn-ghost" disabled={!month || !appState.ready || managingTypes} onclick={() => { openConfig(); }}><Settings2 size={16} /> Metas e comissões</button>
  <button class="btn btn-primary" disabled={!month || !appState.ready || managingTypes || !activeTypes.length} onclick={() => { editing = { date: month === todayISO().slice(0,7) ? todayISO() : `${month}-01`, total: 0, fees: 0, type: activeTypes[0]?.id || '' }; error = ''; }}><Plus size={16} /> Nova venda</button>
 </div>
+
+<div class="sales-settings-actions">
+ <button class="btn btn-ghost" disabled={!month || !appState.ready || managingTypes} onclick={() => { openConfig(); }}><Settings2 size={16} /> Metas e comissões</button>
 <button class="btn btn-ghost" disabled={!appState.ready || !!editing || !!config} onclick={() => { managingTypes = !managingTypes; error = ''; }}><Tags size={16} /> Tipos de venda</button>
+</div>
 {#if managingTypes}
  <Modal open={managingTypes} onClose={() => { managingTypes = false; error = ''; }} title="Tipos de venda" eyebrow="Organização" maxWidth="640px">
   <p>Personalize os tipos para seu comércio. Ao excluir um tipo, ele deixa de aparecer em novas vendas; o histórico e as comissões são preservados.</p>
@@ -141,6 +144,18 @@
 <ConfirmDialog open={!!deleting} title="Excluir venda?" message="A venda será excluída e a comissão do mês será recalculada." confirmLabel="Excluir venda" onCancel={() => deleting = null} onConfirm={() => { removeSale(deleting); deleting = null; showToast({ message: 'Venda excluída.' }); }} />
 <ConfirmDialog open={!!deletingType} title="Excluir tipo de venda?" message={`O tipo “${deletingType?.name || ''}” deixará de aparecer em novas vendas. O histórico e as comissões serão preservados.`} confirmLabel="Excluir tipo" onCancel={() => deletingType = null} onConfirm={() => { saveSaleType({ ...deletingType, deleted: true }); deletingType = null; typeDraft = { name: '' }; showToast({ message: 'Tipo excluído. Histórico preservado.' }); }} />
 <style>
+ .sales-primary-actions, .sales-settings-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; max-width:520px; margin:16px 0; align-items:end; }
+ .sales-primary-actions .field { min-width:0; }
+ .sales-primary-actions .field-input, .sales-primary-actions .btn { width:100%; min-width:0; height:44px; min-height:44px; box-sizing:border-box; }
+ .sales-settings-actions .btn { min-width:0; min-height:44px; padding:8px; gap:6px; }
+ @media(max-width:480px) {
+  .sales-primary-actions, .sales-settings-actions { gap:8px; }
+  .sales-primary-actions .field-input { padding-inline:10px; font-size:12px; }
+  .sales-primary-actions .btn { padding-inline:10px; }
+  .sales-settings-actions .btn { font-size:11px; }
+  .sales-settings-actions :global(svg) { flex-shrink:0; }
+ }
+
  .types-list-head { display:flex; align-items:center; gap:10px; margin:24px 0 12px; }
  .types-list-head h3 { margin:0; font-size:14px; font-weight:700; }
  .types-table { min-width:0; table-layout:fixed; }
