@@ -1,4 +1,4 @@
-import { validateSale, validatePlan, validateSaleType, saleTypesCatalog } from '$lib/goals/sales.js';
+import { validateSale, validatePlan, validateSaleType, saleTypesCatalog, validateSalesSection, forSection } from '$lib/goals/sales.js';
 import { loadLocal, saveLocal, fetchRemoteState, apiPut, apiRemove, fetchMe } from './persist.js';
 import { seedCategories, uid } from './seed.js';
 import { todayISO } from '../format.js';
@@ -50,6 +50,7 @@ let purchaseInstallments = $state([]);
 let sales = $state([]);
 let salesPlans = $state([]);
 let salesTypes = $state([]);
+let salesSections = $state([]);
 
 let mode = $state(/** @type {'loading'|'api'|'local'} */ ('loading'));
 let syncStatus = $state(/** @type {'synced'|'saving'|'error'} */ ('synced'));
@@ -62,6 +63,7 @@ export const appState = {
 	get sales() { return sales; },
 	get salesPlans() { return salesPlans; },
 	get salesTypes() { return salesTypes; },
+	get salesSections() { return salesSections; },
 	get accounts() {
 		return accounts;
 	},
@@ -160,7 +162,8 @@ function snapshot() {
 		purchaseInstallments,
 		sales,
 		salesPlans,
-		salesTypes
+		salesTypes,
+		salesSections
 	};
 }
 
@@ -195,6 +198,7 @@ export async function boot() {
 		sales = local.sales || [];
 		salesPlans = local.salesPlans || [];
 		salesTypes = local.salesTypes || [];
+		salesSections = local.salesSections || [];
 	}
 	ready = true;
 
@@ -245,6 +249,7 @@ export async function boot() {
 	sales = remote.sales || sales;
 	salesPlans = remote.salesPlans || salesPlans;
 	salesTypes = remote.salesTypes || salesTypes;
+	salesSections = remote.salesSections || salesSections;
 	mode = 'api';
 	persistLocalSnapshot();
 
@@ -256,7 +261,7 @@ export async function boot() {
 			'finAccounts', 'finCategories', 'finTransactions', 'reportTemplates', 'reportHistory',
 			'goals', 'resources', 'resourceMoves', 'goalCategories', 'installments', 'amortizations',
 			'patrimonyItems', 'patrimonySnapshots', 'patrimonyItemMoves', 'scoreSnapshots',
-			'purchaseInstallments', 'sales', 'salesPlans', 'salesTypes'
+			'purchaseInstallments', 'sales', 'salesPlans', 'salesTypes', 'salesSections'
 		];
 		const pushOps = [];
 		for (const key of SYNC_KEYS) {
@@ -976,6 +981,7 @@ export async function restoreBackup(data) {
 	sales = data.sales || [];
 	salesPlans = data.salesPlans || [];
 	salesTypes = data.salesTypes || [];
+	salesSections = data.salesSections || [];
 
 	persistLocalSnapshot();
 	if (mode !== 'api') return;
@@ -1000,6 +1006,7 @@ export async function restoreBackup(data) {
 		...sales.map((p) => apiPut('sales', p.id, p)),
 		...salesPlans.map((p) => apiPut('salesPlans', p.id, p)),
 		...salesTypes.map((p) => apiPut('salesTypes', p.id, p)),
+		...salesSections.map((p) => apiPut('salesSections', p.id, p)),
 		apiPut('reportSchedule', 'singleton', reportSchedule),
 		apiPut('alertThresholds', 'singleton', alertThresholds),
 		apiPut('budgetGlobal', 'singleton', budgetGlobal),
@@ -1057,7 +1064,8 @@ export function clearAllData() {
 		purchaseInstallments: purchaseInstallments.map((p) => p.id),
 		sales: sales.map((p) => p.id),
 		salesPlans: salesPlans.map((p) => p.id),
-		salesTypes: salesTypes.map((p) => p.id)
+		salesTypes: salesTypes.map((p) => p.id),
+		salesSections: salesSections.map((p) => p.id)
 	};
 
 	accounts = [];
@@ -1079,6 +1087,7 @@ export function clearAllData() {
 	sales = [];
 	salesPlans = [];
 	salesTypes = [];
+	salesSections = [];
 
 	for (const [collection, list] of Object.entries(ids)) {
 		list.forEach((id) => erase(collection, id));
@@ -1104,7 +1113,19 @@ export function saveSalesPlan(data) {
 export function saveSaleType(data) {
  const type = { ...data, id: data.id || uid(), name: data.name.trim(), deleted: !!data.deleted };
  validateSaleType(type);
- if (!type.deleted && saleTypesCatalog(salesTypes, sales, salesPlans).some(t => !t.deleted && t.id !== type.id && t.name.toLocaleLowerCase('pt-BR') === type.name.toLocaleLowerCase('pt-BR'))) throw new Error('Já existe um tipo com esse nome.');
+ const secId = type.sectionId || 'default';
+ const scoped = forSection(secId, { salesTypes, sales, salesPlans });
+ if (!type.deleted && saleTypesCatalog(scoped.salesTypes, scoped.sales, scoped.salesPlans).some(t => !t.deleted && t.id !== type.id && t.name.toLocaleLowerCase('pt-BR') === type.name.toLocaleLowerCase('pt-BR'))) throw new Error('Já existe um tipo com esse nome nesta seção.');
  salesTypes = [...salesTypes.filter(t => t.id !== type.id), type];
  write('salesTypes', type.id, type);
+}
+
+// ---- Seções de Vendas ----
+
+export function saveSalesSection(data) {
+	const section = { ...data, id: data.id || uid(), name: data.name.trim(), deleted: !!data.deleted };
+	validateSalesSection(section);
+	if (!section.deleted && salesSections.some(s => !s.deleted && s.id !== section.id && s.name.toLocaleLowerCase('pt-BR') === section.name.toLocaleLowerCase('pt-BR'))) throw new Error('Já existe uma seção com esse nome.');
+	salesSections = [...salesSections.filter(s => s.id !== section.id), section];
+	write('salesSections', section.id, section);
 }

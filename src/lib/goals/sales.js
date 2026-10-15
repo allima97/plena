@@ -77,3 +77,21 @@ export function saleTypesCatalog(overrides = [], sales = [], plans = []) {
 export function validateSaleType(type) {
  if (!type || typeof type.id !== 'string' || !type.id.trim() || type.id.length > 120 || typeof type.name !== 'string' || !type.name.trim() || type.name.trim().length > 80 || typeof type.deleted !== 'boolean') throw new Error('Informe um nome de tipo com até 80 caracteres.');
 }
+
+export function validateSalesSection(section) {
+	if (!section || typeof section.id !== 'string' || !section.id.trim() || typeof section.name !== 'string' || !section.name.trim() || section.name.trim().length > 80) throw new Error('Informe um nome de seção com até 80 caracteres.');
+}
+
+/**
+ * Filters sales, plans and types by sectionId.
+ * sectionId === 'default' is the legacy/unscoped section.
+ */
+export function forSection(sectionId, { sales = [], salesPlans = [], salesTypes = [] } = {}) {
+	const isDefault = sectionId === 'default';
+	const filterSectionId = (item) => isDefault ? (!item.sectionId || item.sectionId === 'default') : item.sectionId === sectionId;
+	return {
+		sales: sales.filter(filterSectionId),
+		salesPlans: salesPlans.filter(filterSectionId),
+		salesTypes: salesTypes.filter(filterSectionId),
+	};
+}

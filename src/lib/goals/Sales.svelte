@@ -2,14 +2,22 @@
  import Modal from '$lib/components/Modal.svelte';
  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
  import { showToast } from '$lib/toast.svelte.js';
- import { Plus, Settings2, Tags, Pencil, Trash2 } from 'lucide-svelte';
+ import { Plus, Settings2, Tags, Pencil, Trash2, ArrowLeft } from 'lucide-svelte';
  import { appState, saveSale, removeSale, saveSalesPlan, saveSaleType } from '$lib/fin/store.svelte.js';
+ import { forSection } from './sales.js';
  import { todayISO, fmtMoney, fmtDate } from '$lib/format.js';
  import { saleTypesCatalog, TIERS, emptyPlan, monthSummary, dailyPaceKPI } from './sales.js';
+
+ /** @type {{ sectionId?: string, onBack?: () => void }} */
+ let { sectionId = 'default', onBack = null } = $props();
+
+ // Scope sales data to this section
+ const scopedSales = $derived(forSection(sectionId, { sales: appState.sales, salesPlans: appState.salesPlans, salesTypes: appState.salesTypes }));
+
  let managingTypes = $state(false);
  let typeDraft = $state({ name: '' });
  let deletingType = $state(null);
- const types = $derived(saleTypesCatalog(appState.salesTypes, appState.sales, appState.salesPlans));
+ const types = $derived(saleTypesCatalog(scopedSales.salesTypes, scopedSales.sales, scopedSales.salesPlans));
  const activeTypes = $derived(types.filter(t => !t.deleted));
  const configTypes = $derived(types.filter(t => !t.deleted || Object.hasOwn(config?.rates || {}, t.id) || summary.items.some(s => s.type === t.id)));
  function typeName(id) { return types.find(t => t.id === id)?.name || id; }
@@ -25,7 +33,7 @@
  }
  function submitType(e) {
   e.preventDefault();
-  try { saveSaleType(typeDraft); typeDraft = { name: '' }; error = ''; showToast({ message: 'Tipo salvo.' }); } catch(e) { error = e.message; }
+  try { saveSaleType({ ...typeDraft, sectionId }); typeDraft = { name: '' }; error = ''; showToast({ message: 'Tipo salvo.' }); } catch(e) { error = e.message; }
  }
  let month = $state(todayISO().slice(0,7));
  let editing = $state(null);
@@ -33,8 +41,9 @@
  let error = $state('');
 
  let deleting = $state(null);
- const plan = $derived(appState.salesPlans.find(p => p.id === month));
- const summary = $derived(monthSummary(appState.sales, month, plan));
+ const planId = $derived(sectionId === 'default' ? month : `${sectionId}:${month}`);
+ const plan = $derived(scopedSales.salesPlans.find(p => p.id === planId));
+ const summary = $derived(monthSummary(scopedSales.sales, month, plan));
  const goalPercent = $derived(plan?.target > 0 ? Math.max(0, summary.net / plan.target * 100) : 0);
  const goalFill = $derived(Math.min(100, goalPercent));
  const goalColor = $derived(`hsl(${goalFill * 1.2} 65% 38%)`);
@@ -57,14 +66,23 @@
  );
  function submitSale(e) {
   e.preventDefault();
-  try { saveSale(editing); editing = null; error = ''; showToast({ message: 'Venda salva.' }); } catch(e) { error = e.message; }
+  try { saveSale({ ...editing, sectionId }); editing = null; error = ''; showToast({ message: 'Venda salva.' }); } catch(e) { error = e.message; }
  }
  function submitPlan(e) {
   e.preventDefault();
-  try { saveSalesPlan(config); config = null; error = ''; showToast({ message: 'Metas e comissões salvas.' }); } catch(e) { error = e.message; }
+  try { saveSalesPlan({ ...config, sectionId, id: planId }); config = null; error = ''; showToast({ message: 'Metas e comissões salvas.' }); } catch(e) { error = e.message; }
  }
 </script>
-<div class="page-head"><div><p class="page-eyebrow">Objetivos</p><h1 class="font-display page-title">Vendas</h1><p class="page-sub">Acompanhe suas vendas, metas e comissão mensal.</p></div></div>
+<div class="page-head sales-page-head">
+ {#if onBack}
+  <button class="btn btn-ghost back-btn" onclick={onBack}><ArrowLeft size={16} /> Todas as seções</button>
+ {/if}
+ <div>
+  <p class="page-eyebrow">Vendas</p>
+  <h1 class="font-display page-title">{sectionId === 'default' ? 'Vendas' : (appState.salesSections.find(s => s.id === sectionId)?.name ?? 'Seção')}</h1>
+  <p class="page-sub">Acompanhe suas vendas, metas e comissão mensal.</p>
+ </div>
+</div>
 <div class="sales-primary-actions">
  <label class="field"><span>Mês </span><input class="field-input" type="month" bind:value={month} required disabled={!!editing || !!config} /></label>
  <button class="btn btn-primary" disabled={!month || !appState.ready || managingTypes || !activeTypes.length} onclick={() => { editing = { date: month === todayISO().slice(0,7) ? todayISO() : `${month}-01`, total: 0, fees: 0, type: activeTypes[0]?.id || '', orderNumber: '' }; error = ''; }}><Plus size={16} /> Nova venda</button>
@@ -188,6 +206,8 @@
 <ConfirmDialog open={!!deleting} title="Excluir venda?" message="A venda será excluída e a comissão do mês será recalculada." confirmLabel="Excluir venda" onCancel={() => deleting = null} onConfirm={() => { removeSale(deleting); deleting = null; showToast({ message: 'Venda excluída.' }); }} />
 <ConfirmDialog open={!!deletingType} title="Excluir tipo de venda?" message={`O tipo “${deletingType?.name || ''}” deixará de aparecer em novas vendas. O histórico e as comissões serão preservados.`} confirmLabel="Excluir tipo" onCancel={() => deletingType = null} onConfirm={() => { saveSaleType({ ...deletingType, deleted: true }); deletingType = null; typeDraft = { name: '' }; showToast({ message: 'Tipo excluído. Histórico preservado.' }); }} />
 <style>
+ .sales-page-head { display:flex; flex-direction:column; gap:8px; margin-bottom:4px; }
+ .back-btn { align-self:flex-start; padding:6px 10px; gap:6px; font-size:13px; }
  .sales-primary-actions, .sales-settings-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; max-width:520px; margin:16px 0; align-items:end; }
  .sales-primary-actions .field { min-width:0; }
  .sales-primary-actions .field-input, .sales-primary-actions .btn { width:100%; min-width:0; height:44px; min-height:44px; box-sizing:border-box; }
