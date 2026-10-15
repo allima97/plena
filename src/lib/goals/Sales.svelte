@@ -5,7 +5,7 @@
  import { Plus, Settings2, Tags, Pencil, Trash2 } from 'lucide-svelte';
  import { appState, saveSale, removeSale, saveSalesPlan, saveSaleType } from '$lib/fin/store.svelte.js';
  import { todayISO, fmtMoney, fmtDate } from '$lib/format.js';
- import { saleTypesCatalog, TIERS, emptyPlan, monthSummary } from './sales.js';
+ import { saleTypesCatalog, TIERS, emptyPlan, monthSummary, dailyPaceKPI } from './sales.js';
  let managingTypes = $state(false);
  let typeDraft = $state({ name: '' });
  let deletingType = $state(null);
@@ -16,8 +16,10 @@
  function openConfig() {
   config = structuredClone($state.snapshot(plan || emptyPlan(month, [])));
   config.commissionBase ??= 'net';
+  config.typeTargets ??= {};
   for (const type of types.filter(t => !t.deleted || summary.items.some(s => s.type === t.id))) {
    if (!Object.hasOwn(config.rates, type.id)) config.rates[type.id] = { below: null, target: null, super: null };
+   if (!Object.hasOwn(config.typeTargets, type.id)) config.typeTargets[type.id] = '';
   }
   error = '';
  }
@@ -37,6 +39,22 @@
  const goalFill = $derived(Math.min(100, goalPercent));
  const goalColor = $derived(`hsl(${goalFill * 1.2} 65% 38%)`);
  const percentLabel = $derived(new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1, roundingMode: 'floor' }).format(goalPercent));
+ // Daily pace KPI — only meaningful in the current month
+ const dailyKPI = $derived(plan?.target > 0 ? dailyPaceKPI(plan.target, summary.net, month) : null);
+ // Type-level KPIs for types that have a typeTarget set
+ const typeKPIs = $derived(
+  plan?.typeTargets
+   ? Object.entries(plan.typeTargets)
+     .filter(([, v]) => v !== null && v !== '' && Number(v) > 0)
+     .map(([typeId, target]) => {
+      const sold = summary.byType?.[typeId] ?? 0;
+      const tgt = Number(target);
+      const pct = Math.min(100, Math.max(0, sold / tgt * 100));
+      const tName = types.find(t => t.id === typeId)?.name || typeId;
+      return { typeId, typeName: tName, sold, target: tgt, pct, remaining: Math.max(0, tgt - sold), done: sold >= tgt };
+     })
+   : []
+ );
  function submitSale(e) {
   e.preventDefault();
   try { saveSale(editing); editing = null; error = ''; showToast({ message: 'Venda salva.' }); } catch(e) { error = e.message; }
@@ -100,6 +118,12 @@
   </label>
   <p>A escolha vale para as comissões deste mês. A meta e a supermeta continuam considerando o valor líquido das vendas.</p>
   <div class="form-grid"><label class="field"><span>Meta líquida (R$)</span><input class="field-input" type="number" min="0.01" step="0.01" required bind:value={config.target} /></label><label class="field"><span>Supermeta líquida (R$)</span><input class="field-input" type="number" min="0.02" step="0.01" required bind:value={config.superTarget} /></label></div>
+  <h3 class="config-section-title">Meta por tipo <span class="field-hint" style="display:inline">(opcional)</span></h3>
+  <p class="field-hint">Defina uma meta líquida por tipo para acompanhar o KPI individual. Deixe em branco para não exibir o KPI.</p>
+  <div class="table-wrap"><table class="list type-target-table"><thead><tr><th>Tipo</th><th>Meta líquida (R$)</th></tr></thead><tbody>
+  {#each configTypes as type}<tr><td>{type.name}{type.deleted ? " (excluído)" : ""}</td><td><input class="field-input" aria-label={`Meta de ${type.name}`} type="number" min="0" step="0.01" placeholder="Sem meta" bind:value={config.typeTargets[type.id]} /></td></tr>{/each}
+  </tbody></table></div>
+  <h3 class="config-section-title">Comissões por tipo e faixa</h3>
   <div class="table-wrap"><table class="list rates-table"><thead><tr><th>Tipo</th>{#each Object.values(TIERS) as label}<th>{label} (%)</th>{/each}</tr></thead><tbody>
   {#each configTypes as type}<tr><td data-label="Tipo">{type.name}{type.deleted ? " (excluído)" : ""}</td>{#each Object.entries(TIERS) as [tier, label]}<td data-label={`${label} (%)`}><input class="field-input" aria-label={`${type.name}: ${label} (%)`} type="number" min="0" max="100" step="0.01" required bind:value={config.rates[type.id][tier]} /></td>{/each}</tr>{/each}
   </tbody></table></div>
@@ -126,6 +150,25 @@
  {#each [['Total vendido', summary.total], ['Taxas', summary.fees], ['Vendas líquidas', summary.net], ['Comissão mês', summary.commission]] as [label, value]}<div class="stat-card"><p class="stat-label">{label}</p><strong class="font-display stat-value privacy-value">{value === null ? 'A configurar' : fmtMoney(value)}</strong></div>{/each}
 </div>
 {#if plan}
+ {#if dailyKPI && dailyKPI.isCurrentMonth}
+  <div class="kpi-row">
+   <section class="card kpi-card kpi-daily" aria-label="Ritmo diário necessário">
+    <p class="stat-label">Valor diário necessário</p>
+    <strong class="font-display kpi-value privacy-value">{new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0}).format(dailyKPI.dailyNeeded)}</strong>
+    <p class="kpi-sub">{dailyKPI.onTrack ? '✓ No ritmo para atingir a meta' : `Faltam ${new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(dailyKPI.remaining)} em ${dailyKPI.daysLeft} dia${dailyKPI.daysLeft !== 1 ? 's' : ''}`}</p>
+   </section>
+   {#each typeKPIs as kpi (kpi.typeId)}
+    <section class="card kpi-card kpi-type" aria-label={`Meta de ${kpi.typeName}`}>
+     <p class="stat-label">{kpi.typeName}</p>
+     <strong class="font-display kpi-value privacy-value">{new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(kpi.sold)}</strong>
+     <div class="kpi-progress-track" role="progressbar" aria-label={`Meta ${kpi.typeName}`} aria-valuemin="0" aria-valuemax="100" aria-valuenow={kpi.pct}>
+      <div class="kpi-progress-fill" style:width={`${kpi.pct}%`} style:background={kpi.done ? 'hsl(140 55% 38%)' : 'hsl(30 70% 42%)'}></div>
+     </div>
+     <p class="kpi-sub">{kpi.done ? `✓ Meta atingida (${new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(kpi.target)})` : `Meta: ${new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(kpi.target)} · Falta ${new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(kpi.remaining)}`}</p>
+    </section>
+   {/each}
+  </div>
+ {/if}
  <section class="card sales-goal" aria-label="Atingimento da meta mensal">
   <div class="sales-goal-head">
    <div><p class="stat-label">Meta do mês</p><p class="sales-goal-value privacy-value">{fmtMoney(plan.target)}</p></div>
@@ -198,6 +241,16 @@
  .sales-explanation { margin-top:16px; line-height:1.6; }
  .rates-table input { min-width:0; }
  .rates-table { min-width:0; }
+ .type-target-table input { min-width:0; max-width:160px; }
+ .config-section-title { font-size:14px; font-weight:700; margin:24px 0 6px; }
+
+ .kpi-row { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px; margin:20px 0; }
+ .kpi-card { padding:18px 20px; }
+ .kpi-value { display:block; font-size:22px; margin:6px 0 10px; overflow-wrap:anywhere; }
+ .kpi-sub { font-size:12px; color:var(--text-2); margin:6px 0 0; line-height:1.5; }
+ .kpi-progress-track { height:6px; background:var(--surface-3,#f0e8de); border-radius:99px; overflow:hidden; margin:8px 0 2px; }
+ .kpi-progress-fill { height:100%; border-radius:99px; transition:width .4s ease; }
+ @media(max-width:480px) { .kpi-row { grid-template-columns:1fr; } }
  @media(max-width:760px) {
   .totals { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .totals .stat-card { min-width:0; padding:16px; }

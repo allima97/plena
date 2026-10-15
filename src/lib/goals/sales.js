@@ -2,7 +2,7 @@ export const SALE_TYPES = ['Fretamento', 'Pacote', 'Hotel', 'Facial', 'Serviços
 export const TIERS = { below: 'Meta não batida', target: 'Meta batida', super: 'Supermeta' };
 export const cents = (value) => Math.round(Number(value) * 100);
 export function emptyPlan(month, types = SALE_TYPES) {
- return { id: month, target: 0, superTarget: 0, commissionBase: 'net', rates: Object.fromEntries(types.map(t => [t, { below: 0, target: 0, super: 0 }])) };
+ return { id: month, target: 0, superTarget: 0, commissionBase: 'net', typeTargets: {}, rates: Object.fromEntries(types.map(t => [t, { below: 0, target: 0, super: 0 }])) };
 }
 export function validateSale(s) {
  if (!/^\d{4}-\d{2}-\d{2}$/.test(s.date) || !Number.isFinite(Date.parse(s.date)) || new Date(s.date).toISOString().slice(0,10) !== s.date) throw new Error('Informe uma data válida.');
@@ -18,6 +18,12 @@ export function validatePlan(p) {
   const rate = p.rates?.[type]?.[tier];
   if (!Number.isFinite(rate) || rate < 0 || rate > 100) throw new Error('Preencha todos os percentuais entre 0 e 100.');
  }
+ if (p.typeTargets !== undefined) {
+  if (typeof p.typeTargets !== 'object' || Array.isArray(p.typeTargets)) throw new Error('Metas por tipo inválidas.');
+  for (const v of Object.values(p.typeTargets)) {
+   if (v !== null && v !== '' && (!Number.isFinite(Number(v)) || Number(v) < 0)) throw new Error('Meta por tipo deve ser um valor positivo.');
+  }
+ }
 }
 export function monthSummary(sales, month, plan) {
  const rows = sales.filter(s => s.date.slice(0,7) === month);
@@ -31,7 +37,34 @@ export function monthSummary(sales, month, plan) {
   const base = plan?.commissionBase === 'gross' ? cents(s.total) : cents(s.total)-cents(s.fees);
   return { ...s, rate: configured ? rate : null, commission: configured ? Math.round(base*rate/100)/100 : null };
  });
- return { total: total/100, fees: fees/100, net: net/100, tier, items, commission: tier && items.every(s => s.commission !== null) ? items.reduce((a,s) => a+cents(s.commission),0)/100 : null };
+ // Per-type net totals for type-level KPIs
+ const byType = {};
+ for (const s of rows) {
+  const typeNet = cents(s.total) - cents(s.fees);
+  byType[s.type] = (byType[s.type] || 0) + typeNet;
+ }
+ return { total: total/100, fees: fees/100, net: net/100, tier, items, byType: Object.fromEntries(Object.entries(byType).map(([k,v]) => [k, v/100])), commission: tier && items.every(s => s.commission !== null) ? items.reduce((a,s) => a+cents(s.commission),0)/100 : null };
+}
+
+/**
+ * Calculates how much needs to be sold per remaining day (including today) to hit the monthly goal.
+ * @param {number} goal - monthly target (net, R$)
+ * @param {number} soldNet - net already sold this month (R$)
+ * @param {string} month - 'YYYY-MM'
+ * @returns {{ remaining: number, daysLeft: number, dailyNeeded: number, onTrack: boolean }}
+ */
+export function dailyPaceKPI(goal, soldNet, month) {
+ const now = new Date();
+ const [y, m] = month.split('-').map(Number);
+ const daysInMonth = new Date(y, m, 0).getDate();
+ const isCurrentMonth = now.getFullYear() === y && now.getMonth() + 1 === m;
+ const dayOfMonth = isCurrentMonth ? now.getDate() : daysInMonth;
+ const daysLeft = Math.max(1, daysInMonth - dayOfMonth + 1); // include today
+ const remaining = Math.max(0, goal - soldNet);
+ const dailyNeeded = remaining / daysLeft;
+ // On track = pace so far covers the goal: (soldNet / dayOfMonth) * daysInMonth >= goal
+ const pace = dayOfMonth > 0 ? (soldNet / dayOfMonth) * daysInMonth : 0;
+ return { remaining, daysLeft, dailyNeeded, onTrack: pace >= goal, isCurrentMonth };
 }
 
 // Legacy names remain stable keys; renaming only changes the display label.
