@@ -1,0 +1,7 @@
+# HTML pages: never cache at edge or browser — always fetch fresh
+/*
+  Cache-Control: no-store, no-cache, must-revalidate
+
+# Immutable hashed assets: cache forever (filename changes on each build)
+/_app/immutable/*
+  Cache-Control: public, max-age=31536000, immutable
