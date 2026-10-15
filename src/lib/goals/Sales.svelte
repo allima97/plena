@@ -46,7 +46,7 @@
   try { saveSalesPlan(config); config = null; error = ''; showToast({ message: 'Metas e comissões salvas.' }); } catch(e) { error = e.message; }
  }
 </script>
-<div class="page-head"><div><p class="page-eyebrow">Objetivos</p><h1 class="font-display page-title">Controle de Vendas</h1><p class="page-sub">Acompanhe suas vendas, metas e comissão mensal.</p></div></div>
+<div class="page-head"><div><p class="page-eyebrow">Objetivos</p><h1 class="font-display page-title">Vendas</h1><p class="page-sub">Acompanhe suas vendas, metas e comissão mensal.</p></div></div>
 <div class="sales-primary-actions">
  <label class="field"><span>Mês </span><input class="field-input" type="month" bind:value={month} required disabled={!!editing || !!config} /></label>
  <button class="btn btn-primary" disabled={!month || !appState.ready || managingTypes || !activeTypes.length} onclick={() => { editing = { date: month === todayISO().slice(0,7) ? todayISO() : `${month}-01`, total: 0, fees: 0, type: activeTypes[0]?.id || '' }; error = ''; }}><Plus size={16} /> Nova venda</button>
