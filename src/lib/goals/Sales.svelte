@@ -68,7 +68,7 @@
     <thead><tr><th scope="col">Tipo de venda</th><th scope="col" class="types-actions-heading">Ações</th></tr></thead>
     <tbody>
      {#each [...activeTypes].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')) as type (type.id)}
-      <tr class:editing-type={typeDraft.id === type.id}>
+      <tr class="type-row" class:editing-type={typeDraft.id === type.id}>
        <td data-label="Tipo de venda" class="type-name">{type.name}</td>
        <td class="actions-cell"><div class="actions-row">
         <button class="btn btn-ghost sm" aria-label={`Editar tipo ${type.name}`} onclick={() => { typeDraft = { ...type }; error = ''; }}><Pencil size={14} /> Editar</button>
@@ -150,8 +150,14 @@
  .types-table .actions-row { justify-content:flex-end; flex-wrap:nowrap; gap:8px; }
  .types-table .editing-type { background:var(--surface-3); }
  @media(max-width:760px) {
-  .types-table .type-name { text-align:right; }
-  .types-table .actions-row .btn { min-height:40px; flex:1; }
+  .types-table .type-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:6px 10px; padding:12px; }
+  .types-table .type-row::before { content:'Tipo de venda'; grid-column:1 / -1; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; color:var(--ink-faint); }
+  .types-table .type-name { display:block; align-self:center; min-width:0; padding:0; border:0; text-align:left; }
+  .types-table .type-name::before { display:none; }
+  .types-table .actions-cell { padding:0; border:0; align-self:center; }
+  .types-table .actions-row { gap:4px; }
+  .types-table .actions-row .btn { min-height:40px; padding:8px; font-size:11px; flex:0 0 auto; }
+  .types-table .actions-row :global(svg) { display:none; }
  }
 
  .sales-goal { padding:20px; margin:20px 0; }
