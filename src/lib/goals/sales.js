@@ -69,7 +69,7 @@ export function dailyPaceKPI(goal, soldNet, month) {
 
 // Legacy names remain stable keys; renaming only changes the display label.
 export function saleTypesCatalog(overrides = [], sales = [], plans = []) {
- const ids = new Set([...SALE_TYPES, ...sales.map(s => s.type), ...plans.flatMap(p => Object.keys(p.rates || {}))]);
+ const ids = new Set([...sales.map(s => s.type), ...plans.flatMap(p => Object.keys(p.rates || {}))]);
  const catalog = new Map([...ids].map(id => [id, { id, name: id, deleted: false }]));
  for (const type of overrides) catalog.set(type.id, type);
  return [...catalog.values()];
