@@ -171,6 +171,53 @@ function persistLocalSnapshot() {
 	saveLocal(snapshot());
 }
 
+// ── Migração: dados de vendas sem sectionId → seção "Turismo" ────────────────
+// Roda uma vez: se existem vendas/planos/tipos sem sectionId e ainda não existe
+// nenhuma seção cadastrada, cria "Turismo" e reassocia todos os registros.
+function migrateLegacySalesToSection(sectionName) {
+	const hasLegacy =
+	sales.some(s => !s.sectionId) ||
+	salesPlans.some(p => !p.sectionId) ||
+	salesTypes.some(t => !t.sectionId);
+	if (!hasLegacy) return; // nada a migrar
+
+	// Usa seção existente de mesmo nome ou cria uma nova
+	let section = salesSections.find(s => !s.deleted && s.name.toLocaleLowerCase('pt-BR') === sectionName.toLocaleLowerCase('pt-BR'));
+	if (!section) {
+	section = { id: uid(), name: sectionName, deleted: false };
+	salesSections = [...salesSections, section];
+	write('salesSections', section.id, section);
+	}
+	const sid = section.id;
+
+	// Reassocia vendas
+	sales = sales.map(s => s.sectionId ? s : { ...s, sectionId: sid });
+	sales.filter(s => s.sectionId === sid && !s._migrated).forEach(s => {
+	const updated = { ...s, _migrated: true };
+	sales = sales.map(x => x.id === updated.id ? updated : x);
+	write('sales', updated.id, updated);
+	});
+
+	// Reassocia planos (o id do plano era só "YYYY-MM"; agora é "sectionId:YYYY-MM")
+	salesPlans = salesPlans.map(p => {
+	if (p.sectionId) return p;
+	// Mantém o id original para não quebrar lookup — sectionId marca o dono
+	const updated = { ...p, sectionId: sid };
+	write('salesPlans', updated.id, updated);
+	return updated;
+	});
+
+	// Reassocia tipos
+	salesTypes = salesTypes.map(t => {
+	if (t.sectionId) return t;
+	const updated = { ...t, sectionId: sid };
+	write('salesTypes', updated.id, updated);
+	return updated;
+	});
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export async function boot() {
 	fetchMe().then((me) => (user = me));
 	const local = loadLocal();
@@ -201,6 +248,7 @@ export async function boot() {
 		salesSections = local.salesSections || [];
 	}
 	ready = true;
+	migrateLegacySalesToSection('Turismo');
 
 	const remote = await fetchRemoteState();
 	if (!remote) {
@@ -250,6 +298,9 @@ export async function boot() {
 	salesPlans = remote.salesPlans || salesPlans;
 	salesTypes = remote.salesTypes || salesTypes;
 	salesSections = remote.salesSections || salesSections;
+
+	migrateLegacySalesToSection('Turismo');
+
 	mode = 'api';
 	persistLocalSnapshot();
 

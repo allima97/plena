@@ -41,8 +41,12 @@
  let error = $state('');
 
  let deleting = $state(null);
+ // For new plans, id = 'sectionId:YYYY-MM'; for migrated plans (legacy), id = 'YYYY-MM'
  const planId = $derived(sectionId === 'default' ? month : `${sectionId}:${month}`);
- const plan = $derived(scopedSales.salesPlans.find(p => p.id === planId));
+ const plan = $derived(
+  scopedSales.salesPlans.find(p => p.id === planId) ||
+  scopedSales.salesPlans.find(p => p.id === month) // fallback: plano migrado
+ );
  const summary = $derived(monthSummary(scopedSales.sales, month, plan));
  const goalPercent = $derived(plan?.target > 0 ? Math.max(0, summary.net / plan.target * 100) : 0);
  const goalFill = $derived(Math.min(100, goalPercent));
