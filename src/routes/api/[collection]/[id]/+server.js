@@ -1,5 +1,6 @@
 import { validateSale, validatePlan, validateSaleType } from '$lib/goals/sales.js';
 import { json } from '@sveltejs/kit';
+import { claimLegacyData, dataOwner } from '$lib/server/data-owner.js';
 
 export const prerender = false;
 
@@ -31,9 +32,11 @@ function checkCollection(collection) {
 }
 
 /** PUT /api/:collection/:id — grava (cria ou substitui) um documento. */
-export async function PUT({ platform, params, request }) {
+export async function PUT({ locals, platform, params, request }) {
 	const db = platform?.env?.DB;
 	if (!db) return json({ error: 'D1 não configurado' }, { status: 503 });
+	const owner = dataOwner(locals);
+	if (!owner) return json({ error: 'unauthorized' }, { status: 401 });
 	if (!checkCollection(params.collection)) return json({ error: 'Coleção desconhecida' }, { status: 400 });
 
 	let data;
@@ -51,24 +54,28 @@ export async function PUT({ platform, params, request }) {
  } catch (error) {
   return json({ error: error.message || 'Dados inválidos.' }, { status: 400 });
  }
+	await claimLegacyData(db, owner, platform.env);
 	await db
 		.prepare(
-			'INSERT INTO documents (collection, id, data, updated_at) VALUES (?, ?, ?, ?) ' +
-				'ON CONFLICT(collection, id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at'
+			'INSERT INTO documents (owner_email, collection, id, data, updated_at) VALUES (?, ?, ?, ?, ?) ' +
+				'ON CONFLICT(owner_email, collection, id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at'
 		)
-		.bind(params.collection, params.id, JSON.stringify(data), Date.now())
+		.bind(owner, params.collection, params.id, JSON.stringify(data), Date.now())
 		.run();
 
 	return json({ ok: true });
 }
 
 /** DELETE /api/:collection/:id — remove um documento. */
-export async function DELETE({ platform, params }) {
+export async function DELETE({ locals, platform, params }) {
 	const db = platform?.env?.DB;
 	if (!db) return json({ error: 'D1 não configurado' }, { status: 503 });
+	const owner = dataOwner(locals);
+	if (!owner) return json({ error: 'unauthorized' }, { status: 401 });
 	if (!checkCollection(params.collection)) return json({ error: 'Coleção desconhecida' }, { status: 400 });
 
-	await db.prepare('DELETE FROM documents WHERE collection = ? AND id = ?').bind(params.collection, params.id).run();
+	await claimLegacyData(db, owner, platform.env);
+	await db.prepare('DELETE FROM documents WHERE owner_email = ? AND collection = ? AND id = ?').bind(owner, params.collection, params.id).run();
 
 	return json({ ok: true });
 }

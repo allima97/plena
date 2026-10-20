@@ -1,5 +1,5 @@
 import { validateSale, validatePlan, validateSaleType, saleTypesCatalog, validateSalesSection, forSection } from '$lib/goals/sales.js';
-import { loadLocal, saveLocal, fetchRemoteState, apiPut, apiRemove, fetchMe } from './persist.js';
+import { loadLocal, saveLocal, fetchRemoteState, apiPut, apiRemove, fetchMe, setLocalIdentity } from './persist.js';
 import { seedCategories, uid } from './seed.js';
 import { todayISO } from '../format.js';
 import { downloadBlob } from './export.js';
@@ -219,8 +219,9 @@ function migrateLegacySalesToSection(sectionName) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function boot() {
-	fetchMe().then((me) => (user = me));
-	const local = loadLocal();
+	user = await fetchMe();
+	setLocalIdentity(user?.email);
+	const local = loadLocal({ allowLegacy: user?.isLegacyDataOwner === true });
 	if (local) {
 		accounts = local.finAccounts || [];
 		categories = local.finCategories || [];

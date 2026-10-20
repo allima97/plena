@@ -3,11 +3,25 @@
 // Own storage key (plena-*) so it never collides with other apps sharing
 // the same browser (e.g. the Rumo Financeiro / nextgoals app).
 
-const LS_KEY = 'plena-state-v1';
+const LEGACY_LS_KEY = 'plena-state-v1';
+let activeLSKey = `${LEGACY_LS_KEY}:anonymous`;
 
-export function loadLocal() {
+/** Seleciona a área local da identidade atual, sem ler dados de outra conta. */
+export function setLocalIdentity(email) {
+	const normalized = typeof email === 'string' ? email.trim().toLowerCase() : '';
+	activeLSKey = `${LEGACY_LS_KEY}:${encodeURIComponent(normalized || 'anonymous')}`;
+}
+
+export function loadLocal({ allowLegacy = false } = {}) {
 	try {
-		const raw = localStorage.getItem(LS_KEY);
+		let raw = localStorage.getItem(activeLSKey);
+		if (!raw && allowLegacy) {
+			raw = localStorage.getItem(LEGACY_LS_KEY);
+			if (raw) {
+				localStorage.setItem(activeLSKey, raw);
+				localStorage.removeItem(LEGACY_LS_KEY);
+			}
+		}
 		return raw ? JSON.parse(raw) : null;
 	} catch {
 		return null;
@@ -16,7 +30,7 @@ export function loadLocal() {
 
 export function saveLocal(data) {
 	try {
-		localStorage.setItem(LS_KEY, JSON.stringify(data));
+		localStorage.setItem(activeLSKey, JSON.stringify(data));
 	} catch {
 		// storage full or disabled -- the app still works for this session
 	}

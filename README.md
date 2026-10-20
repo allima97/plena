@@ -84,10 +84,10 @@ diretamente. Por segurança é "fechado por padrão": enquanto
 `TEAM_DOMAIN`/`POLICY_AUD` não estiverem configurados em `wrangler.jsonc`,
 a API responde 401 para todo mundo (não fica aberta enquanto isso).
 
-Como o Plena é de uso pessoal (só você), não existe tabela de usuários nem
-separação de dados por conta — o login aqui é só o "cadeado" na porta,
-impedindo que outra pessoa acesse a URL. Isso é mais simples do que o
-esquema multiusuário do nextgoals, de propósito.
+Cada registro remoto é vinculado ao e-mail verificado pelo Cloudflare Access.
+As leituras, alterações e exclusões são filtradas por essa identidade no
+servidor e no banco; duas contas Google não compartilham dados. O armazenamento
+local do navegador também tem uma área separada por conta.
 
 Passo a passo, uma vez só (você já tem o Zero Trust configurado por causa
 do nextgoals, então é só o passo 3 em diante que é novo):

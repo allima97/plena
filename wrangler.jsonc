@@ -15,7 +15,8 @@
 		{
 			"binding": "DB",
 			"database_name": "plena-db",
-			"database_id": "0df2c54b-70ce-43ab-a04b-7816876d0d5b"
+			"database_id": "0df2c54b-70ce-43ab-a04b-7816876d0d5b",
+			"migrations_dir": "migrations"
 		}
 	],
 	// Cloudflare Access (Zero Trust) -- login com Google na frente do site
