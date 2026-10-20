@@ -34,8 +34,15 @@ export async function handle({ event, resolve }) {
 			}), true);
 		}
 		event.locals.user = user;
-		const needsOwnerMatch = event.request.method === 'PUT' || event.request.method === 'DELETE' || event.url.pathname === '/api/plena/state';
-		if (needsOwnerMatch) {
+		const needsOwnerMatch = event.request.method === 'PUT' || event.request.method === 'DELETE';
+		// GETs to the authenticated state endpoint can safely support older
+		// installed clients that do not send X-Plena-Owner: the owner always
+		// comes from the verified Access JWT. If a client does send the header,
+		// still reject account switches before returning any state.
+		const stateReadWithOwner = event.request.method === 'GET' &&
+			event.url.pathname === '/api/plena/state' &&
+			event.request.headers.has('X-Plena-Owner');
+		if (needsOwnerMatch || stateReadWithOwner) {
 			const expectedOwner = event.request.headers.get('X-Plena-Owner')?.trim().toLowerCase();
 			if (!expectedOwner || expectedOwner !== user.email) {
 				return withSecurityHeaders(new Response(JSON.stringify({ error: 'account_changed' }), {
