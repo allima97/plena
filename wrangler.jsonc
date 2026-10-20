@@ -27,6 +27,7 @@
 	// "Login com Google", se precisar recriar isso do zero um dia).
 	"vars": {
 		"TEAM_DOMAIN": "https://nxapps.cloudflareaccess.com",
-		"POLICY_AUD": "43f80517f57450906c918145b91b19cb560e194fca1c3b6abf2071f1f8eb2968"
+		"POLICY_AUD": "43f80517f57450906c918145b91b19cb560e194fca1c3b6abf2071f1f8eb2968",
+		"LEGACY_DATA_OWNER_EMAIL": "allima97@gmail.com"
 	}
 }
