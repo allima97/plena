@@ -1,6 +1,11 @@
 # HTML pages: never cache at edge or browser — always fetch fresh
 /*
   Cache-Control: no-store, no-cache, must-revalidate
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Content-Security-Policy: frame-ancestors 'none'; object-src 'none'; base-uri 'self'
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
 
 # Immutable hashed assets: cache forever (filename changes on each build)
 /_app/immutable/*

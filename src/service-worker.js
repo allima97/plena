@@ -2,10 +2,11 @@
 // Service worker mínimo do Plena: cacheia os assets de build + estáticos para
 // permitir "Adicionar à tela inicial" / instalação como PWA e um uso básico
 // offline (a tela abre; dados dependem de já terem sido carregados antes).
-import { build, files, version } from '$service-worker';
+import { assets, immutable, prerendered } from '$app/manifest';
+import { version } from '$app/env';
 
 const CACHE = `plena-cache-${version}`;
-const ASSETS = [...build, ...files];
+const ASSETS = [...immutable, ...assets, ...prerendered].map(({ path }) => new URL(path, self.location.origin).pathname);
 
 self.addEventListener('install', (event) => {
 	event.waitUntil(
@@ -44,9 +45,13 @@ self.addEventListener('fetch', (event) => {
 			if (cached) return cached;
 		}
 
+		// Só os arquivos conhecidos do build ficam disponíveis offline. Navegações
+		// e demais respostas do servidor podem conter dados de uma sessão.
+		if (!ASSETS.includes(url.pathname)) return fetch(event.request);
+
 		try {
 			const response = await fetch(event.request);
-			if (response.status === 200) cache.put(event.request, response.clone());
+			if (response.status === 200 && response.type === 'basic') cache.put(url.pathname, response.clone());
 			return response;
 		} catch (err) {
 			const cached = await cache.match(event.request);

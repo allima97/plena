@@ -1,13 +1,7 @@
-// Verificação do login do Cloudflare Access (Zero Trust), sem depender de
-// nenhuma lib externa — só Web Crypto, que os Workers já têm nativamente.
-// Mesma ideia do worker.js do nextgoals (que usa a lib `jose`), reimplementada
-// aqui à mão para não precisar adicionar uma dependência nova ao projeto.
-//
-// "Fechado por padrão": se TEAM_DOMAIN/POLICY_AUD não estiverem configurados
-// em wrangler.jsonc, ou o token não bater (assinatura, emissor, audiência,
-// expiração), retorna null — nunca deixa passar por engano.
-
+// Verifica localmente o JWT emitido pelo Cloudflare Access. O backend falha
+// fechado caso configuração, assinatura ou claims não sejam válidos.
 function base64UrlToUint8Array(base64Url) {
+	if (!/^[A-Za-z0-9_-]+$/.test(base64Url)) throw new Error('base64url inválido');
 	const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
 	const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
 	const raw = atob(padded);
@@ -18,26 +12,29 @@ function base64UrlToUint8Array(base64Url) {
 
 function base64UrlDecodeJSON(base64Url) {
 	const bytes = base64UrlToUint8Array(base64Url);
-	return JSON.parse(new TextDecoder().decode(bytes));
+	return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
 }
 
-// createRemoteJWKSet do `jose` cacheia as chaves públicas do Access e só
-// busca de novo quando aparece um `kid` desconhecido — replicando isso aqui
-// com uma variável de módulo simples (vale por instância do Worker).
 let jwksCache = null;
 let jwksFetchedAt = 0;
 const JWKS_TTL_MS = 60 * 60 * 1000;
+const JWKS_REFRESH_COOLDOWN_MS = 30 * 1000;
 
 async function fetchJWKS(teamDomain) {
-	const res = await fetch(`${teamDomain}/cdn-cgi/access/certs`);
+	const res = await fetch(`${teamDomain}/cdn-cgi/access/certs`, { signal: AbortSignal.timeout(5000) });
 	if (!res.ok) throw new Error(`falha ao buscar as chaves do Access: ${res.status}`);
-	return res.json();
+	const jwks = await res.json();
+	if (!Array.isArray(jwks?.keys)) throw new Error('JWKS inválido');
+	return jwks;
 }
 
 async function getJWKS(teamDomain, forceRefresh = false) {
 	const now = Date.now();
-	if (forceRefresh || !jwksCache || now - jwksFetchedAt > JWKS_TTL_MS) {
-		jwksCache = await fetchJWKS(teamDomain);
+	const expired = !jwksCache || now - jwksFetchedAt > JWKS_TTL_MS;
+	const refreshAllowed = now - jwksFetchedAt > JWKS_REFRESH_COOLDOWN_MS;
+	if ((expired || forceRefresh) && (!forceRefresh || refreshAllowed || !jwksCache)) {
+		const next = await fetchJWKS(teamDomain);
+		jwksCache = next;
 		jwksFetchedAt = now;
 	}
 	return jwksCache;
@@ -50,27 +47,30 @@ async function importRS256Key(jwk) {
 async function verifySignature(jwk, headerB64, payloadB64, signatureB64) {
 	const key = await importRS256Key(jwk);
 	const data = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
-	const signature = base64UrlToUint8Array(signatureB64);
-	return crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, signature, data);
+	return crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, base64UrlToUint8Array(signatureB64), data);
 }
 
-/**
- * Confere o header `Cf-Access-Jwt-Assertion` que o Access injeta em toda
- * requisição que passou pelo login. Retorna `{ email, name }` da pessoa
- * logada, ou `null` se o Access não estiver configurado, o header não
- * existir, ou o token não for válido.
- * @returns {Promise<{email: string, name: string|null}|null>}
- */
+function validEmail(value) {
+	return typeof value === 'string' && value.length <= 320 && value === value.trim() &&
+		/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+/** @returns {Promise<{email: string, name: string|null}|null>} */
 export async function verifyAccessJWT(request, env) {
 	const teamDomain = env?.TEAM_DOMAIN;
 	const policyAud = env?.POLICY_AUD;
-	if (!teamDomain || !policyAud) return null;
+	if (typeof teamDomain !== 'string' || typeof policyAud !== 'string' || !policyAud) return null;
+	try {
+		const issuer = new URL(teamDomain);
+		if (issuer.protocol !== 'https:' || issuer.pathname !== '/' || issuer.search || issuer.hash) return null;
+	} catch {
+		return null;
+	}
 
 	const token = request.headers.get('Cf-Access-Jwt-Assertion');
-	if (!token) return null;
-
+	if (!token || token.length > 8192) return null;
 	const parts = token.split('.');
-	if (parts.length !== 3) return null;
+	if (parts.length !== 3 || parts.some((part) => !part)) return null;
 	const [headerB64, payloadB64, signatureB64] = parts;
 
 	let header, payload;
@@ -80,30 +80,28 @@ export async function verifyAccessJWT(request, env) {
 	} catch {
 		return null;
 	}
-	if (header.alg !== 'RS256') return null;
+	if (!header || typeof header !== 'object' || header.alg !== 'RS256' || typeof header.kid !== 'string' || !header.kid) return null;
+	if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
 
 	try {
 		let jwks = await getJWKS(teamDomain);
-		let jwk = jwks.keys?.find((k) => k.kid === header.kid);
+		let jwk = jwks.keys.find((key) => key.kid === header.kid);
 		if (!jwk) {
-			// kid pode ter rotacionado -- busca de novo uma vez antes de desistir.
 			jwks = await getJWKS(teamDomain, true);
-			jwk = jwks.keys?.find((k) => k.kid === header.kid);
+			jwk = jwks.keys.find((key) => key.kid === header.kid);
 		}
-		if (!jwk) return null;
-
-		const valid = await verifySignature(jwk, headerB64, payloadB64, signatureB64);
-		if (!valid) return null;
+		if (!jwk || jwk.kty !== 'RSA' || (jwk.use && jwk.use !== 'sig') || (jwk.alg && jwk.alg !== 'RS256')) return null;
+		if (!(await verifySignature(jwk, headerB64, payloadB64, signatureB64))) return null;
 
 		const now = Math.floor(Date.now() / 1000);
-		if (typeof payload.exp === 'number' && payload.exp < now) return null;
-		if (typeof payload.nbf === 'number' && payload.nbf > now) return null;
-		if (payload.iss !== teamDomain) return null;
+		if (!Number.isSafeInteger(payload.exp) || payload.exp <= now) return null;
+		if (payload.nbf !== undefined && (!Number.isSafeInteger(payload.nbf) || payload.nbf > now)) return null;
+		if (payload.iat !== undefined && (!Number.isSafeInteger(payload.iat) || payload.iat > now + 60)) return null;
+		if (payload.iss !== teamDomain || !validEmail(payload.email)) return null;
 		const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
 		if (!aud.includes(policyAud)) return null;
-		if (!payload.email) return null;
 
-		return { email: payload.email, name: payload.name || null };
+		return { email: payload.email.toLowerCase(), name: typeof payload.name === 'string' ? payload.name.slice(0, 200) : null };
 	} catch (err) {
 		console.error('[access] verificação do JWT falhou:', err?.message || err);
 		return null;
