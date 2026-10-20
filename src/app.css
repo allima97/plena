@@ -624,6 +624,10 @@ table.list .num {
 }
 
 .nav-block {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	overscroll-behavior: contain;
 	margin-top: 40px;
 	padding: 0 4px;
 }
@@ -683,6 +687,7 @@ table.list .num {
 }
 
 .sidebar-footer {
+	flex: 0 0 auto;
 	margin-top: auto;
 	padding: 0 4px;
 }

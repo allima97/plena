@@ -116,17 +116,16 @@
 	});
 
 	function handleAvatarClick() {
-		if (!appState.user?.logoutUrl) return;
 		if (appState.settings.confirmExitApp) {
 			confirmSairOpen = true;
 			return;
 		}
-		window.location.href = appState.user.logoutUrl;
+		window.location.href = appState.user?.logoutUrl || `${window.location.origin}/cdn-cgi/access/logout`;
 	}
 
 	function confirmSair() {
 		confirmSairOpen = false;
-		if (appState.user?.logoutUrl) window.location.href = appState.user.logoutUrl;
+		window.location.href = appState.user?.logoutUrl || `${window.location.origin}/cdn-cgi/access/logout`;
 	}
 
 	function isActive(href) {
@@ -225,12 +224,10 @@
 					{t('sync_carregando')}
 				{/if}
 			</div>
-			{#if appState.user?.logoutUrl}
-				<button class="nav-item logout-btn" onclick={handleAvatarClick}>
-					<LogOut size={18} strokeWidth={1.8} />
-					<span>{t('nav_sair')}</span>
-				</button>
-			{/if}
+			<button class="nav-item logout-btn" onclick={handleAvatarClick}>
+				<LogOut size={18} strokeWidth={1.8} />
+				<span>{t('nav_sair')}</span>
+			</button>
 		</div>
 	</aside>
 
