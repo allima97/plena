@@ -34,6 +34,16 @@ export async function handle({ event, resolve }) {
 			}), true);
 		}
 		event.locals.user = user;
+		const needsOwnerMatch = event.request.method === 'PUT' || event.request.method === 'DELETE' || event.url.pathname === '/api/plena/state';
+		if (needsOwnerMatch) {
+			const expectedOwner = event.request.headers.get('X-Plena-Owner')?.trim().toLowerCase();
+			if (!expectedOwner || expectedOwner !== user.email) {
+				return withSecurityHeaders(new Response(JSON.stringify({ error: 'account_changed' }), {
+					status: 409,
+					headers: { 'content-type': 'application/json; charset=utf-8' }
+				}), true);
+			}
+		}
 		if (!isSameOriginMutation(event.request, event.url)) {
 			return withSecurityHeaders(new Response(JSON.stringify({ error: 'forbidden' }), {
 				status: 403,

@@ -37,6 +37,7 @@ export async function GET({ locals, platform }) {
 		.all();
 
 	const state = {
+		owner,
 		finAccounts: [],
 		finCategories: [],
 		finTransactions: [],

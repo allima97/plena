@@ -251,7 +251,7 @@ export async function boot() {
 	ready = true;
 	migrateLegacySalesToSection('Turismo');
 
-	const remote = await fetchRemoteState();
+	const remote = await fetchRemoteState(user?.email);
 	if (!remote) {
 		mode = 'local';
 		if (!categories.length) {

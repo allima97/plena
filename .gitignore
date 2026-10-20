@@ -1,5 +1,8 @@
 node_modules
 
+# Local finance import contains private user records; never publish it.
+/import-objetivos.sql
+
 # Output
 .output
 .vercel

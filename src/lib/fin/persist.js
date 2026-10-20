@@ -5,10 +5,12 @@
 
 const LEGACY_LS_KEY = 'plena-state-v1';
 let activeLSKey = `${LEGACY_LS_KEY}:anonymous`;
+let activeIdentity = '';
 
 /** Seleciona a área local da identidade atual, sem ler dados de outra conta. */
 export function setLocalIdentity(email) {
 	const normalized = typeof email === 'string' ? email.trim().toLowerCase() : '';
+	activeIdentity = normalized;
 	activeLSKey = `${LEGACY_LS_KEY}:${encodeURIComponent(normalized || 'anonymous')}`;
 }
 
@@ -37,12 +39,16 @@ export function saveLocal(data) {
 }
 
 /** @returns {Promise<{finAccounts:any[], finCategories:any[], finTransactions:any[], goals:any[], reportTemplates:any[], reportHistory:any[], reportSchedule:any, alertThresholds:any, purchaseInstallments:any[]}|null>} */
-export async function fetchRemoteState() {
+export async function fetchRemoteState(expectedEmail = activeIdentity) {
+	const expectedOwner = typeof expectedEmail === 'string' ? expectedEmail.trim().toLowerCase() : '';
+	if (!expectedOwner || expectedOwner !== activeIdentity) return null;
 	try {
-		const res = await fetch('/api/plena/state', { headers: { accept: 'application/json' } });
+		const res = await fetch('/api/plena/state', {
+		headers: { accept: 'application/json', 'X-Plena-Owner': expectedOwner }
+		});
 		if (!res.ok) return null;
 		const data = await res.json();
-		if (!data || !Array.isArray(data.finCategories)) return null;
+		if (!data || data.owner !== expectedOwner || !Array.isArray(data.finCategories)) return null;
 		return data;
 	} catch {
 		return null;
@@ -51,10 +57,11 @@ export async function fetchRemoteState() {
 
 /** @returns {Promise<boolean>} true se a API confirmou a escrita (2xx). */
 export async function apiPut(collection, id, data) {
+	if (!activeIdentity) return false;
 	try {
 		const res = await fetch(`/api/${collection}/${id}`, {
 			method: 'PUT',
-			headers: { 'content-type': 'application/json' },
+			headers: { 'content-type': 'application/json', 'X-Plena-Owner': activeIdentity },
 			body: JSON.stringify(data)
 		});
 		return res.ok;
@@ -67,8 +74,12 @@ export async function apiPut(collection, id, data) {
 
 /** @returns {Promise<boolean>} true se a API confirmou a remoção (2xx). */
 export async function apiRemove(collection, id) {
+	if (!activeIdentity) return false;
 	try {
-		const res = await fetch(`/api/${collection}/${id}`, { method: 'DELETE' });
+		const res = await fetch(`/api/${collection}/${id}`, {
+			method: 'DELETE',
+			headers: { 'X-Plena-Owner': activeIdentity }
+		});
 		return res.ok;
 	} catch {
 		return false;
