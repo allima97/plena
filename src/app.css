@@ -3183,6 +3183,21 @@ table.list .num {
 	height: 100%;
 	border-radius: 999px;
 }
+.card-usage-pct {
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--ink-muted);
+	background: var(--surface-3);
+	padding: 2px 8px;
+	border-radius: 20px;
+	flex-shrink: 0;
+}
+.card-usage-pct.pct-medium { color: #9a6500; background: #fff0cc; }
+.card-usage-pct.pct-high   { color: #b52a1c; background: #fde9e7; }
+@media (prefers-color-scheme: dark) {
+	.card-usage-pct.pct-medium { color: #f5c542; background: rgba(245,197,66,.15); }
+	.card-usage-pct.pct-high   { color: #f87171; background: rgba(248,113,113,.15); }
+}
 
 /* ---------- categorias: rows + tip panel ---------- */
 

@@ -224,6 +224,7 @@
 				<div class="card-usage-item">
 					<div class="card-usage-top">
 						<span style="display:flex;align-items:center"><span class="card-usage-dot {grad}"></span>{acc.nome}</span>
+						<span class="card-usage-pct" class:pct-high={pct >= 80} class:pct-medium={pct >= 50 && pct < 80}>{pct}%</span>
 					</div>
 					<p class="card-usage-value privacy-value">{fmtMoney(limiteUtilizado(acc))}</p>
 					<p class="card-usage-sub">de <span class="privacy-value">{fmtMoney(acc.limite)}</span></p>
