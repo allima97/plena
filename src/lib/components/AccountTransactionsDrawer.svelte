@@ -333,7 +333,7 @@
 
 	.atd-panel {
 		width: 100%;
-		max-width: 520px;
+		max-width: 640px;
 		height: auto;
 		max-height: 88vh;
 		display: flex;
@@ -449,18 +449,18 @@
 	.atd-filters {
 		display: flex;
 		align-items: center;
-		gap: 8px;
-		padding: 12px 16px;
+		gap: 10px;
+		padding: 12px 20px;
 		border-bottom: 1px solid var(--border-soft);
 		flex-wrap: nowrap;
 		flex: none;
 	}
 	.atd-quick-filters {
 		display: flex;
-		gap: 4px;
+		gap: 6px;
 		flex: 1;
 		flex-wrap: nowrap;
-		overflow: hidden;
+		min-width: 0;
 	}
 	/* No mobile, esconde chips e mostra select */
 	.atd-quick-select-mobile {
@@ -483,7 +483,7 @@
 	.atd-list {
 		flex: 1;
 		overflow-y: auto;
-		padding: 8px 16px;
+		padding: 8px 20px;
 	}
 	.atd-empty {
 		padding: 48px 24px;
