@@ -3068,19 +3068,24 @@ table.list .num {
 	margin: 4px 0 0;
 }
 .grad-red {
-	background: linear-gradient(135deg, #d97a6e, #a5372c);
+	background: linear-gradient(135deg, #e63838, #971010);
 }
 .grad-purple {
 	background: linear-gradient(135deg, #9481e0, #5c3fae);
 }
 .grad-blue {
-	background: linear-gradient(135deg, #5a86e6, #2c4fa8);
+	background: linear-gradient(135deg, #3a7cc8, #124688);
 }
 .grad-dark {
-	background: linear-gradient(135deg, #2e353f, #0d1116);
+	/* agora: cinza */
+	background: linear-gradient(135deg, #b2b2b2, #636363);
 }
 .grad-orange {
-	background: linear-gradient(135deg, #e3a94a, #b06f1e);
+	background: linear-gradient(135deg, #ff7040, #c43510);
+}
+.grad-yellow {
+	/* amarelo vivo no topo, âmbar escuro na base — texto branco funciona */
+	background: linear-gradient(135deg, #ffe84a, #8a6400);
 }
 .grad-green {
 	background: linear-gradient(135deg, #45c48a, #1f7d51);
