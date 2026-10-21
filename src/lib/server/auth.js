@@ -2,7 +2,12 @@ const SESSION_COOKIE = '__Host-plena_session';
 const CHALLENGE_COOKIE = '__Host-plena_challenge';
 const SESSION_TTL = 30 * 24 * 60 * 60 * 1000;
 const CHALLENGE_TTL = 5 * 60 * 1000;
-const PASSWORD_ITERATIONS = 310_000;
+// Cloudflare Workers rejects PBKDF2 iteration counts above 100,000.
+const PASSWORD_ITERATIONS = 100_000;
+// The account-wide included email quota is shared with Salão na Mão. Reserve
+// 500 of its 3,000 monthly messages for that app.
+const MONTHLY_EMAIL_LIMIT = 2_500;
+const EMAIL_BILLING_CYCLE_DAY = 18;
 const encoder = new TextEncoder();
 
 function base64url(bytes) {
@@ -120,6 +125,21 @@ async function rateLimit(db, key, limit, windowMs) {
 	return Number(result?.count) <= limit;
 }
 
+function emailBillingPeriod(now) {
+	const date = new Date(now);
+	if (date.getUTCDate() < EMAIL_BILLING_CYCLE_DAY) date.setUTCMonth(date.getUTCMonth() - 1);
+	return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${EMAIL_BILLING_CYCLE_DAY}`;
+}
+
+async function reserveMonthlyEmail(db, now) {
+	const period = emailBillingPeriod(now);
+	return db.prepare(
+		`INSERT INTO auth_email_usage (billing_period, count) VALUES (?, 1)
+		 ON CONFLICT(billing_period) DO UPDATE SET count = count + 1
+		 WHERE count < ? RETURNING count`
+	).bind(period, MONTHLY_EMAIL_LIMIT).first();
+}
+
 async function requestAllowed(event) {
 	const origin = event.request.headers.get('Origin');
 	if (!origin || origin !== event.url.origin) return false;
@@ -180,13 +200,19 @@ async function requestCode(event, env) {
 	await db.prepare(
 		'INSERT INTO auth_challenges (id, email, name, password_hash, code_hash, purpose, created_at, expires_at, last_sent_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
 	).bind(challengeId, email, accountName, passwordHash, codeHash, body.mode, now, now + CHALLENGE_TTL, now).run();
-
-	try {
-		if (body.mode !== 'reset' || existing) await sendCode(env, email, code, body.mode);
-	} catch (error) {
-		await db.prepare('DELETE FROM auth_challenges WHERE id = ?').bind(challengeId).run();
-		console.error('[auth] falha ao enviar código de acesso:', error?.message || error);
-		return json({ error: 'email_unavailable', message: 'Não foi possível enviar o código agora. Tente novamente em instantes.' }, 503);
+	if (body.mode !== 'reset' || existing) {
+		const emailReservation = await reserveMonthlyEmail(db, now);
+		if (!emailReservation) {
+			await db.prepare('DELETE FROM auth_challenges WHERE id = ?').bind(challengeId).run();
+			return json({ error: 'email_quota_reached', message: 'O limite mensal de envio de códigos foi atingido. Tente novamente no próximo ciclo.' }, 429);
+		}
+		try {
+			await sendCode(env, email, code, body.mode);
+		} catch (error) {
+			await db.prepare('DELETE FROM auth_challenges WHERE id = ?').bind(challengeId).run();
+			console.error('[auth] falha ao enviar código de acesso:', error?.message || error);
+			return json({ error: 'email_unavailable', message: 'Não foi possível enviar o código agora. Tente novamente em instantes.' }, 503);
+		}
 	}
 
 	const headers = new Headers();

@@ -84,13 +84,13 @@ As senhas usam PBKDF2-SHA-256 com salt aleatório. E-mails de autenticação sã
 transacionais pelo binding `EMAIL` do Cloudflare Email Service, usando
 `conta@salaonamao.com`. Configure `AUTH_SECRET` como segredo do Worker. A
 migração `0002_email_password_auth.sql` cria as tabelas de usuários, códigos,
-sessões e limites de tentativa.
+sessões e limites de tentativa. A migração `0003_auth_email_quota.sql` limita
+os envios do PLENA a 2.500 por ciclo de cobrança (dia 18), reservando margem
+da franquia compartilhada para os e-mails do Salão na Mão.
 
-O domínio do PLENA também precisa deixar de estar protegido por uma política
-Cloudflare Access que force o login Google; mantenha o Access em bypass para
-este app específico, pois a autenticação e a proteção das APIs passam a ser
-feitas pelo Worker do PLENA. Não altere o provedor Google compartilhado por
-outros aplicativos.
+O domínio e o Worker do PLENA foram removidos da aplicação compartilhada do
+Cloudflare Access, para que a autenticação própria do app seja usada. O
+provedor Google e os demais destinos, incluindo NextGoals, continuam no Access.
 
 ## Estrutura
 

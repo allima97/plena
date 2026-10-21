@@ -141,6 +141,7 @@
 			<p class="eyebrow">CONFIRMAÇÃO DE SEGURANÇA</p>
 			<h1 id="login-title">Confira seu e-mail.</h1>
 			<p class="intro">{mode === 'reset' ? 'Se o e-mail estiver cadastrado, um código será enviado para ' : 'Enviamos um código de 6 dígitos para '}<strong>{sentTo}</strong>. Digite-o para {mode === 'register' ? 'validar o cadastro' : mode === 'reset' ? 'continuar a redefinição' : 'entrar na sua conta'}.</p>
+			{#if mode === 'reset'}<p class="hint reset-guidance">Se este for seu primeiro acesso, volte à tela de entrada e escolha <strong>Criar conta</strong>. A redefinição só envia código para contas já cadastradas. Se já tem uma conta, confira também a caixa de spam.</p>{/if}
 			<form onsubmit={verify}>
 				<label for="code">Código de verificação</label>
 				<input id="code" class="code-input" type="text" inputmode="numeric" autocomplete="one-time-code" bind:value={code} required pattern={'[0-9]{6}'} minlength="6" maxlength="6" placeholder="000000" />
