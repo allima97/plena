@@ -10,8 +10,8 @@
 	import { Plus, Wallet, CreditCard, Landmark, Pencil, Trash2, Archive, ArchiveRestore, MoreHorizontal } from 'lucide-svelte';
 	import AccountTransactionsDrawer from '$lib/components/AccountTransactionsDrawer.svelte';
 
-	const PALETTE = ['grad-red', 'grad-orange', 'grad-yellow', 'grad-blue', 'grad-purple', 'grad-green', 'grad-dark'];
-	const PALETTE_LABELS = { 'grad-red': 'Vermelho', 'grad-orange': 'Laranja', 'grad-yellow': 'Amarelo', 'grad-blue': 'Azul', 'grad-purple': 'Roxo', 'grad-green': 'Verde', 'grad-dark': 'Cinza' };
+	const PALETTE = ['grad-red', 'grad-orange', 'grad-yellow', 'grad-blue', 'grad-purple', 'grad-green', 'grad-dark', 'grad-black'];
+	const PALETTE_LABELS = { 'grad-red': 'Vermelho', 'grad-orange': 'Laranja', 'grad-yellow': 'Amarelo', 'grad-blue': 'Azul', 'grad-purple': 'Roxo', 'grad-green': 'Verde', 'grad-dark': 'Cinza', 'grad-black': 'Preto' };
 
 	let showModal = $state(false);
 	let editing = $state(null);

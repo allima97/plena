@@ -22,7 +22,7 @@
 
 	let { acc, open, onClose, onOpenActions } = $props();
 
-	const PALETTE = ['grad-red', 'grad-orange', 'grad-yellow', 'grad-blue', 'grad-purple', 'grad-green', 'grad-dark'];
+	const PALETTE = ['grad-red', 'grad-orange', 'grad-yellow', 'grad-blue', 'grad-purple', 'grad-green', 'grad-dark', 'grad-black'];
 
 	let quickFilter = $state('all');
 	let monthFilter = $state('all');

@@ -3090,6 +3090,9 @@ table.list .num {
 .grad-green {
 	background: linear-gradient(135deg, #45c48a, #1f7d51);
 }
+.grad-black {
+	background: linear-gradient(135deg, #3a424d, #0a0e13);
+}
 .account-tile.add-tile {
 	background: var(--surface-2);
 	border: 1.5px dashed var(--border);
