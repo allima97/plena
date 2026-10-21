@@ -217,7 +217,7 @@
 				<p class="font-display" style="margin:0;font-size:18px">Limite utilizado</p>
 			</div>
 		</div>
-		<div class="card-usage-list">
+		<div class="card-usage-list" style="--card-count:{cartoes.length}">
 			{#each cartoes as acc, i (acc.id)}
 				{@const grad = acc.cor || PALETTE[(appState.accounts.indexOf(acc)) % PALETTE.length]}
 				{@const pct = acc.limite ? Math.min(100, Math.round((limiteUtilizado(acc) / acc.limite) * 100)) : 0}

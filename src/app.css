@@ -3137,7 +3137,7 @@ table.list .num {
 @media (min-width: 700px) {
 	.card-usage-list {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+		grid-template-columns: repeat(var(--card-count, 4), 1fr);
 		gap: 16px;
 	}
 }
