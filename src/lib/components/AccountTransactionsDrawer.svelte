@@ -249,12 +249,20 @@
 
 			<!-- Filtros -->
 			<div class="atd-filters">
-				<div class="atd-quick-filters">
+				<!-- Desktop: chips numa linha -->
+				<div class="atd-quick-filters atd-chips-desktop">
 					<button class="quick-filter-chip" class:active={quickFilter === 'all'} onclick={() => (quickFilter = 'all')}>Todos</button>
 					<button class="quick-filter-chip" class:active={quickFilter === 'receita'} onclick={() => (quickFilter = 'receita')}>Receitas</button>
 					<button class="quick-filter-chip" class:active={quickFilter === 'despesa'} onclick={() => (quickFilter = 'despesa')}>Despesas</button>
 					<button class="quick-filter-chip" class:active={quickFilter === 'pendente'} onclick={() => (quickFilter = 'pendente')}>Pendentes</button>
 				</div>
+				<!-- Mobile: dropdown -->
+				<select class="atd-month-select atd-quick-select-mobile" bind:value={quickFilter}>
+					<option value="all">Todos</option>
+					<option value="receita">Receitas</option>
+					<option value="despesa">Despesas</option>
+					<option value="pendente">Pendentes</option>
+				</select>
 				<select class="atd-month-select" bind:value={monthFilter}>
 					<option value="all">Todos os meses</option>
 					{#each mesesDisponiveis as m}
@@ -316,27 +324,30 @@
 		inset: 0;
 		z-index: 50;
 		display: flex;
-		align-items: stretch;
-		justify-content: flex-end;
+		align-items: center;
+		justify-content: center;
 		background: rgba(23, 33, 43, 0.45);
 		backdrop-filter: blur(3px);
+		padding: 20px;
 	}
 
 	.atd-panel {
 		width: 100%;
 		max-width: 520px;
-		height: 100%;
+		height: auto;
+		max-height: 88vh;
 		display: flex;
 		flex-direction: column;
 		background: var(--card);
-		box-shadow: -8px 0 40px rgba(0, 0, 0, 0.18);
+		box-shadow: 0 8px 48px rgba(0, 0, 0, 0.22);
 		overflow: hidden;
-		animation: atd-slide-in 0.22s ease;
+		border-radius: 16px;
+		animation: atd-fade-scale 0.22s ease;
 	}
 
-	@keyframes atd-slide-in {
-		from { transform: translateX(100%); opacity: 0; }
-		to   { transform: translateX(0);    opacity: 1; }
+	@keyframes atd-fade-scale {
+		from { transform: scale(0.95); opacity: 0; }
+		to   { transform: scale(1);    opacity: 1; }
 	}
 
 	/* Header com gradiente */
@@ -441,14 +452,20 @@
 		gap: 8px;
 		padding: 12px 16px;
 		border-bottom: 1px solid var(--border-soft);
-		flex-wrap: wrap;
+		flex-wrap: nowrap;
 		flex: none;
 	}
 	.atd-quick-filters {
 		display: flex;
 		gap: 4px;
 		flex: 1;
-		flex-wrap: wrap;
+		flex-wrap: nowrap;
+		overflow: hidden;
+	}
+	/* No mobile, esconde chips e mostra select */
+	.atd-quick-select-mobile {
+		display: none;
+		flex: 1;
 	}
 	.atd-month-select {
 		font-size: 12px;
@@ -486,15 +503,17 @@
 		justify-content: center;
 	}
 
-	/* Mobile: vira bottom sheet */
+	/* Mobile: bottom sheet */
 	@media (max-width: 600px) {
 		.atd-backdrop {
 			align-items: flex-end;
 			justify-content: center;
+			padding: 0;
 		}
 		.atd-panel {
 			max-width: 100%;
 			height: 92dvh;
+			max-height: 92dvh;
 			border-radius: 22px 22px 0 0;
 			box-shadow: 0 -8px 40px rgba(0,0,0,0.18);
 			animation: atd-slide-up 0.24s ease;
@@ -502,6 +521,13 @@
 		@keyframes atd-slide-up {
 			from { transform: translateY(100%); opacity: 0; }
 			to   { transform: translateY(0);    opacity: 1; }
+		}
+		/* Filtros: esconde chips, mostra dropdown */
+		.atd-chips-desktop {
+			display: none;
+		}
+		.atd-quick-select-mobile {
+			display: block;
 		}
 	}
 </style>
