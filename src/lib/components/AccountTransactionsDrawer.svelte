@@ -483,7 +483,7 @@
 	.atd-list {
 		flex: 1;
 		overflow-y: auto;
-		padding: 8px 0;
+		padding: 8px 16px;
 	}
 	.atd-empty {
 		padding: 48px 24px;
