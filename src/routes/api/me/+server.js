@@ -4,8 +4,7 @@ import { claimLegacyData, dataOwner, isLegacyDataOwner } from '$lib/server/data-
 
 export const prerender = false;
 
-/** GET /api/me — identidade da pessoa logada (o hooks.server.js já garante
- * que só chega aqui quem passou pelo Cloudflare Access). */
+/** GET /api/me — identidade da pessoa com uma sessão Plena válida. */
 export async function GET({ locals }) {
 	const owner = dataOwner(locals);
 	if (!owner) return json({ error: 'unauthorized' }, { status: 401 });
@@ -14,6 +13,6 @@ export async function GET({ locals }) {
 		email: owner,
 		name: locals.user.name,
 		isLegacyDataOwner: isLegacyDataOwner(owner, env),
-		logoutUrl: env.TEAM_DOMAIN ? `${env.TEAM_DOMAIN}/cdn-cgi/access/logout` : null
+		logoutUrl: '/api/auth/logout'
 	});
 }

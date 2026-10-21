@@ -86,8 +86,7 @@ export async function apiRemove(collection, id) {
 	}
 }
 
-/** Identidade da pessoa logada via Cloudflare Access, ou null (Access ainda
- * não configurado, ou app rodando local/sem login). Nunca lança erro. */
+/** Identidade da pessoa autenticada no Plena, ou null quando não há sessão. */
 export async function fetchMe() {
 	try {
 		const res = await fetch('/api/me', { headers: { accept: 'application/json' } });

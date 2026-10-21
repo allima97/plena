@@ -40,6 +40,13 @@
 	let showOnboarding = $state(false);
 	let onboardingChecked = false;
 	let confirmSairOpen = $state(false);
+	let appBootStarted = false;
+
+	$effect(() => {
+		if (isLoginPage || appBootStarted) return;
+		appBootStarted = true;
+		boot();
+	});
 
 	// Mostra a apresentação inicial uma única vez, só para quem ainda não tem nenhuma
 	// conta cadastrada (sinal de conta nova) e ainda não viu/pulou o tour antes.
@@ -107,6 +114,7 @@
 	}
 
 	const alertCount = $derived(upcomingDue(appState.transactions, appState.alertThresholds).total);
+	const isLoginPage = $derived(page.url.pathname === '/login');
 
 	const initials = $derived.by(() => {
 		const src = appState.user?.name || appState.user?.email || '';
@@ -115,17 +123,26 @@
 		return (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase();
 	});
 
-	function handleAvatarClick() {
+	async function handleAvatarClick() {
 		if (appState.settings.confirmExitApp) {
 			confirmSairOpen = true;
 			return;
 		}
-		window.location.href = appState.user?.logoutUrl || `${window.location.origin}/cdn-cgi/access/logout`;
+		await signOut();
 	}
 
-	function confirmSair() {
+	async function confirmSair() {
 		confirmSairOpen = false;
-		window.location.href = appState.user?.logoutUrl || `${window.location.origin}/cdn-cgi/access/logout`;
+		await signOut();
+	}
+
+	async function signOut() {
+		try {
+			await fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+		} catch {
+			/* clear local navigation regardless */
+		}
+		window.location.href = '/login';
 	}
 
 	function isActive(href) {
@@ -151,7 +168,6 @@
 	}
 
 	onMount(() => {
-		boot();
 		window.addEventListener('keydown', handleGlobalKeydown);
 		return () => window.removeEventListener('keydown', handleGlobalKeydown);
 	});
@@ -173,6 +189,9 @@
 	});
 </script>
 
+{#if isLoginPage}
+	{@render children()}
+{:else}
 <div class="app-shell" class:nav-open={mobileNavOpen}>
 	<aside class="sidebar">
 		<div class="brand">
@@ -310,3 +329,4 @@
 		</a>
 	{/each}
 </nav>
+{/if}

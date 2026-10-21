@@ -1,6 +1,3 @@
-// This is a static build (adapter-static) with a single route: all the
-// actual data lives in the signed-in user's browser/D1 via runtime fetch
-// calls (see src/lib/persist.js), never at build time, so there's nothing
-// for SvelteKit to server-render — ssr:false keeps this a pure client app.
-export const prerender = true;
+// Authenticated routes must pass through the Worker session guard at runtime.
+export const prerender = false;
 export const ssr = false;

@@ -61,9 +61,8 @@ ler/gravar em `/api/plena/state` e `/api/<coleção>/<id>`, e o app troca
 sozinho de "Salvo neste navegador" para "Salvo no banco de dados" (veja o
 rodapé da barra lateral).
 
-**Sobre segurança:** as rotas `/api/*` já exigem login (ver seção
-"Login com Google" logo abaixo) — sem ele configurado, a API responde 401 e
-o app cai sozinho para o `localStorage`.
+**Sobre segurança:** as rotas `/api/*` exigem uma sessão autenticada. Sem
+ela, a API responde 401 e as páginas privadas redirecionam para `/login`.
 
 Para testar localmente contra o banco (em vez de só localStorage):
 
@@ -73,49 +72,25 @@ npm run build
 wrangler dev
 ```
 
-## 🔐 Login com Google (Cloudflare Access)
+## 🔐 Acesso ao PLENA
 
-Igual ao nextgoals: quem cuida do "Entrar com o Google" é o **Cloudflare
-Access** (Zero Trust) — ele fica na frente do site inteiro, e entrega ao
-Worker um crachá assinado (JWT) dizendo quem é. O Worker (em
-`src/hooks.server.js` + `src/lib/server/access.js`) só confere esse crachá
-nas rotas `/api/*`; nunca lida com senha nem com a conta do Google
-diretamente. Por segurança é "fechado por padrão": enquanto
-`TEAM_DOMAIN`/`POLICY_AUD` não estiverem configurados em `wrangler.jsonc`,
-a API responde 401 para todo mundo (não fica aberta enquanto isso).
+O acesso usa e-mail e senha, seguido por um código de 6 dígitos enviado por
+e-mail. Novas contas confirmam o endereço antes de serem criadas. O código
+expira em cinco minutos, pode ser usado uma vez e tem limite de tentativas.
+As sessões são armazenadas como hashes no D1, duram até 30 dias e são
+revogadas pelo botão **Sair**.
 
-Cada registro remoto é vinculado ao e-mail verificado pelo Cloudflare Access.
-As leituras, alterações e exclusões são filtradas por essa identidade no
-servidor e no banco; duas contas Google não compartilham dados. O armazenamento
-local do navegador também tem uma área separada por conta.
+As senhas usam PBKDF2-SHA-256 com salt aleatório. E-mails de autenticação são
+transacionais pelo binding `EMAIL` do Cloudflare Email Service, usando
+`conta@salaonamao.com`. Configure `AUTH_SECRET` como segredo do Worker. A
+migração `0002_email_password_auth.sql` cria as tabelas de usuários, códigos,
+sessões e limites de tentativa.
 
-Passo a passo, uma vez só (você já tem o Zero Trust configurado por causa
-do nextgoals, então é só o passo 3 em diante que é novo):
-
-1. Zero Trust já está ativado na sua conta (feito quando você configurou o
-   nextgoals) — não precisa repetir.
-2. O Google como método de login também já está configurado (idem).
-3. **Crie uma Application nova, só para o Plena**: **Zero Trust → Access →
-   Applications → Add an application → Self-hosted**. Aponte o domínio para
-   onde o Worker do Plena está publicado (o mesmo domínio do
-   `wrangler deploy`, ex.: `plena.allima97.workers.dev` ou um domínio
-   próprio, se você configurar um depois). Na política de acesso, escolha
-   **Login Methods: Google** com regra **Emails** apontando só para o seu
-   e-mail (diferente do nextgoals, aqui não precisa ser "Everyone", já que é
-   um app de uma pessoa só).
-4. **Pegue a "Application Audience (AUD) Tag"** dessa Application nova (
-   aparece na tela de visão geral dela, ou em **Additional settings**) e
-   cole em `wrangler.jsonc`, em `vars.POLICY_AUD`, no lugar do placeholder
-   `COLOQUE_AQUI_O_AUD_TAG_DA_APPLICATION_DO_PLENA`. O `TEAM_DOMAIN` já está
-   preenchido (é o mesmo do nextgoals).
-5. `git push` (ou `wrangler deploy`) de novo depois de editar o
-   `wrangler.jsonc` — as variáveis em `vars` só valem a partir do próximo
-   deploy.
-
-Depois disso, abrir a URL do Plena vai pedir login com Google antes de
-mostrar qualquer coisa, e o rodapé da barra lateral deve trocar para "Salvo
-no banco de dados" assim que você entrar. Um ícone com suas iniciais aparece
-no topo direito — clicar nele sai da conta.
+O domínio do PLENA também precisa deixar de estar protegido por uma política
+Cloudflare Access que force o login Google; mantenha o Access em bypass para
+este app específico, pois a autenticação e a proteção das APIs passam a ser
+feitas pelo Worker do PLENA. Não altere o provedor Google compartilhado por
+outros aplicativos.
 
 ## Estrutura
 

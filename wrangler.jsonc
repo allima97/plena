@@ -19,15 +19,16 @@
 			"migrations_dir": "migrations"
 		}
 	],
-	// Cloudflare Access (Zero Trust) -- login com Google na frente do site
-	// inteiro. Nenhum dos dois valores é secreto (POLICY_AUD é só o
-	// identificador público da Application no Access), por isso ficam aqui
-	// em "vars" e não como secret. Mesmos valores do nextgoals -- a mesma
-	// Application do Access cobre os dois domínios (veja README.md, seção
-	// "Login com Google", se precisar recriar isso do zero um dia).
+	// Email transacional para os códigos de login. O domínio remetente está
+	// habilitado no Cloudflare Email Service.
+	"send_email": [
+		{
+			"name": "EMAIL",
+			"allowed_sender_addresses": ["conta@salaonamao.com"]
+		}
+	],
 	"vars": {
-		"TEAM_DOMAIN": "https://nxapps.cloudflareaccess.com",
-		"POLICY_AUD": "43f80517f57450906c918145b91b19cb560e194fca1c3b6abf2071f1f8eb2968",
+		"AUTH_EMAIL_FROM": "conta@salaonamao.com",
 		"LEGACY_DATA_OWNER_EMAIL": "allima97@gmail.com"
 	}
 }
