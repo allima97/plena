@@ -1,4 +1,5 @@
 import { json } from '@sveltejs/kit';
+import { env } from 'cloudflare:workers';
 import { claimLegacyData, dataOwner } from '$lib/server/data-owner.js';
 
 export const prerender = false;
@@ -24,12 +25,12 @@ const ARRAY_COLLECTIONS = [
 const SINGLETON_COLLECTIONS = ['reportSchedule', 'alertThresholds', 'settings', 'budgetGlobal'];
 
 /** GET /api/plena/state — junta todas as coleções do usuário num só payload. */
-export async function GET({ locals, platform }) {
-	const db = platform?.env?.DB;
+export async function GET({ locals }) {
+	const db = env.DB;
 	if (!db) return json({ error: 'D1 não configurado' }, { status: 503 });
 	const owner = dataOwner(locals);
 	if (!owner) return json({ error: 'unauthorized' }, { status: 401 });
-	await claimLegacyData(db, owner, platform.env);
+	await claimLegacyData(db, owner, env);
 
 	const { results } = await db
 		.prepare('SELECT collection, id, data FROM documents WHERE owner_email = ? AND collection IN (' + [...ARRAY_COLLECTIONS, ...SINGLETON_COLLECTIONS].map(() => '?').join(',') + ')')

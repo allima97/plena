@@ -1,4 +1,5 @@
 import { verifyAccessJWT } from '$lib/server/access.js';
+import { env } from 'cloudflare:workers';
 
 function withSecurityHeaders(response, isApi) {
 	const headers = new Headers(response.headers);
@@ -25,8 +26,7 @@ function isSameOriginMutation(request, url) {
 export async function handle({ event, resolve }) {
 	const isApi = event.url.pathname.startsWith('/api/');
 	if (isApi) {
-		const env = event.platform?.env;
-		const user = env ? await verifyAccessJWT(event.request, env) : null;
+		const user = await verifyAccessJWT(event.request, env);
 		if (!user) {
 			return withSecurityHeaders(new Response(JSON.stringify({ error: 'unauthorized' }), {
 				status: 401,
