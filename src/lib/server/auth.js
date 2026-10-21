@@ -172,7 +172,7 @@ async function requestCode(event, env) {
 	const ip = event.request.headers.get('CF-Connecting-IP') || 'unknown';
 	const ipKey = await sha256(ip);
 	const emailKey = await sha256(email);
-	if (!(await rateLimit(db, `start:${ipKey}`, 15, 60_000)) || !(await rateLimit(db, `email:${emailKey}`, 5, 60 * 60_000)))
+	if (!(await rateLimit(db, `start:${ipKey}`, 15, 60_000)) || !(await rateLimit(db, `email:${emailKey}`, 10, 60 * 60_000)))
 		return json({ error: 'rate_limited', message: 'Muitas tentativas. Aguarde e tente novamente.' }, 429);
 
 	const existing = await db.prepare('SELECT email, name, password_hash FROM auth_users WHERE email = ? COLLATE NOCASE').bind(email).first();

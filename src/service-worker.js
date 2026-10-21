@@ -31,34 +31,28 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
 	if (event.request.method !== 'GET') return;
 
-	async function respond() {
-		const url = new URL(event.request.url);
-		const cache = await caches.open(CACHE);
+	const url = new URL(event.request.url);
 
-		// Nunca cacheia chamadas de API — precisam sempre ir à rede/D1.
-		if (url.pathname.startsWith('/api/')) {
-			return fetch(event.request);
-		}
+	// Chamadas de API e páginas renderizadas pelo servidor não são interceptadas:
+	// deixa o browser fazer a requisição diretamente para evitar que uma falha
+	// de rede rejeite a promise do FetchEvent e produza um "network error".
+	if (url.pathname.startsWith('/api/') || !ASSETS.includes(url.pathname)) return;
 
-		if (ASSETS.includes(url.pathname)) {
+	// Assets conhecidos do build: serve do cache, atualiza em background.
+	event.respondWith(
+		(async () => {
+			const cache = await caches.open(CACHE);
 			const cached = await cache.match(url.pathname);
 			if (cached) return cached;
-		}
-
-		// Só os arquivos conhecidos do build ficam disponíveis offline. Navegações
-		// e demais respostas do servidor podem conter dados de uma sessão.
-		if (!ASSETS.includes(url.pathname)) return fetch(event.request);
-
-		try {
-			const response = await fetch(event.request);
-			if (response.status === 200 && response.type === 'basic') cache.put(url.pathname, response.clone());
-			return response;
-		} catch (err) {
-			const cached = await cache.match(event.request);
-			if (cached) return cached;
-			throw err;
-		}
-	}
-
-	event.respondWith(respond());
+			try {
+				const response = await fetch(event.request);
+				if (response.status === 200 && response.type === 'basic') cache.put(url.pathname, response.clone());
+				return response;
+			} catch {
+				const fallback = await cache.match(url.pathname);
+				if (fallback) return fallback;
+				return Response.error();
+			}
+		})()
+	);
 });
