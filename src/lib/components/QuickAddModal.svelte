@@ -109,7 +109,7 @@
 			subcategoriaId: form.subcategoriaId,
 			contaId: form.contaId,
 			formaPagamento: null,
-			statusPagamento: 'pago'
+			statusPagamento: contaSelecionada?.tipo === 'cartao' ? 'pendente' : 'pago'
 		});
 		showToast({
 			message: `✓ ${form.tipo === 'receita' ? 'Receita' : 'Despesa'} de ${fmtMoney(created.valor)} registrada.`,
