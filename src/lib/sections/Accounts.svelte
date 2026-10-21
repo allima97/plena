@@ -7,7 +7,8 @@
 	import Modal from '$lib/components/Modal.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import RowActionsModal from '$lib/components/RowActionsModal.svelte';
-	import { Plus, Wallet, CreditCard, Landmark, Pencil, Trash2, Archive, ArchiveRestore } from 'lucide-svelte';
+	import { Plus, Wallet, CreditCard, Landmark, Pencil, Trash2, Archive, ArchiveRestore, MoreHorizontal } from 'lucide-svelte';
+	import AccountTransactionsDrawer from '$lib/components/AccountTransactionsDrawer.svelte';
 
 	const PALETTE = ['grad-red', 'grad-purple', 'grad-blue', 'grad-dark', 'grad-orange', 'grad-green'];
 	const PALETTE_LABELS = { 'grad-red': 'Vermelho', 'grad-purple': 'Roxo', 'grad-blue': 'Azul', 'grad-dark': 'Escuro', 'grad-orange': 'Laranja', 'grad-green': 'Verde' };
@@ -17,6 +18,7 @@
 	let deleting = $state(null);
 	let rowActions = $state({ open: false, title: '', subtitle: '', actions: [] });
 	let highlightId = $state(null);
+	let selectedAcc = $state(null);
 	const activeAccounts = $derived(appState.accounts.filter((a) => !a.archived));
 	const archivedAccounts = $derived(appState.accounts.filter((a) => a.archived));
 
@@ -147,11 +149,11 @@
 			class:highlight={highlightId === acc.id}
 			role="button"
 			tabindex="0"
-			onclick={() => openAccountActions(acc)}
+			onclick={() => (selectedAcc = acc)}
 			onkeydown={(e) => {
 				if (e.key === 'Enter' || e.key === ' ') {
 					e.preventDefault();
-					openAccountActions(acc);
+					selectedAcc = acc;
 				}
 			}}
 		>
@@ -159,7 +161,7 @@
 				<div class="tile-decor d1"></div>
 				<div class="tile-decor d2"></div>
 			</div>
-			<div class="account-tile-head">
+			<div class="account-tile-head" style="position:relative">
 				<div class="account-tile-bank">
 					<span class="account-icon">{#if acc.tipo === 'cartao'}<CreditCard size={17} />{:else}<Landmark size={17} />{/if}</span>
 					<div style="min-width:0">
@@ -167,6 +169,15 @@
 						<p class="account-tile-type">{acc.tipo === 'cartao' ? 'Cartão de crédito' : 'Conta corrente'}</p>
 					</div>
 				</div>
+				<button
+					type="button"
+					class="tile-actions-btn"
+					onclick={(e) => { e.stopPropagation(); openAccountActions(acc); }}
+					aria-label="Ações de {acc.nome}"
+					title="Editar / Arquivar / Excluir"
+				>
+					<MoreHorizontal size={16} />
+				</button>
 			</div>
 			<div class="account-tile-body">
 				<p class="account-tile-label">{acc.tipo === 'cartao' ? 'Fatura atual' : 'Saldo disponível'}</p>
@@ -282,6 +293,13 @@
 	</form>
 </Modal>
 
+<AccountTransactionsDrawer
+	acc={selectedAcc}
+	open={selectedAcc !== null}
+	onClose={() => (selectedAcc = null)}
+	onOpenActions={openAccountActions}
+/>
+
 <RowActionsModal
 	open={rowActions.open}
 	onClose={() => (rowActions = { ...rowActions, open: false })}
@@ -311,4 +329,29 @@
 	.archived-account { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); }
 	.archived-account div { min-width: 0; overflow-wrap: anywhere; }
 	.archived-account p { margin: 4px 0 0; }
+	.tile-actions-btn {
+		position: absolute;
+		top: 12px;
+		right: 12px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 30px;
+		height: 30px;
+		border: none;
+		background: rgba(255,255,255,0.15);
+		border-radius: 8px;
+		color: #fff;
+		cursor: pointer;
+		opacity: 0;
+		transition: opacity 0.15s, background 0.15s;
+		z-index: 2;
+	}
+	.account-tile:hover .tile-actions-btn,
+	.account-tile:focus-within .tile-actions-btn {
+		opacity: 1;
+	}
+	.tile-actions-btn:hover {
+		background: rgba(255,255,255,0.3);
+	}
 </style>
