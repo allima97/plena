@@ -14,6 +14,7 @@
 	import { LANGUAGE_OPTIONS, t } from '$lib/i18n.js';
 	import { showToast } from '$lib/toast.svelte.js';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import SyncSettings from '$lib/components/SyncSettings.svelte';
 	import { Save, Download, Upload, Trash2, ShieldAlert } from 'lucide-svelte';
 
 	const SECOES = [
@@ -21,7 +22,8 @@
 		{ id: 'layout', label: () => t('settings_tab_layout') },
 		{ id: 'lingua', label: () => t('settings_tab_lingua') },
 		{ id: 'backup', label: () => t('settings_tab_backup') },
-		{ id: 'apagar', label: () => t('settings_tab_apagar') }
+		{ id: 'apagar', label: () => t('settings_tab_apagar') },
+		{ id: 'integracoes', label: () => 'Integrações' }
 	];
 	let secaoAtiva = $state('geral');
 
@@ -287,6 +289,10 @@
 			</div>
 			<button type="button" class="btn btn-danger" onclick={() => (confirmando = 'tudo')}><Trash2 size={15} /> {t('settings_apagar_botao')}</button>
 		</div>
+	</div>
+{:else if secaoAtiva === 'integracoes'}
+	<div class="card" style="max-width:560px">
+		<SyncSettings />
 	</div>
 {/if}
 
