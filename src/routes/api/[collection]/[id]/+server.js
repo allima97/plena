@@ -2,6 +2,7 @@ import { validateSale, validatePlan, validateSaleType } from '$lib/goals/sales.j
 import { json } from '@sveltejs/kit';
 import { env } from 'cloudflare:workers';
 import { claimLegacyData, dataOwner } from '$lib/server/data-owner.js';
+import { isSyncable, triggerSyncToNextgoals } from '$lib/server/sync.js';
 
 export const prerender = false;
 
@@ -57,7 +58,7 @@ function checkCollection(collection) {
 }
 
 /** PUT /api/:collection/:id — grava ou substitui um documento do usuário. */
-export async function PUT({ locals, params, request }) {
+export async function PUT({ locals, params, request, platform }) {
 	const db = env.DB;
 	if (!db) return json({ error: 'D1 não configurado' }, { status: 503 });
 	const owner = dataOwner(locals);
@@ -92,11 +93,20 @@ export async function PUT({ locals, params, request }) {
 			'ON CONFLICT(owner_email, collection, id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at'
 	).bind(owner, params.collection, params.id, JSON.stringify(data), Date.now()).run();
 
+	// Dispara sync para o Nextgoals em background (não bloqueia a resposta).
+	// A escrita local já foi confirmada acima — o sync é best-effort.
+	if (isSyncable(params.collection)) {
+		const syncPromise = triggerSyncToNextgoals(db, owner, 'PUT', params.collection, params.id, data, env);
+		// Usa waitUntil quando disponível para que o Worker não seja encerrado
+		// antes de o fetch de sync completar.
+		platform?.ctx?.waitUntil(syncPromise);
+	}
+
 	return json({ ok: true });
 }
 
 /** DELETE /api/:collection/:id — remove somente o documento do usuário logado. */
-export async function DELETE({ locals, params }) {
+export async function DELETE({ locals, params, platform }) {
 	const db = env.DB;
 	if (!db) return json({ error: 'D1 não configurado' }, { status: 503 });
 	const owner = dataOwner(locals);
@@ -106,5 +116,12 @@ export async function DELETE({ locals, params }) {
 
 	await claimLegacyData(db, owner, env);
 	await db.prepare('DELETE FROM documents WHERE owner_email = ? AND collection = ? AND id = ?').bind(owner, params.collection, params.id).run();
+
+	// Dispara sync em background
+	if (isSyncable(params.collection)) {
+		const syncPromise = triggerSyncToNextgoals(db, owner, 'DELETE', params.collection, params.id, null, env);
+		platform?.ctx?.waitUntil(syncPromise);
+	}
+
 	return json({ ok: true });
 }
