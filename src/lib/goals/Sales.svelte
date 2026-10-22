@@ -324,7 +324,7 @@
  .types-dist-bar { height:5px; margin:0; }
  @media(max-width:480px) { .kpi-row { grid-template-columns:1fr; } }
  @media(max-width:760px) {
-  .totals { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .totals { grid-template-columns:minmax(0,1fr); }
   .kpi-row { grid-template-columns:1fr; }
   .totals .stat-card { min-width:0; padding:16px; }
   .totals .stat-value { font-size:18px; line-height:1.25; margin-top:8px; }
@@ -334,7 +334,6 @@
   .rates-table input { width:110px; flex-shrink:0; }
   .toolbar .btn { flex:1; }
  }
- @media(max-width:380px) { .totals { grid-template-columns:1fr; } }
 
  /* Sales table: column header/data alignment + icon action buttons */
  .sales-list .th-actions { text-align:center; }

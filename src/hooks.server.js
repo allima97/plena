@@ -32,7 +32,7 @@ function redirectToLogin(url) {
 }
 
 const PUBLIC_ASSET_PREFIXES = ['/_app/', '/icons/'];
-const PUBLIC_ASSETS = new Set(['/favicon.svg', '/manifest.webmanifest', '/service-worker.js', '/robots.txt']);
+const PUBLIC_ASSETS = new Set(['/favicon.svg', '/favicon.ico', '/apple-touch-icon.png', '/manifest.webmanifest', '/service-worker.js', '/robots.txt']);
 
 export async function handle({ event, resolve }) {
 	const path = event.url.pathname;
