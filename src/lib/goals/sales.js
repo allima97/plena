@@ -30,7 +30,8 @@ export function monthSummary(sales, month, plan) {
  const total = rows.reduce((a,s) => a+cents(s.total),0);
  const fees = rows.reduce((a,s) => a+cents(s.fees),0);
  const net = total-fees;
- const tier = !plan ? null : net >= cents(plan.superTarget) ? 'super' : net >= cents(plan.target) ? 'target' : 'below';
+ const goalBase = plan?.commissionBase === 'gross' ? total : net;
+ const tier = !plan ? null : goalBase >= cents(plan.superTarget) ? 'super' : goalBase >= cents(plan.target) ? 'target' : 'below';
  const items = rows.map(s => {
   const rate = tier && Object.hasOwn(plan.rates, s.type) ? plan.rates[s.type]?.[tier] : null;
   const configured = Number.isFinite(rate);
@@ -40,10 +41,10 @@ export function monthSummary(sales, month, plan) {
  // Per-type net totals for type-level KPIs
  const byType = {};
  for (const s of rows) {
-  const typeNet = cents(s.total) - cents(s.fees);
-  byType[s.type] = (byType[s.type] || 0) + typeNet;
+  const typeBase = plan?.commissionBase === 'gross' ? cents(s.total) : cents(s.total) - cents(s.fees);
+  byType[s.type] = (byType[s.type] || 0) + typeBase;
  }
- return { total: total/100, fees: fees/100, net: net/100, tier, items, byType: Object.fromEntries(Object.entries(byType).map(([k,v]) => [k, v/100])), commission: tier && items.every(s => s.commission !== null) ? items.reduce((a,s) => a+cents(s.commission),0)/100 : null };
+ return { total: total/100, fees: fees/100, net: net/100, goalBase: goalBase/100, tier, items, byType: Object.fromEntries(Object.entries(byType).map(([k,v]) => [k, v/100])), commission: tier && items.every(s => s.commission !== null) ? items.reduce((a,s) => a+cents(s.commission),0)/100 : null };
 }
 
 /**

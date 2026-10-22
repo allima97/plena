@@ -48,12 +48,12 @@
   scopedSales.salesPlans.find(p => p.id === month) // fallback: plano migrado
  );
  const summary = $derived(monthSummary(scopedSales.sales, month, plan));
- const goalPercent = $derived(plan?.target > 0 ? Math.max(0, summary.net / plan.target * 100) : 0);
+ const goalPercent = $derived(plan?.target > 0 ? Math.max(0, summary.goalBase / plan.target * 100) : 0);
  const goalFill = $derived(Math.min(100, goalPercent));
  const goalColor = $derived(`hsl(${goalFill * 1.2} 65% 38%)`);
  const percentLabel = $derived(new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1, roundingMode: 'floor' }).format(goalPercent));
  // Daily pace KPI — only meaningful in the current month
- const dailyKPI = $derived(plan?.target > 0 ? dailyPaceKPI(plan.target, summary.net, month) : null);
+ const dailyKPI = $derived(plan?.target > 0 ? dailyPaceKPI(plan.target, summary.goalBase, month) : null);
  // Type-level KPIs for types that have a typeTarget set
  const typeKPIs = $derived(
   plan?.typeTargets
@@ -138,8 +138,8 @@
     <option value="gross">Valor total (com taxas)</option>
    </select>
   </label>
-  <p>A escolha vale para as comissões deste mês. A meta e a supermeta continuam considerando o valor líquido das vendas.</p>
-  <div class="form-grid"><label class="field"><span>Meta líquida (R$)</span><input class="field-input" type="number" min="0.01" step="0.01" required bind:value={config.target} /></label><label class="field"><span>Supermeta líquida (R$)</span><input class="field-input" type="number" min="0.02" step="0.01" required bind:value={config.superTarget} /></label></div>
+  <p>A escolha vale para as comissões <strong>e para o atingimento da meta</strong> deste mês: se "valor total", a meta compara o total bruto vendido; se "valor líquido", compara as vendas sem taxas.</p>
+  <div class="form-grid"><label class="field"><span>Meta (R$)</span><input class="field-input" type="number" min="0.01" step="0.01" required bind:value={config.target} /></label><label class="field"><span>Supermeta (R$)</span><input class="field-input" type="number" min="0.02" step="0.01" required bind:value={config.superTarget} /></label></div>
   <h3 class="config-section-title">Meta por tipo <span class="field-hint" style="display:inline">(opcional)</span></h3>
   <p class="field-hint">Defina uma meta líquida por tipo para acompanhar o KPI individual. Deixe em branco para não exibir o KPI.</p>
   <div class="table-wrap"><table class="list type-target-table"><thead><tr><th>Tipo</th><th>Meta líquida (R$)</th></tr></thead><tbody>
@@ -199,7 +199,7 @@
   <div class="goal-progress-track" role="progressbar" aria-label="Atingimento da meta" aria-valuemin="0" aria-valuemax="100" aria-valuenow={goalFill} aria-valuetext={`${percentLabel}% da meta atingida`}>
    <div class="goal-progress-fill" style:width={`${goalFill}%`} style:background={goalColor}></div>
   </div>
-  <p class="stat-sub">Vendas líquidas: <span class="privacy-value">{fmtMoney(summary.net)}</span>{#if goalPercent < 100} · Faltam <span class="privacy-value">{fmtMoney(Math.max(0, plan.target - summary.net))}</span>{/if}</p>
+  <p class="stat-sub">{plan?.commissionBase === 'gross' ? 'Total vendido' : 'Vendas líquidas'}: <span class="privacy-value">{fmtMoney(summary.goalBase)}</span>{#if goalPercent < 100} · Faltam <span class="privacy-value">{fmtMoney(Math.max(0, plan.target - summary.goalBase))}</span>{/if}</p>
  </section>
 {/if}
 <div class="card sales-list"><div class="table-wrap"><table class="list"><thead><tr><th>Pedido</th><th>Data venda</th><th>Tipo</th><th class="num">Valor total</th><th class="num">Taxas</th><th class="num">Líquido</th><th class="num">Comissão (%)</th><th class="num">Comissão mês</th><th class="th-actions">Ações</th></tr></thead><tbody>
