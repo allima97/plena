@@ -199,7 +199,7 @@
   <div class="goal-progress-track" role="progressbar" aria-label="Atingimento da meta" aria-valuemin="0" aria-valuemax="100" aria-valuenow={goalFill} aria-valuetext={`${percentLabel}% da meta atingida`}>
    <div class="goal-progress-fill" style:width={`${goalFill}%`} style:background={goalColor}></div>
   </div>
-  <p class="stat-sub">{plan?.commissionBase === 'gross' ? 'Total vendido' : 'Vendas líquidas'}: <span class="privacy-value">{fmtMoney(summary.goalBase)}</span>{#if goalPercent < 100} · Faltam <span class="privacy-value">{fmtMoney(Math.max(0, plan.target - summary.goalBase))}</span>{/if}</p>
+  <p class="stat-sub">Total vendido: <span class="privacy-value">{fmtMoney(summary.goalBase)}</span>{#if goalPercent < 100} · Faltam <span class="privacy-value">{fmtMoney(Math.max(0, plan.target - summary.goalBase))}</span>{/if}</p>
  </section>
 {/if}
 <div class="card sales-list"><div class="table-wrap"><table class="list"><thead><tr><th>Pedido</th><th>Data venda</th><th>Tipo</th><th class="num">Valor total</th><th class="num">Taxas</th><th class="num">Líquido</th><th class="num">Comissão (%)</th><th class="num">Comissão mês</th><th class="th-actions">Ações</th></tr></thead><tbody>
