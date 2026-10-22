@@ -210,7 +210,7 @@
 <ConfirmDialog open={!!deleting} title="Excluir venda?" message="A venda será excluída e a comissão do mês será recalculada." confirmLabel="Excluir venda" onCancel={() => deleting = null} onConfirm={() => { removeSale(deleting); deleting = null; showToast({ message: 'Venda excluída.' }); }} />
 <ConfirmDialog open={!!deletingType} title="Excluir tipo de venda?" message={`O tipo “${deletingType?.name || ''}” deixará de aparecer em novas vendas. O histórico e as comissões serão preservados.`} confirmLabel="Excluir tipo" onCancel={() => deletingType = null} onConfirm={() => { saveSaleType({ ...deletingType, deleted: true }); deletingType = null; typeDraft = { name: '' }; showToast({ message: 'Tipo excluído. Histórico preservado.' }); }} />
 <style>
- .sales-page-head { display:flex; flex-direction:column; gap:8px; margin-bottom:4px; }
+ .sales-page-head { display:flex; flex-direction:column; gap:8px; margin-bottom:4px; align-items:flex-start; }
  .back-btn { align-self:flex-start; padding:6px 10px; gap:6px; font-size:13px; }
  .sales-primary-actions, .sales-settings-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; max-width:520px; margin:16px 0; align-items:end; }
  .sales-primary-actions .field { min-width:0; }
