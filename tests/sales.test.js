@@ -5,8 +5,10 @@ const plan = emptyPlan('2026-10');
 plan.target = 1000; plan.superTarget = 2000;
 for (const type of SALE_TYPES) plan.rates[type] = { below: 1, target: 2, super: 3 };
 const sale = { date:'2026-10-14', type:'Hotel', total:1100, fees:100 };
-test('monthly thresholds use net revenue and include exact boundaries', () => {
- assert.equal(monthSummary([{...sale,total:1099.99}], '2026-10', plan).tier,'below');
+test('monthly thresholds use gross revenue and include exact boundaries', () => {
+ assert.equal(monthSummary([{...sale,total:999.99}], '2026-10', plan).tier,'below');
+ assert.equal(monthSummary([{...sale,total:1000}], '2026-10', plan).tier,'target');
+ assert.equal(monthSummary([{...sale,total:2000}], '2026-10', plan).tier,'super');
  assert.equal(monthSummary([sale], '2026-10', plan).commission,20);
  assert.equal(monthSummary([sale,sale], '2026-10', plan).commission,60);
  assert.equal(monthSummary([sale,{...sale,date:'2026-11-01'}], '2026-10',plan).net,1000);
@@ -41,15 +43,15 @@ test('custom types, renaming and deletion preserve historical commissions', asyn
  assert.throws(() => validateSaleType({ ...custom, name: '  ' }));
 });
 
-test('commission basis is independent of net goal achievement and persists in plans', () => {
+test('commission basis is independent of gross goal achievement and persists in plans', () => {
  const gross = JSON.parse(JSON.stringify({ ...plan, commissionBase: 'gross' }));
  validatePlan(gross);
  assert.equal(monthSummary([sale], '2026-10', gross).commission, 22);
  assert.equal(monthSummary([sale], '2026-10', plan).commission, 20);
- const below = { ...sale, total: 1100, fees: 200 };
+ const below = { ...sale, total: 999, fees: 200 };
  assert.equal(monthSummary([below], '2026-10', gross).tier, 'below');
- assert.equal(monthSummary([below], '2026-10', gross).commission, 11);
- assert.equal(monthSummary([below], '2026-10', plan).commission, 9);
+ assert.equal(monthSummary([below], '2026-10', gross).commission, 9.99);
+ assert.equal(monthSummary([below], '2026-10', plan).commission, 7.99);
  const legacy = { ...plan }; delete legacy.commissionBase;
  validatePlan(legacy);
  assert.equal(monthSummary([sale], '2026-10', legacy).commission, 20);

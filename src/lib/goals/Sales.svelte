@@ -1,4 +1,5 @@
 <script>
+ import { tick } from 'svelte';
  import Modal from '$lib/components/Modal.svelte';
  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
  import { showToast } from '$lib/toast.svelte.js';
@@ -7,6 +8,7 @@
  import { forSection } from './sales.js';
  import { todayISO, fmtMoney, fmtDate } from '$lib/format.js';
  import { saleTypesCatalog, TIERS, emptyPlan, monthSummary, dailyPaceKPI } from './sales.js';
+ import { filterSalesRows, salesTablePage } from './sales-table.js';
 
  /** @type {{ sectionId?: string, onBack?: () => void }} */
  let { sectionId = 'default', onBack = null } = $props();
@@ -48,6 +50,25 @@
   scopedSales.salesPlans.find(p => p.id === month) // fallback: plano migrado
  );
  const summary = $derived(monthSummary(scopedSales.sales, month, plan));
+ const tableScope = $derived(`${sectionId}:${month}`);
+ let tableFilters = $state({ scope: '', type: '', query: '', page: 0 });
+ const currentFilters = $derived(tableFilters.scope === tableScope ? tableFilters : { scope: tableScope, type: '', query: '', page: 0 });
+ const filterTypes = $derived(types.filter(t => !t.deleted || summary.items.some(s => s.type === t.id)));
+ const selectedType = $derived(filterTypes.some(t => t.id === currentFilters.type) ? currentFilters.type : '');
+ const tableRows = $derived(filterSalesRows(summary.items, { type: selectedType, query: currentFilters.query }, types).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || '').localeCompare(a.createdAt || '') || String(b.id).localeCompare(String(a.id))));
+ const tablePage = $derived(salesTablePage(tableRows, currentFilters.page));
+ let ledgerElement = $state(null);
+ function updateTableFilters(patch) {
+  tableFilters = { ...currentFilters, type: selectedType, ...patch, scope: tableScope, page: 0 };
+ }
+ async function changeTablePage(delta) {
+  tableFilters = { ...currentFilters, type: selectedType, scope: tableScope, page: tablePage.page + delta };
+  await tick();
+  const direction = delta > 0 ? 'next' : 'previous';
+  const focusTarget = ledgerElement?.querySelector(`[data-page-direction="${direction}"]:not(:disabled)`) || ledgerElement?.querySelector('.sales-pagination button:not(:disabled)');
+  focusTarget?.focus({ preventScroll: true });
+  ledgerElement?.scrollIntoView({ block: 'start' });
+ }
  const goalPercent = $derived(plan?.target > 0 ? Math.max(0, summary.goalBase / plan.target * 100) : 0);
  const goalFill = $derived(Math.min(100, goalPercent));
  const goalColor = $derived(`hsl(${goalFill * 1.2} 65% 38%)`);
@@ -101,7 +122,7 @@
  </div>
 </div>
 <div class="sales-primary-actions">
- <label class="field"><span>Mês </span><input class="field-input" type="month" bind:value={month} required disabled={!!editing || !!config} /></label>
+ <label class="field"><span>Mês </span><input class="field-input" type="month" bind:value={month} onchange={e => tableFilters = { scope: `${sectionId}:${e.currentTarget.value}`, type: '', query: '', page: 0 }} required disabled={!!editing || !!config} /></label>
  <button class="btn btn-primary" disabled={!month || !appState.ready || managingTypes || !activeTypes.length} onclick={() => { editing = { date: month === todayISO().slice(0,7) ? todayISO() : `${month}-01`, total: 0, fees: 0, type: activeTypes[0]?.id || '', orderNumber: '' }; error = ''; }}><Plus size={16} /> Nova venda</button>
 </div>
 
@@ -240,14 +261,54 @@
   <p class="stat-sub">Total vendido: <span class="privacy-value">{fmtMoney(summary.goalBase)}</span>{#if goalPercent < 100} · Faltam <span class="privacy-value">{fmtMoney(Math.max(0, plan.target - summary.goalBase))}</span>{/if}</p>
  </section>
 {/if}
-<div class="card sales-list"><div class="table-wrap"><table class="list"><thead><tr><th>Pedido</th><th>Data venda</th><th>Tipo</th><th class="num">Valor total</th><th class="num">Taxas</th><th class="num">Líquido</th><th class="num">Comissão (%)</th><th class="num">Comissão mês</th><th class="th-actions">Ações</th></tr></thead><tbody>
- {#each [...summary.items].sort((a,b) => b.date.localeCompare(a.date)) as sale (sale.id)}
+{#snippet salesPagination(position)}
+ <nav class="sales-pagination" aria-label={`Paginação das vendas — ${position}`}>
+  <span class="list-nav-range">Vendas {tablePage.start + 1}–{tablePage.end} de {tablePage.total}</span>
+  <div class="sales-page-controls">
+   <button type="button" class="list-nav-btn" data-page-direction="previous" aria-label="Página anterior" disabled={tablePage.page === 0} onclick={() => changeTablePage(-1)}>Anterior</button>
+   <span class="sales-page-label">Página <strong>{tablePage.page + 1}</strong> de <strong>{tablePage.totalPages}</strong></span>
+   <button type="button" class="list-nav-btn" data-page-direction="next" aria-label="Próxima página" disabled={tablePage.page >= tablePage.totalPages - 1} onclick={() => changeTablePage(1)}>Próxima</button>
+  </div>
+ </nav>
+{/snippet}
+<section class="card sales-list" aria-label="Vendas do mês">
+ <div class="sales-table-filters">
+  <label class="field"><span>Filtrar por tipo</span><select class="field-input" aria-label="Filtrar por tipo" value={selectedType} onchange={e => updateTableFilters({ type: e.currentTarget.value })}><option value="">Todos os tipos</option>{#each filterTypes as type (type.id)}<option value={type.id}>{type.name}{type.deleted ? ' (excluído)' : ''}</option>{/each}</select></label>
+  <label class="field"><span>Buscar nas vendas</span><input class="field-input" type="search" aria-label="Buscar nas vendas" aria-describedby="sales-table-status" placeholder="Pedido, tipo, data ou valor" autocomplete="off" value={currentFilters.query} oninput={e => updateTableFilters({ query: e.currentTarget.value })} /></label>
+  <button type="button" class="btn btn-ghost" disabled={!selectedType && !currentFilters.query} onclick={() => updateTableFilters({ type: '', query: '' })}>Limpar filtros</button>
+ </div>
+ <p id="sales-table-status" class="field-hint sales-table-status" role="status" aria-live="polite">Resultados: {tablePage.total} de {summary.items.length} venda{summary.items.length === 1 ? '' : 's'} no mês{#if tablePage.total}{` · exibindo ${tablePage.start + 1}–${tablePage.end}`}{/if}</p>
+ <div class="sales-table-results" bind:this={ledgerElement}>
+ {#if tablePage.total}{@render salesPagination('superior')}{/if}
+ <div class="table-wrap"><table class="list"><thead><tr><th scope="col">Pedido</th><th scope="col">Data venda</th><th scope="col">Tipo</th><th scope="col" class="num">Valor total</th><th scope="col" class="num">Taxas</th><th scope="col" class="num">Líquido</th><th scope="col" class="num">Comissão (%)</th><th scope="col" class="num">Comissão mês</th><th scope="col" class="th-actions">Ações</th></tr></thead><tbody>
+ {#each tablePage.items as sale (sale.id)}
  <tr><td data-label="Pedido">{sale.orderNumber || '—'}</td><td data-label="Data venda">{fmtDate(sale.date)}</td><td data-label="Tipo">{typeName(sale.type)}</td><td data-label="Valor total" class="num privacy-value">{fmtMoney(sale.total)}</td><td data-label="Taxas" class="num privacy-value">{fmtMoney(sale.fees)}</td><td data-label="Líquido" class="num privacy-value">{fmtMoney(sale.total-sale.fees)}</td><td data-label="Comissão (%)" class="num">{sale.rate === null ? '—' : `${sale.rate}%`}</td><td data-label="Comissão mês" class="num privacy-value">{sale.commission === null ? '—' : fmtMoney(sale.commission)}</td><td class="actions-cell"><div class="actions-row"><button class="btn btn-ghost tbl-icon-btn" disabled={managingTypes} aria-label="Editar venda" onclick={() => { editing = { id: sale.id, date: sale.date, total: sale.total, fees: sale.fees, type: sale.type, orderNumber: sale.orderNumber ?? '' }; error = ''; }}><Pencil size={14} /></button><button class="btn btn-danger tbl-icon-btn" aria-label="Excluir venda" onclick={() => deleting = sale.id}><Trash2 size={14} /></button></div></td></tr>
- {:else}<tr><td colspan="9" class="empty">Nenhuma venda neste mês. Cadastre sua primeira venda.</td></tr>{/each}
- </tbody></table></div></div>
+ {:else}<tr><td colspan="9" class="empty">{summary.items.length ? 'Nenhuma venda encontrada. Tente outro tipo ou busca.' : 'Nenhuma venda neste mês. Cadastre sua primeira venda.'}</td></tr>{/each}
+ </tbody></table></div>
+ {#if tablePage.total}{@render salesPagination('inferior')}{/if}
+ </div>
+</section>
 <ConfirmDialog open={!!deleting} title="Excluir venda?" message="A venda será excluída e a comissão do mês será recalculada." confirmLabel="Excluir venda" onCancel={() => deleting = null} onConfirm={() => { removeSale(deleting); deleting = null; showToast({ message: 'Venda excluída.' }); }} />
 <ConfirmDialog open={!!deletingType} title="Excluir tipo de venda?" message={`O tipo “${deletingType?.name || ''}” deixará de aparecer em novas vendas. O histórico e as comissões serão preservados.`} confirmLabel="Excluir tipo" onCancel={() => deletingType = null} onConfirm={() => { saveSaleType({ ...deletingType, deleted: true }); deletingType = null; typeDraft = { name: '' }; showToast({ message: 'Tipo excluído. Histórico preservado.' }); }} />
 <style>
+ .sales-table-filters { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr) auto; gap:12px; align-items:end; margin-bottom:12px; }
+ .sales-table-filters .field { min-width:0; }
+ .sales-table-filters .field-input { width:100%; min-width:0; }
+ .sales-table-filters .btn { min-height:44px; }
+ .sales-table-status { margin:0 0 12px; }
+ .sales-table-results { scroll-margin-top:20px; }
+ .sales-pagination { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:14px 0; }
+ .sales-page-controls { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px; }
+ .sales-page-label { font-size:12px; color:var(--ink-soft); text-align:center; white-space:nowrap; }
+ .sales-pagination .list-nav-btn { min-height:40px; }
+ @media(max-width:760px) {
+  .sales-table-filters { grid-template-columns:minmax(0,1fr); }
+  .sales-table-results { scroll-margin-top:100px; }
+  .sales-pagination { flex-direction:column; align-items:stretch; }
+  .sales-pagination .list-nav-range { text-align:center; }
+  .sales-page-controls { gap:8px; }
+  .sales-pagination .list-nav-btn { padding:8px 10px; }
+ }
  .sales-page-head { display:flex; flex-direction:column; gap:8px; margin-bottom:4px; align-items:flex-start; }
  .back-btn { align-self:flex-start; padding:6px 10px; gap:6px; font-size:13px; }
  .sales-primary-actions, .sales-settings-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; max-width:520px; margin:16px 0; align-items:end; }
