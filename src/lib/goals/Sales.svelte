@@ -202,9 +202,9 @@
   <p class="stat-sub">Vendas líquidas: <span class="privacy-value">{fmtMoney(summary.net)}</span>{#if goalPercent < 100} · Faltam <span class="privacy-value">{fmtMoney(Math.max(0, plan.target - summary.net))}</span>{/if}</p>
  </section>
 {/if}
-<div class="card sales-list"><div class="table-wrap"><table class="list"><thead><tr><th>Pedido</th><th>Data venda</th><th>Tipo</th><th>Valor total</th><th>Taxas</th><th>Líquido</th><th>Comissão (%)</th><th>Comissão mês</th><th>Ações</th></tr></thead><tbody>
+<div class="card sales-list"><div class="table-wrap"><table class="list"><thead><tr><th>Pedido</th><th>Data venda</th><th>Tipo</th><th class="num">Valor total</th><th class="num">Taxas</th><th class="num">Líquido</th><th class="num">Comissão (%)</th><th class="num">Comissão mês</th><th class="th-actions">Ações</th></tr></thead><tbody>
  {#each [...summary.items].sort((a,b) => b.date.localeCompare(a.date)) as sale (sale.id)}
- <tr><td data-label="Pedido">{sale.orderNumber || '—'}</td><td data-label="Data venda">{fmtDate(sale.date)}</td><td data-label="Tipo">{typeName(sale.type)}</td><td data-label="Valor total" class="num privacy-value">{fmtMoney(sale.total)}</td><td data-label="Taxas" class="num privacy-value">{fmtMoney(sale.fees)}</td><td data-label="Líquido" class="num privacy-value">{fmtMoney(sale.total-sale.fees)}</td><td data-label="Comissão (%)" class="num">{sale.rate === null ? '—' : `${sale.rate}%`}</td><td data-label="Comissão mês" class="num privacy-value">{sale.commission === null ? '—' : fmtMoney(sale.commission)}</td><td class="actions-cell"><div class="actions-row"><button class="btn btn-ghost sm" disabled={managingTypes} onclick={() => { editing = { id: sale.id, date: sale.date, total: sale.total, fees: sale.fees, type: sale.type, orderNumber: sale.orderNumber ?? '' }; error = ''; }}>Editar</button><button class="btn btn-ghost sm" onclick={() => deleting = sale.id}>Excluir</button></div></td></tr>
+ <tr><td data-label="Pedido">{sale.orderNumber || '—'}</td><td data-label="Data venda">{fmtDate(sale.date)}</td><td data-label="Tipo">{typeName(sale.type)}</td><td data-label="Valor total" class="num privacy-value">{fmtMoney(sale.total)}</td><td data-label="Taxas" class="num privacy-value">{fmtMoney(sale.fees)}</td><td data-label="Líquido" class="num privacy-value">{fmtMoney(sale.total-sale.fees)}</td><td data-label="Comissão (%)" class="num">{sale.rate === null ? '—' : `${sale.rate}%`}</td><td data-label="Comissão mês" class="num privacy-value">{sale.commission === null ? '—' : fmtMoney(sale.commission)}</td><td class="actions-cell"><div class="actions-row"><button class="btn btn-ghost tbl-icon-btn" disabled={managingTypes} aria-label="Editar venda" onclick={() => { editing = { id: sale.id, date: sale.date, total: sale.total, fees: sale.fees, type: sale.type, orderNumber: sale.orderNumber ?? '' }; error = ''; }}><Pencil size={14} /></button><button class="btn btn-danger tbl-icon-btn" aria-label="Excluir venda" onclick={() => deleting = sale.id}><Trash2 size={14} /></button></div></td></tr>
  {:else}<tr><td colspan="9" class="empty">Nenhuma venda neste mês. Cadastre sua primeira venda.</td></tr>{/each}
  </tbody></table></div></div>
 <ConfirmDialog open={!!deleting} title="Excluir venda?" message="A venda será excluída e a comissão do mês será recalculada." confirmLabel="Excluir venda" onCancel={() => deleting = null} onConfirm={() => { removeSale(deleting); deleting = null; showToast({ message: 'Venda excluída.' }); }} />
@@ -286,4 +286,10 @@
   .toolbar .btn { flex:1; }
  }
  @media(max-width:380px) { .totals { grid-template-columns:1fr; } }
+
+ /* Sales table: column header/data alignment + icon action buttons */
+ .sales-list .th-actions { text-align:center; }
+ .sales-list .actions-cell { text-align:center; }
+ .sales-list .actions-row { justify-content:center; flex-wrap:nowrap; gap:6px; }
+ .tbl-icon-btn { min-height:32px; width:32px; padding:0; }
 </style>
