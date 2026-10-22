@@ -182,7 +182,7 @@
 {/if}
 {#if !plan}<p class="card editor">Configure as metas e os percentuais deste mês para calcular a comissão.</p>{/if}
 <div class="totals">
- {#each [['Total vendido', summary.total], ['Taxas', summary.fees], ['Vendas líquidas', summary.net], ['Comissão mês', summary.commission]] as [label, value]}<div class="stat-card"><p class="stat-label">{label}</p><strong class="font-display stat-value privacy-value">{value === null ? 'A configurar' : fmtMoney(value)}</strong></div>{/each}
+ {#each [['Total vendido', summary.total], ['Taxas', summary.fees], ['Vendas líquidas', summary.net]] as [label, value]}<div class="stat-card"><p class="stat-label">{label}</p><strong class="font-display stat-value privacy-value">{value === null ? 'A configurar' : fmtMoney(value)}</strong></div>{/each}
 </div>
 {#if plan}
  {#if dailyKPI && dailyKPI.isCurrentMonth}
@@ -202,7 +202,14 @@
      <p class="kpi-sub">{kpi.done ? `✓ Meta atingida (${new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(kpi.target)})` : `Meta: ${new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(kpi.target)} · Falta ${new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(kpi.remaining)}`}</p>
     </section>
    {/each}
-   {#if typeDistribution.length > 0}
+   <section class="card kpi-card kpi-commission" aria-label="Comissão do mês">
+    <p class="stat-label">Comissão mês</p>
+    <strong class="font-display kpi-value privacy-value">{summary.commission === null ? 'A configurar' : fmtMoney(summary.commission)}</strong>
+    {#if summary.commission === null}<p class="kpi-sub">Configure os percentuais de comissão</p>{/if}
+   </section>
+  </div>
+  {#if typeDistribution.length > 0}
+   <div class="types-row">
     <section class="card kpi-card kpi-types-dist" aria-label="Distribuição por tipo de venda">
      <p class="stat-label">Tipos de vendas</p>
      <div class="types-dist-list">
@@ -219,8 +226,8 @@
       {/each}
      </div>
     </section>
-   {/if}
-  </div>
+   </div>
+  {/if}
  {/if}
  <section class="card sales-goal" aria-label="Atingimento da meta mensal">
   <div class="sales-goal-head">
@@ -290,7 +297,7 @@
  .toolbar { display:flex; flex-wrap:wrap; gap:12px; align-items:end; margin:16px 0; }
  .toolbar .field { flex:1; min-width:160px; }
  .editor { padding:20px; margin:16px 0; }
- .totals { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin:20px 0; }
+ .totals { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin:20px 0; }
  .stat-value { display:block; overflow-wrap:anywhere; }
  .sales-list { padding:20px; margin-top:20px; min-width:0; }
  .sales-explanation { margin-top:16px; line-height:1.6; }
@@ -306,8 +313,10 @@
  .kpi-progress-track { height:6px; background:var(--surface-3,#f0e8de); border-radius:99px; overflow:hidden; margin:8px 0 2px; }
  .kpi-progress-fill { height:100%; border-radius:99px; transition:width .4s ease; }
  /* Types distribution card */
+ .types-row { margin:0 0 20px; }
+ .types-row .kpi-types-dist { width:100%; box-sizing:border-box; }
  .kpi-types-dist { display:flex; flex-direction:column; }
- .types-dist-list { display:flex; flex-direction:column; gap:10px; margin-top:10px; flex:1; }
+ .types-dist-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px 24px; margin-top:10px; flex:1; }
  .types-dist-item { }
  .types-dist-header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px; }
  .types-dist-name { font-size:12px; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:72%; }
@@ -315,7 +324,8 @@
  .types-dist-bar { height:5px; margin:0; }
  @media(max-width:480px) { .kpi-row { grid-template-columns:1fr; } }
  @media(max-width:760px) {
-  .totals { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .totals { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .kpi-row { grid-template-columns:1fr; }
   .totals .stat-card { min-width:0; padding:16px; }
   .totals .stat-value { font-size:18px; line-height:1.25; margin-top:8px; }
   .sales-goal-value { font-size:18px; }
