@@ -68,6 +68,19 @@
      })
    : []
  );
+ // Distribuição percentual de vendas por tipo (sempre pelo bruto)
+ const typeDistribution = $derived(
+  summary.total > 0
+   ? Object.entries(summary.byType ?? {})
+     .map(([typeId, amount]) => ({
+      typeId,
+      typeName: types.find(t => t.id === typeId)?.name ?? typeId,
+      amount,
+      pct: Math.round(amount / summary.total * 1000) / 10
+     }))
+     .sort((a, b) => b.pct - a.pct)
+   : []
+ );
  function submitSale(e) {
   e.preventDefault();
   try { saveSale({ ...editing, sectionId }); editing = null; error = ''; showToast({ message: 'Venda salva.' }); } catch(e) { error = e.message; }
@@ -189,6 +202,24 @@
      <p class="kpi-sub">{kpi.done ? `✓ Meta atingida (${new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(kpi.target)})` : `Meta: ${new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(kpi.target)} · Falta ${new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(kpi.remaining)}`}</p>
     </section>
    {/each}
+   {#if typeDistribution.length > 0}
+    <section class="card kpi-card kpi-types-dist" aria-label="Distribuição por tipo de venda">
+     <p class="stat-label">Tipos de vendas</p>
+     <div class="types-dist-list">
+      {#each typeDistribution as t, i (t.typeId)}
+       <div class="types-dist-item">
+        <div class="types-dist-header">
+         <span class="types-dist-name">{t.typeName}</span>
+         <span class="types-dist-pct">{new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1}).format(t.pct)}%</span>
+        </div>
+        <div class="kpi-progress-track types-dist-bar">
+         <div class="kpi-progress-fill" style:width={`${t.pct}%`} style:background={`hsl(${(140 + i * 30) % 360} 55% 38%)`}></div>
+        </div>
+       </div>
+      {/each}
+     </div>
+    </section>
+   {/if}
   </div>
  {/if}
  <section class="card sales-goal" aria-label="Atingimento da meta mensal">
@@ -268,12 +299,20 @@
  .type-target-table input { min-width:0; max-width:160px; }
  .config-section-title { font-size:14px; font-weight:700; margin:24px 0 6px; }
 
- .kpi-row { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px; margin:20px 0; }
+ .kpi-row { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin:20px 0; }
  .kpi-card { padding:18px 20px; }
  .kpi-value { display:block; font-size:22px; margin:6px 0 10px; overflow-wrap:anywhere; }
  .kpi-sub { font-size:12px; color:var(--text-2); margin:6px 0 0; line-height:1.5; }
  .kpi-progress-track { height:6px; background:var(--surface-3,#f0e8de); border-radius:99px; overflow:hidden; margin:8px 0 2px; }
  .kpi-progress-fill { height:100%; border-radius:99px; transition:width .4s ease; }
+ /* Types distribution card */
+ .kpi-types-dist { display:flex; flex-direction:column; }
+ .types-dist-list { display:flex; flex-direction:column; gap:10px; margin-top:10px; flex:1; }
+ .types-dist-item { }
+ .types-dist-header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px; }
+ .types-dist-name { font-size:12px; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:72%; }
+ .types-dist-pct { font-size:12px; font-weight:700; color:var(--text-1); flex-shrink:0; }
+ .types-dist-bar { height:5px; margin:0; }
  @media(max-width:480px) { .kpi-row { grid-template-columns:1fr; } }
  @media(max-width:760px) {
   .totals { grid-template-columns:repeat(2,minmax(0,1fr)); }
