@@ -11,6 +11,7 @@
    */
 
   import { onMount } from 'svelte';
+  import { appState } from '$lib/fin/store.svelte.js';
 
   // ── Estado
   let status = $state(null);         // null=carregando, objeto após fetch
@@ -53,7 +54,7 @@
     loading = true;
     error = '';
     try {
-      const r = await fetch('/api/sync/status');
+      const r = await fetch('/api/sync/status', {headers:{'X-Plena-Owner':appState.user?.email || ''}});
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       status = await r.json();
     } catch (e) {
@@ -69,7 +70,7 @@
     activating = true;
     error = '';
     try {
-      const r = await fetch('/api/sync/initiate', { method: 'POST' });
+      const r = await fetch('/api/sync/initiate', { method: 'POST', headers:{'content-type':'application/json','X-Plena-Owner':appState.user?.email || ''}, body:JSON.stringify({confirm:true}) });
       const body = await r.json();
       if (!r.ok) { error = body.error || 'Erro ao solicitar código.'; return; }
       step = 'sent';
@@ -88,7 +89,7 @@
     try {
       const r = await fetch('/api/sync/verify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Plena-Owner':appState.user?.email || '' },
         body: JSON.stringify({ code: otp }),
       });
       const body = await r.json();
@@ -110,7 +111,7 @@
     try {
       const r = await fetch('/api/sync/disable', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Plena-Owner':appState.user?.email || '' },
         body: JSON.stringify({ confirm: true }),
       });
       const body = await r.json();

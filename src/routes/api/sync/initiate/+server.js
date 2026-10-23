@@ -1,3 +1,4 @@
+import { rateLimit } from '$lib/server/auth.js';
 /**
  * POST /api/sync/initiate
  *
@@ -24,11 +25,13 @@ export const prerender = false;
 const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutos
 const OTP_RATE_LIMIT_MS = 60 * 1000; // 1 OTP por minuto
 
-export async function POST({ locals }) {
+export async function POST({ locals, request }) {
   const db = env.DB;
   if (!db) return json({ error: 'D1 não configurado' }, { status: 503 });
   const owner = dataOwner(locals);
   if (!owner) return json({ error: 'unauthorized' }, { status: 401 });
+  const consent = await request.json().catch(() => null);
+  if (consent?.confirm !== true) return json({ error:'Confirme o compartilhamento antes de ativar a integração.' }, { status:400 });
 
   const ngUrl = env.NEXTGOALS_URL;
   const syncSecret = env.SYNC_SECRET;
@@ -47,6 +50,8 @@ export async function POST({ locals }) {
 
   // 2. Rate limit: não permite disparar OTP mais de 1x/min
   const now = Date.now();
+  if (!(await rateLimit(db, 'sync-start:' + await hashOtp('rate', owner, env.AUTH_SECRET || env.SYNC_SECRET), 1, 60_000))) return json({error:'Aguarde 1 minuto antes de solicitar outro código.'}, {status:429});
+  await db.prepare('DELETE FROM sync_otps WHERE expires_at <= ? OR used = 1').bind(now).run();
   const recentOtp = await db
     .prepare(
       'SELECT created_at FROM sync_otps WHERE owner_email = ? AND used = 0 AND expires_at > ? ORDER BY created_at DESC LIMIT 1'
@@ -85,7 +90,7 @@ export async function POST({ locals }) {
 
   // 4. Gera OTP e envia por e-mail
   const code = randomSyncOtpCode();
-  const codeHash = await hashOtp(code);
+  const codeHash = await hashOtp(code, owner, env.AUTH_SECRET || env.SYNC_SECRET);
   const otpId = randomId();
   const expiresAt = now + OTP_TTL_MS;
 
@@ -103,7 +108,7 @@ export async function POST({ locals }) {
     });
   } catch (e) {
     await db.prepare('DELETE FROM sync_otps WHERE id = ?').bind(otpId).run();
-    console.error('[sync/initiate] envio de e-mail falhou:', e.message);
+    console.error('[sync/initiate] email delivery failed');
     return json({ error: 'Não foi possível enviar o código por e-mail. Tente novamente.' }, { status: 502 });
   }
   return json({ ok: true });

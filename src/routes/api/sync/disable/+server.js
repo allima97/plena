@@ -57,6 +57,8 @@ export async function POST({ locals, request }) {
     .bind(nowIso, link.id)
     .run();
 
+  await db.prepare('UPDATE privacy_consents SET revoked_at = ? WHERE owner = ? AND purpose = ?').bind(Date.now(), owner, 'plena-nextgoals-sync').run();
+
   // Notifica o Nextgoals (best-effort: não falha a operação se o NG não responder)
   const ngUrl = env.NEXTGOALS_URL;
   const syncSecret = env.SYNC_SECRET;

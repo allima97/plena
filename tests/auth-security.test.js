@@ -1,0 +1,30 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {DatabaseSync} from 'node:sqlite';import {readFile} from 'node:fs/promises';
+import {handleAuthRoute,getSessionUser,sessionCookieName} from '../src/lib/server/auth.js';
+test('password + email code, one-use challenges, reset revocation, cookies and origins',async t=>{
+ const sql=new DatabaseSync(':memory:');t.after(()=>sql.close());sql.exec(await readFile(new URL('../migrations/0002_email_password_auth.sql',import.meta.url),'utf8'));sql.exec(await readFile(new URL('../migrations/0003_auth_email_quota.sql',import.meta.url),'utf8'));
+ const db={prepare(query){const st=sql.prepare(query);let a=[];return{bind(...v){a=v;return this;},async first(){return st.get(...a)||null;},async run(){return st.run(...a);}};},async batch(statements){sql.exec('BEGIN');try{for(const st of statements)await st.run();sql.exec('COMMIT');}catch(e){sql.exec('ROLLBACK');throw e;}}};
+ let code;const env={DB:db,AUTH_SECRET:'test-only-secret-with-at-least-32-characters',AUTH_EMAIL_FROM:'test@example.test',EMAIL:{send:async message=>{code=message.text.match(/\d{6}/)[0];}}};
+ const req=(path,body,cookie='',origin='https://plena.test')=>{const url=new URL('https://plena.test/api/auth/'+path);return{url,request:new Request(url,{method:'POST',headers:{Origin:origin,'content-type':'application/json',Cookie:cookie},body:JSON.stringify(body)})};};
+ const send=(...args)=>handleAuthRoute(req(...args),env);
+ const cookie=(res,name)=>name+'='+res.headers.get('set-cookie').match(new RegExp(name+'=([^;]*)'))[1];
+ const credentials={mode:'register',email:'Alice@example.test',name:'Alice',password:'test-password-12345'};
+ assert.equal((await send('start',credentials,'','https://evil.test')).status,403);
+ let response=await send('start',credentials);assert.equal(response.status,200);const challenge=cookie(response,'__Host-plena_challenge');const originalCode=code;
+ assert.match(response.headers.get('set-cookie'),/HttpOnly; Secure; SameSite=Lax/);
+ response=await send('verify',{code},challenge);assert.equal(response.status,200);let session=cookie(response,sessionCookieName);
+ assert.equal((await getSessionUser(new Request('https://plena.test',{headers:{Cookie:session}}),env)).email,'alice@example.test');
+ const stored=sql.prepare('SELECT password_hash FROM auth_users').get().password_hash;assert.ok(!stored.includes(credentials.password));assert.match(stored,/^pbkdf2-sha256/);
+ assert.equal((await send('verify',{code:originalCode},challenge)).status,401);
+ assert.equal((await send('start',{...credentials,mode:'login',password:'wrong-password-123'})).status,401);
+ response=await send('start',{mode:'reset',email:credentials.email});const reset=cookie(response,'__Host-plena_challenge');
+ response=await send('verify',{code,newPassword:'new-test-password-12345'},reset);assert.equal(response.status,200);assert.equal((await response.json()).passwordReset,true);
+ assert.equal(await getSessionUser(new Request('https://plena.test',{headers:{Cookie:session}}),env),null);
+ assert.equal((await send('start',{...credentials,mode:'login'})).status,401);
+ response=await send('start',{...credentials,mode:'login',password:'new-test-password-12345'});const login=cookie(response,'__Host-plena_challenge');const correct=code;
+ for(let i=0;i<5;i++){const failed=await send('verify',{code:correct==='000000'?'000001':'000000'},login);assert.equal(failed.status,i===4?429:400);}
+ assert.equal((await send('verify',{code:correct},login)).status,401);
+ response=await send('start',{...credentials,mode:'login',password:'new-test-password-12345'});response=await send('verify',{code},cookie(response,'__Host-plena_challenge'));session=cookie(response,sessionCookieName);
+ assert.equal((await send('logout',{},session)).status,204);
+ assert.equal(await getSessionUser(new Request('https://plena.test',{headers:{Cookie:session}}),env),null);
+});

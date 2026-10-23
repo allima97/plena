@@ -220,9 +220,10 @@ export function randomSyncOtpCode() {
   return String(v % 1_000_000).padStart(6, '0');
 }
 
-export async function hashOtp(code) {
-  const digest = await crypto.subtle.digest('SHA-256', encoder.encode(code));
-  return base64url(new Uint8Array(digest));
+export async function hashOtp(code, owner = '', secret = '') {
+  if (!secret) { const digest = await crypto.subtle.digest('SHA-256', encoder.encode(code)); return base64url(new Uint8Array(digest)); }
+  const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name:'HMAC', hash:'SHA-256' }, false, ['sign']);
+  return base64url(new Uint8Array(await crypto.subtle.sign('HMAC', key, encoder.encode(`sync:${owner}:${code}`))));
 }
 
 export function timingSafeEqual(a, b) {
@@ -271,7 +272,7 @@ export async function reconcileSync(db, owner, env, { force = false } = {}) {
       method: 'POST', headers: { 'content-type': 'application/json', Authorization: `Bearer ${env.SYNC_SECRET}` },
       body: JSON.stringify({ target_user_id: link.nextgoals_user_id, records }), signal: AbortSignal.timeout(25_000),
     });
-    if (!response.ok) throw new Error(`NextGoals: HTTP ${response.status} ${(await response.text()).slice(0, 180)}`);
+    if (!response.ok) throw new Error(`NextGoals: HTTP ${response.status}`);
     const result = await response.json();
     if (!Array.isArray(result.records)) throw new Error('Resposta de sincronização inválida.');
     const statements = [];

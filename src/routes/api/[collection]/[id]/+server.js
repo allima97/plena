@@ -1,3 +1,4 @@
+import { validId } from '$lib/server/security.js';
 import { salesRecordDeleted, enforceSalesDeletions } from '$lib/server/sales-delete.js';
 import { validateSale, validatePlan, validateSaleType } from '$lib/goals/sales.js';
 import { json } from '@sveltejs/kit';
@@ -18,7 +19,7 @@ const KNOWN_COLLECTIONS = [
 ];
 
 function validDocumentId(id) {
-	return typeof id === 'string' && id.length > 0 && id.length <= 200 && !/[\u0000-\u001f]/.test(id);
+	return validId(id);
 }
 
 async function readLimitedJson(request) {

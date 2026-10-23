@@ -158,6 +158,7 @@
 		{/if}
 		<p class="privacy">Seu acesso é protegido por confirmação de e-mail. Nunca compartilhe seu código.</p>
 	</section>
+<p><a href="/privacidade" data-sveltekit-reload>Privacidade e seus dados · nxapps</a></p>
 </main>
 
 <style>

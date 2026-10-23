@@ -1,3 +1,4 @@
+import { validId, validateObject } from './security.js';
 // Versioned shared records. Deletions retain a timestamp so reconciliation
 // cannot restore a record deleted in either application.
 export function syncTimestamp(value) {
@@ -17,6 +18,12 @@ export async function runSyncStatements(db, statements) {
 export function syncRecordStatements(db, owner, ownerColumn, record) {
   if (!['owner_email', 'user_id'].includes(ownerColumn)) throw new Error('Identidade inválida.');
   const { collection, id, data, deleted = false } = record;
+  if (collection !== 'salesTypeRemovals' && !validId(id)) throw new Error('Identificador inválido.');
+  if (!deleted) {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Documento inválido.');
+    if (data.id !== undefined && data.id !== id) throw new Error('Identificador inconsistente.');
+    validateObject(data);
+  }
   const time = syncTimestamp(record.updatedAt);
   const storedTime = ownerColumn === 'user_id' ? new Date(time).toISOString() : time;
   const permanentRoot = ['salesSections', 'salesTypes'].includes(collection);

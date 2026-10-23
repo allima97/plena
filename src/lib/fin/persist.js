@@ -46,6 +46,7 @@ export async function fetchRemoteState(expectedEmail = activeIdentity) {
 		const res = await fetch('/api/plena/state', {
 		headers: { accept: 'application/json', 'X-Plena-Owner': expectedOwner }
 		});
+		inspectSession(res);
 		if (!res.ok) return null;
 		const data = await res.json();
 		if (!data || data.owner !== expectedOwner || !Array.isArray(data.finCategories)) return null;
@@ -59,11 +60,12 @@ export async function fetchRemoteState(expectedEmail = activeIdentity) {
 export async function apiPut(collection, id, data) {
 	if (!activeIdentity) return false;
 	try {
-		const res = await fetch(`/api/${collection}/${id}`, {
+		const res = await fetch(`/api/${collection}/${encodeURIComponent(id)}`, {
 			method: 'PUT',
 			headers: { 'content-type': 'application/json', 'X-Plena-Owner': activeIdentity },
 			body: JSON.stringify(data)
 		});
+		inspectSession(res);
 		return res.ok;
 	} catch {
 		// offline/unreachable -- the local copy already has the change,
@@ -76,10 +78,11 @@ export async function apiPut(collection, id, data) {
 export async function apiRemove(collection, id) {
 	if (!activeIdentity) return false;
 	try {
-		const res = await fetch(`/api/${collection}/${id}`, {
+		const res = await fetch(`/api/${collection}/${encodeURIComponent(id)}`, {
 			method: 'DELETE',
 			headers: { 'X-Plena-Owner': activeIdentity }
 		});
+		inspectSession(res);
 		return res.ok;
 	} catch {
 		return false;
@@ -90,6 +93,7 @@ export async function apiRemove(collection, id) {
 export async function fetchMe() {
 	try {
 		const res = await fetch('/api/me', { headers: { accept: 'application/json' } });
+		inspectSession(res);
 		if (!res.ok) return null;
 		const data = await res.json();
 		if (!data || !data.email) return null;
@@ -97,4 +101,15 @@ export async function fetchMe() {
 	} catch {
 		return null;
 	}
+}
+
+export function clearPrivateLocalData() {
+  try { for (const key of Object.keys(localStorage)) if (key.startsWith(LEGACY_LS_KEY)) localStorage.removeItem(key); } catch {}
+}
+function inspectSession(response) {
+  if ([401, 409].includes(response.status)) {
+    clearPrivateLocalData();
+    window.location.replace('/login');
+  }
+  return response;
 }

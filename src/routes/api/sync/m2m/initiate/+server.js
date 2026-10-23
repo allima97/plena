@@ -10,6 +10,7 @@ export async function POST(event) {
   let body;
   try { body = await event.request.json(); }
   catch { return json({ error: 'Corpo inválido.' }, { status: 400 }); }
+  if (body?.confirm !== true) return json({error:'Confirme o compartilhamento.'}, {status:400});
   const owner = typeof body?.user_id === 'string' ? body.user_id.trim().toLowerCase() : '';
   if (!owner || owner.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(owner))
     return json({ error: 'E-mail inválido.' }, { status: 400 });

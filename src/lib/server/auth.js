@@ -1,3 +1,4 @@
+import { readJson } from './security.js';
 const SESSION_COOKIE = '__Host-plena_session';
 const CHALLENGE_COOKIE = '__Host-plena_challenge';
 const SESSION_TTL = 30 * 24 * 60 * 60 * 1000;
@@ -107,12 +108,10 @@ function json(data, status = 200, headers = new Headers()) {
 }
 
 async function parseBody(request) {
-	const raw = await request.text().catch(() => '');
-	if (!raw || encoder.encode(raw).byteLength > 4096) return null;
-	try { return JSON.parse(raw); } catch { return null; }
+	try { return await readJson(request, 4096); } catch { return null; }
 }
 
-async function rateLimit(db, key, limit, windowMs) {
+export async function rateLimit(db, key, limit, windowMs) {
 	const now = Date.now();
 	await db.prepare('DELETE FROM auth_rate_limits WHERE window_started_at < ?').bind(now - 7 * 24 * 60 * 60_000).run();
 	const result = await db.prepare(
@@ -169,9 +168,11 @@ async function requestCode(event, env) {
 
 	const db = env.DB;
 	if (!db || typeof env.AUTH_SECRET !== 'string' || env.AUTH_SECRET.length < 32 || !env.EMAIL) return json({ error: 'auth_unavailable' }, 503);
+	await db.prepare('DELETE FROM auth_sessions WHERE expires_at <= ?').bind(Date.now()).run();
+	await db.prepare('DELETE FROM auth_challenges WHERE expires_at <= ?').bind(Date.now()).run();
 	const ip = event.request.headers.get('CF-Connecting-IP') || 'unknown';
-	const ipKey = await sha256(ip);
-	const emailKey = await sha256(email);
+	const ipKey = await hmac(`ip:${ip}`, env.AUTH_SECRET);
+	const emailKey = await hmac(`email:${email}`, env.AUTH_SECRET);
 	if (!(await rateLimit(db, `start:${ipKey}`, 15, 60_000)) || !(await rateLimit(db, `email:${emailKey}`, 10, 60 * 60_000)))
 		return json({ error: 'rate_limited', message: 'Muitas tentativas. Aguarde e tente novamente.' }, 429);
 
@@ -210,7 +211,7 @@ async function requestCode(event, env) {
 			await sendCode(env, email, code, body.mode);
 		} catch (error) {
 			await db.prepare('DELETE FROM auth_challenges WHERE id = ?').bind(challengeId).run();
-			console.error('[auth] falha ao enviar código de acesso:', error?.message || error);
+			console.error('[auth] email delivery failed');
 			return json({ error: 'email_unavailable', message: 'Não foi possível enviar o código agora. Tente novamente em instantes.' }, 503);
 		}
 	}
@@ -266,9 +267,11 @@ async function verifyCode(event, env) {
 		}
 	}
 	if (consumed.purpose === 'reset') {
-		await env.DB.prepare('UPDATE auth_users SET password_hash = ?, updated_at = ? WHERE email = ? COLLATE NOCASE')
-			.bind(newPasswordHash, now, consumed.email).run();
-		await env.DB.prepare('DELETE FROM auth_sessions WHERE email = ? COLLATE NOCASE').bind(consumed.email).run();
+    await env.DB.batch([
+      env.DB.prepare('UPDATE auth_users SET password_hash = ?, updated_at = ? WHERE email = ? COLLATE NOCASE').bind(newPasswordHash, now, consumed.email),
+      env.DB.prepare('DELETE FROM auth_sessions WHERE email = ? COLLATE NOCASE').bind(consumed.email),
+      env.DB.prepare('DELETE FROM auth_challenges WHERE email = ? COLLATE NOCASE').bind(consumed.email)
+    ]);
 		const headers = new Headers();
 		clearCookie(headers, CHALLENGE_COOKIE);
 		return json({ ok: true, passwordReset: true }, 200, headers);
@@ -276,8 +279,9 @@ async function verifyCode(event, env) {
 
 	const sessionToken = randomToken();
 	const sessionId = await sha256(sessionToken);
-	await env.DB.prepare('INSERT INTO auth_sessions (id, email, created_at, expires_at, last_seen_at) VALUES (?, ?, ?, ?, ?)')
-		.bind(sessionId, consumed.email, now, now + SESSION_TTL, now).run();
+  const created = await env.DB.prepare('INSERT INTO auth_sessions (id, email, created_at, expires_at, last_seen_at) SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM auth_users WHERE email = ? COLLATE NOCASE AND password_hash = ?) RETURNING id')
+    .bind(sessionId, consumed.email, now, now + SESSION_TTL, now, consumed.email, consumed.password_hash).first();
+  if (!created) return json({error:'challenge_expired', message:'Sua senha mudou. Faça login novamente.'}, 401);
 	const headers = new Headers();
 	clearCookie(headers, CHALLENGE_COOKIE);
 	setCookie(headers, SESSION_COOKIE, sessionToken, Math.floor(SESSION_TTL / 1000));

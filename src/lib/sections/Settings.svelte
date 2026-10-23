@@ -141,6 +141,8 @@
 	{/each}
 </div>
 
+<p class="field-hint"><a href="/privacidade" data-sveltekit-reload>Privacidade e meus dados</a> · <a href="/api/privacy/export">Baixar meus dados pessoais</a></p>
+
 {#if secaoAtiva === 'geral'}
 	<div class="card" style="max-width:560px">
 		<p class="stat-label" style="margin:0 0 4px">{t('settings_geral_titulo')}</p>

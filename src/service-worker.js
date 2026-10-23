@@ -29,7 +29,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-	if (event.request.method !== 'GET') return;
+	if (event.request.method !== 'GET' || event.request.mode === 'navigate') return;
 
 	const url = new URL(event.request.url);
 

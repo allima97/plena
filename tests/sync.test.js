@@ -72,9 +72,9 @@ test('sync routes retain authentication, deliver OTP, confirm once and isolate i
   }
   const status = await invoke('sync/m2m/status', routes.m2mStatus, { user_id: owner });
   assert.equal(status.status, 200); assert.equal((await status.json()).linked, false);
-  assert.equal((await invoke('sync/m2m/initiate', routes.m2m, { user_id: owner })).status, 200);
+  assert.equal((await invoke('sync/m2m/initiate', routes.m2m, { user_id: owner, confirm:true })).status, 200);
   assert.match(code, /^\d{6}$/); assert.ok(calls.includes('/api/sync/check'));
-  assert.equal((await routes.initiate(event('sync/initiate', {}))).status, 429);
+  assert.equal((await routes.initiate(event('sync/initiate', {confirm:true}))).status, 429);
   assert.equal((await routes.verify(event('sync/verify', { code: code === '000000' ? '000001' : '000000' }))).status, 400);
   assert.equal(sqlite.prepare('SELECT attempts FROM sync_otps').get().attempts, 1);
   assert.equal((await routes.verify(event('sync/verify', { code }))).status, 200);
@@ -91,11 +91,13 @@ test('sync routes retain authentication, deliver OTP, confirm once and isolate i
   assert.equal((await routes.disable(event('sync/disable', { confirm: true }))).status, 200);
   assert.equal(sqlite.prepare('SELECT enabled FROM sync_links').get().enabled, 0);
   assert.ok(calls.includes('/api/sync/deregister'));
+  sqlite.exec('UPDATE auth_rate_limits SET window_started_at = 0');
   failEmail = true;
-  assert.equal((await routes.initiate(event('sync/initiate', {}))).status, 502, 'a failed email never reports OTP sent');
+  assert.equal((await routes.initiate(event('sync/initiate', {confirm:true}))).status, 502, 'a failed email never reports OTP sent');
   assert.equal(sqlite.prepare('SELECT count(*) AS n FROM sync_otps WHERE used = 0').get().n, 0);
+  sqlite.exec('UPDATE auth_rate_limits SET window_started_at = 0');
   failEmail = false;
-  await routes.initiate(event('sync/initiate', {}));
+  await routes.initiate(event('sync/initiate', {confirm:true}));
   const wrong = code === '111111' ? '222222' : '111111';
   for (let i = 0; i < 5; i++) await routes.verify(event('sync/verify', { code: wrong }));
   assert.equal((await routes.verify(event('sync/verify', { code }))).status, 400, 'five wrong attempts invalidate the challenge');

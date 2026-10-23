@@ -1,5 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
+	import { clearPrivateLocalData } from '$lib/fin/persist.js';
+	import { showToast } from '$lib/toast.svelte.js';
 	import { page } from '$app/state';
 	import '../app.css';
 	import { appState, boot, retrySync, refreshSharedState } from '$lib/fin/store.svelte.js';
@@ -138,13 +140,15 @@
 	}
 
 	async function signOut() {
-		try {
-			await fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-		} catch {
-			/* clear local navigation regardless */
-		}
-		window.location.href = '/login';
-	}
+    try {
+      const response = await fetch('/api/auth/logout', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+      if (!response.ok) throw new Error();
+      clearPrivateLocalData();
+      window.location.replace('/login');
+    } catch {
+      showToast({message:'Não foi possível encerrar a sessão. Verifique a conexão e tente novamente.'});
+    }
+  }
 
 	function isActive(href) {
 		if (href === '/') return page.url.pathname === '/';
@@ -169,10 +173,14 @@
 	}
 
 	onMount(() => {
+		const checkOtherSession = event => { if(event.key?.startsWith('plena-state-v1') && event.newValue === null) window.location.replace('/login'); };
+		window.addEventListener('storage', checkOtherSession);
+		const checkRestoredPage = event => { if(event.persisted) window.location.reload(); };
+		window.addEventListener('pageshow', checkRestoredPage);
 		window.addEventListener('keydown', handleGlobalKeydown);
 		const stopRefresh = startStateRefresh({ refresh: refreshSharedState, canRefresh: () =>
 			!document.querySelector('[role="dialog"], .modal-backdrop') && !document.activeElement?.matches('input, textarea, select, [contenteditable="true"]') });
-		return () => { window.removeEventListener('keydown', handleGlobalKeydown); stopRefresh(); };
+		return () => { window.removeEventListener('storage', checkOtherSession); window.removeEventListener('pageshow', checkRestoredPage); window.removeEventListener('keydown', handleGlobalKeydown); stopRefresh(); };
 	});
 
 	// Layout/tema (Configurações > Layout): aplica tema claro/escuro e as cores custom (primária,
