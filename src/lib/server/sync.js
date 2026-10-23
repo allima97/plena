@@ -1,3 +1,5 @@
+import { legacyPlanSection } from '../goals/sales-deletion.js';
+import { enforceSalesDeletions } from './sales-delete.js';
 import { readSyncRecords, syncRecordStatements, runSyncStatements } from './sync-records.js';
 /**
  * Sincronismo Plena ↔ Nextgoals
@@ -36,6 +38,7 @@ const TO_NEXTGOALS = {
   salesTypes:    'salesTypes',
   sales:         'sales',
   salesPlans:    'salesPlans',
+  salesTypeRemovals: 'salesTypeRemovals',
 };
 
 // Nextgoals name  →  Plena name
@@ -260,7 +263,7 @@ export async function reconcileSync(db, owner, env, { force = false } = {}) {
     const legacySection = local.find(record => record.collection === 'salesSections' && !record.deleted && !record.data.deleted && record.data.name === 'Turismo')?.id;
     const records = local.map(record => {
       const data = record.data && legacySection && ['salesPlans', 'salesTypes', 'sales'].includes(record.collection) && !record.data.sectionId
-        ? { ...record.data, sectionId: legacySection } : record.data;
+        ? { ...record.data, sectionId: legacyPlanSection(local, record, legacySection) } : record.data;
       const mapped = plenaToNextgoals(record.collection, record.id, data || { id: record.id });
       return { ...record, collection: mapped.ngCollection, id: mapped.ngId, ...(record.deleted ? {} : { data: mapped.ngData }) };
     });
@@ -278,6 +281,7 @@ export async function reconcileSync(db, owner, env, { force = false } = {}) {
       statements.push(...syncRecordStatements(db, owner, 'owner_email', { ...record, collection: mapped.collection, id: mapped.id, data: mapped.data }));
     }
     await runSyncStatements(db, statements);
+    await enforceSalesDeletions(db, owner, 'owner_email');
     await db.prepare('UPDATE sync_links SET reconciled_at = ?, last_sync_at = ?, last_sync_error = NULL WHERE id = ?')
       .bind(Date.now(), new Date().toISOString(), link.id).run();
     return { linked: true, ok: true };

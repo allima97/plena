@@ -23,6 +23,7 @@
  *    → last-write-wins com base no timestamp da escrita original.
  */
 
+import { deleteSalesData, enforceSalesDeletions } from '$lib/server/sales-delete.js';
 import { validateSale, validatePlan, validateSaleType } from '$lib/goals/sales.js';
 import { syncRecordStatements, runSyncStatements } from '$lib/server/sync-records.js';
 import { json } from '@sveltejs/kit';
@@ -33,11 +34,11 @@ export const prerender = false;
 
 const SYNCABLE_FROM_NEXTGOALS = new Set([
   'goals', 'resources', 'resourceMoves', 'installments', 'amortizations',
-  'categories', 'salesSections', 'salesTypes', 'sales', 'salesPlans',
+  'categories', 'salesSections', 'salesTypes', 'sales', 'salesPlans', 'salesTypeRemovals',
 ]);
 
 function validId(id) {
-  return typeof id === 'string' && id.length > 0 && id.length <= 200 && !/[\u0000-\u001f]/.test(id);
+  return typeof id === 'string' && id.length > 0 && id.length <= 500 && !/[\u0000-\u001f]/.test(id);
 }
 
 export async function POST({ request }) {
@@ -88,7 +89,12 @@ export async function POST({ request }) {
     // Para DELETE: mapeia a coleção e o ID
     const mapped = nextgoalsToPlena(collection, id, { id });
     if (!mapped) return json({ ok: true, skipped: 'unmappable' });
+    if (['salesSections', 'salesTypes'].includes(collection)) {
+      await deleteSalesData(db, ownerEmail, 'owner_email', collection, id, data?.sectionId, source_updated_at ?? Date.now());
+      return json({ ok: true });
+    }
     await runSyncStatements(db, syncRecordStatements(db, ownerEmail, 'owner_email', { collection: mapped.collection, id: mapped.id, deleted: true, updatedAt: source_updated_at ?? Date.now() }));
+    if (collection === 'salesTypeRemovals') await enforceSalesDeletions(db, ownerEmail, 'owner_email');
     return json({ ok: true });
   }
 
@@ -115,5 +121,6 @@ export async function POST({ request }) {
   await runSyncStatements(db, syncRecordStatements(db, ownerEmail, 'owner_email', {
     collection: mapped.collection, id: mapped.id, data: mapped.data, updatedAt,
   }));
+  if (collection === 'salesPlans') await enforceSalesDeletions(db, ownerEmail, 'owner_email');
   return json({ ok: true });
 }

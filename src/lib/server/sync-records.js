@@ -19,19 +19,33 @@ export function syncRecordStatements(db, owner, ownerColumn, record) {
   const { collection, id, data, deleted = false } = record;
   const time = syncTimestamp(record.updatedAt);
   const storedTime = ownerColumn === 'user_id' ? new Date(time).toISOString() : time;
+  const permanentRoot = ['salesSections', 'salesTypes'].includes(collection);
   if (deleted) return [
     db.prepare(`INSERT INTO sync_tombstones(owner, collection, id, deleted_at) VALUES (?, ?, ?, ?)
       ON CONFLICT(owner, collection, id) DO UPDATE SET deleted_at = excluded.deleted_at
       WHERE excluded.deleted_at > sync_tombstones.deleted_at`).bind(owner, collection, id, time),
-    db.prepare(`DELETE FROM documents WHERE ${ownerColumn} = ? AND collection = ? AND id = ? AND updated_at <= ?`)
-      .bind(owner, collection, id, storedTime),
+    db.prepare(`DELETE FROM documents WHERE ${ownerColumn} = ? AND collection = ? AND id = ? ${permanentRoot ? '' : 'AND updated_at <= ?'}`)
+      .bind(owner, collection, id, ...(permanentRoot ? [] : [storedTime])),
   ];
+  const permanent = ['salesSections', 'salesTypes'].includes(collection);
+  let guard = permanent ? '1 = 1' : 'deleted_at >= ?';
+  const params = permanent ? [] : [time];
+  let extra = '';
+  if (['sales', 'salesTypes', 'salesPlans'].includes(collection)) {
+    const sectionId = data.sectionId || 'default';
+    extra += " AND NOT EXISTS (SELECT 1 FROM sync_tombstones WHERE owner = ? AND collection = 'salesSections' AND id = ?)";
+    params.push(owner, sectionId);
+    if (collection !== 'salesPlans') {
+      extra += " AND NOT EXISTS (SELECT 1 FROM sync_tombstones WHERE owner = ? AND collection = 'salesTypeRemovals' AND id = ?)";
+      params.push(owner, JSON.stringify([sectionId, collection === 'salesTypes' ? id : data.type]));
+    }
+  }
   return [db.prepare(`INSERT INTO documents (${ownerColumn}, collection, id, data, updated_at)
     SELECT ?, ?, ?, ?, ? WHERE NOT EXISTS (
-      SELECT 1 FROM sync_tombstones WHERE owner = ? AND collection = ? AND id = ? AND deleted_at >= ?
-    ) ON CONFLICT(${ownerColumn}, collection, id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at
+      SELECT 1 FROM sync_tombstones WHERE owner = ? AND collection = ? AND id = ? AND ${guard}
+    ) ${extra} ON CONFLICT(${ownerColumn}, collection, id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at
       WHERE excluded.updated_at >= documents.updated_at`)
-    .bind(owner, collection, id, JSON.stringify(data), storedTime, owner, collection, id, time)];
+    .bind(owner, collection, id, JSON.stringify(data), storedTime, owner, collection, id, ...params)];
 }
 
 export async function readSyncRecords(db, owner, ownerColumn, collections) {
@@ -48,7 +62,7 @@ export async function readSyncRecords(db, owner, ownerColumn, collections) {
   for (const row of deleted || []) {
     if (!allowed.has(row.collection)) continue;
     const key = `${row.collection}/${row.id}`;
-    if (!records.has(key) || records.get(key).updatedAt <= row.deleted_at)
+    if (['salesSections', 'salesTypes'].includes(row.collection) || !records.has(key) || records.get(key).updatedAt <= row.deleted_at)
       records.set(key, { collection: row.collection, id: row.id, deleted: true, updatedAt: row.deleted_at });
   }
   return [...records.values()];

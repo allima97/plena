@@ -85,6 +85,34 @@ try {
   assert.equal(psql.prepare("SELECT count(*) AS n FROM documents WHERE owner_email=? AND id='from-ng'").get(owner).n,0);
   assert.equal(nsql.prepare("SELECT count(*) AS n FROM documents WHERE user_id=? AND id='from-ng'").get(owner).n,0);
   assert.equal(psql.prepare("SELECT count(*) AS n FROM documents WHERE owner_email=? AND id='private'").get(other).n,1);
+  // Permanent sales deletion is scoped by identity, requires reviewed counts,
+  // reaches the linked peer, and remains deleted after reconciliation.
+  response=await nRequest('/api/salesSections/other','PUT',{id:'other',name:'Turismo',deleted:false});assert.equal(response.status,200);
+  response=await nRequest('/api/sales/other-sale','PUT',{id:'other-sale',sectionId:'other',date:'2026-10-23',type:'Hotel',total:200,fees:10});assert.equal(response.status,200);
+  response=await nRequest('/api/salesTypes/Hotel','DELETE',{confirm:false,sectionId:section,expectedSalesCount:1});assert.equal(response.status,400);
+  response=await nRequest('/api/salesTypes/Hotel','DELETE',{confirm:true,sectionId:section,expectedSalesCount:0});assert.equal(response.status,409);
+  assert.equal(nsql.prepare("SELECT count(*) AS n FROM documents WHERE user_id=? AND id='sale'").get(owner).n,1);
+  response=await nRequest('/api/salesTypes/Hotel','DELETE',{confirm:true,sectionId:section,expectedSalesCount:1});assert.equal(response.status,200,await response.text());
+  for(const [sql,column] of [[psql,'owner_email'],[nsql,'user_id']]){
+    assert.equal(sql.prepare(`SELECT count(*) AS n FROM documents WHERE ${column}=? AND collection='sales' AND id='sale'`).get(owner).n,0);
+    assert.equal(sql.prepare(`SELECT count(*) AS n FROM documents WHERE ${column}=? AND collection='sales' AND id='other-sale'`).get(owner).n,1);
+  }
+  response=await nRequest('/api/salesSections/tourism','DELETE',{confirm:true,sectionId:section,expectedSalesCount:0});assert.equal(response.status,200,await response.text());
+  await reconcileSync(pdb,owner,penv,{force:true});
+  for(const [sql,column] of [[psql,'owner_email'],[nsql,'user_id']]){
+    assert.equal(sql.prepare(`SELECT count(*) AS n FROM documents WHERE ${column}=? AND collection='salesSections' AND id='tourism'`).get(owner).n,0);
+    assert.equal(sql.prepare(`SELECT count(*) AS n FROM documents WHERE ${column}=? AND collection='salesPlans' AND (id='2026-10' OR id='tourism:2026-10')`).get(owner).n,0);
+    assert.equal(sql.prepare(`SELECT count(*) AS n FROM documents WHERE ${column}=? AND collection='salesSections' AND id='other'`).get(owner).n,1);
+  }
+  response=await nRequest('/api/salesSections/tourism','PUT',{id:'tourism',name:'Stale restore',deleted:false});assert.equal(response.status,409);
+  const transport = nenv.PLENA;
+  nenv.PLENA = { fetch: request => request.url.endsWith('/inbound') ? Response.json({error:'temporarily_unavailable'},{status:503}) : transport.fetch(request) };
+  response=await nRequest('/api/salesSections/other','DELETE',{confirm:true,sectionId:'other',expectedSalesCount:1});assert.equal(response.status,200,await response.text());
+  assert.equal(psql.prepare("SELECT count(*) AS n FROM documents WHERE owner_email=? AND id='other'").get(owner).n,1);
+  nenv.PLENA=transport;
+  const repaired=await reconcileSync(pdb,owner,penv,{force:true});assert.equal(repaired.error,undefined);
+  for(const [sql,column] of [[psql,'owner_email'],[nsql,'user_id']])assert.equal(sql.prepare(`SELECT count(*) AS n FROM documents WHERE ${column}=? AND id IN ('other','other-sale')`).get(owner).n,0);
+  console.log('PASS: permanent type/control deletion, confirmation counts, peer cascade, legacy plan cleanup, reconciliation and duplicate-name isolation.');
   console.log('PASS: authenticated activation, existing goals, newest conflict, section plans, changes in both directions, deletion, repeat reconciliation and account/privacy isolation.');
 } finally {
   psql.close();nsql.close();await new Promise(resolve=>server.close(resolve));delete globalThis.__integrationEnv;await rm(dir,{recursive:true,force:true});

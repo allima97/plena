@@ -1,3 +1,4 @@
+import { salesRecordDeleted, enforceSalesDeletions } from '$lib/server/sales-delete.js';
 import { validateSale, validatePlan, validateSaleType } from '$lib/goals/sales.js';
 import { json } from '@sveltejs/kit';
 import { env } from 'cloudflare:workers';
@@ -88,13 +89,20 @@ export async function PUT({ locals, params, request, platform }) {
 		return json({ error: error.message || 'Dados inválidos.' }, { status: 400 });
 	}
 
+	if (await salesRecordDeleted(db, owner, params.collection, params.id, data))
+		return json({ error: 'Este controle, tipo ou registro foi excluído. Atualize a tela para continuar.' }, { status: 409 });
 	await claimLegacyData(db, owner, env);
 	const updatedAt = Date.now();
+	if (['salesSections', 'salesTypes', 'sales', 'salesPlans'].includes(params.collection)) {
+		await runSyncStatements(db, syncRecordStatements(db, owner, 'owner_email', { collection: params.collection, id: params.id, data, updatedAt }));
+	} else {
 	await db.prepare(
 		'INSERT INTO documents (owner_email, collection, id, data, updated_at) VALUES (?, ?, ?, ?, ?) ' +
 			'ON CONFLICT(owner_email, collection, id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at'
 	).bind(owner, params.collection, params.id, JSON.stringify(data), updatedAt).run();
+	}
 
+	if (params.collection === 'salesPlans') await enforceSalesDeletions(db, owner, 'owner_email');
 	// Dispara sync para o Nextgoals em background (não bloqueia a resposta).
 	// A escrita local já foi confirmada acima — o sync é best-effort.
 	if (isSyncable(params.collection)) {
