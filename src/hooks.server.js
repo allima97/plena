@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { claimLegacyData } from '$lib/server/data-owner.js';
 import { getSessionUser, handleAuthRoute } from '$lib/server/auth.js';
+import { isMachineSyncPath, verifySyncSecret } from '$lib/server/sync.js';
 
 function withSecurityHeaders(response, isApi = false) {
 	const headers = new Headers(response.headers);
@@ -37,6 +38,12 @@ const PUBLIC_ASSETS = new Set(['/favicon.svg', '/favicon.ico', '/apple-touch-ico
 export async function handle({ event, resolve }) {
 	const path = event.url.pathname;
 	const isApi = path.startsWith('/api/');
+	// These exact routes authenticate the other Worker, rather than a browser.
+	if (isMachineSyncPath(path)) {
+		if (!verifySyncSecret(event.request, env))
+			return withSecurityHeaders(Response.json({ error: 'unauthorized' }, { status: 401 }), true);
+		return withSecurityHeaders(await resolve(event), true);
+	}
 	if (path.startsWith('/api/auth/')) {
 		const response = await handleAuthRoute(event, env);
 		if (response) return withSecurityHeaders(response, true);

@@ -11,6 +11,7 @@
 		"binding": "ASSETS",
 		"directory": ".svelte-kit/cloudflare"
 	},
+	"services": [{ "binding": "NEXTGOALS", "service": "nextgoals" }],
 	"d1_databases": [
 		{
 			"binding": "DB",
@@ -32,7 +33,7 @@
 		"LEGACY_DATA_OWNER_EMAIL": "allima97@gmail.com",
 		// URL pública do Worker do Nextgoals (sem barra final)
 		// Exemplo: "https://nextgoals.nxapps.workers.dev"
-		"NEXTGOALS_URL": ""
+		"NEXTGOALS_URL": "https://nextgoals.nxapps.com.br"
 		// SYNC_SECRET: segredo compartilhado entre Plena e Nextgoals.
 		// NÃO colocar aqui — usar: wrangler secret put SYNC_SECRET
 		// O mesmo valor deve ser configurado nos dois Workers.

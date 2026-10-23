@@ -88,18 +88,20 @@ export async function PUT({ locals, params, request, platform }) {
 	}
 
 	await claimLegacyData(db, owner, env);
+	const updatedAt = Date.now();
 	await db.prepare(
 		'INSERT INTO documents (owner_email, collection, id, data, updated_at) VALUES (?, ?, ?, ?, ?) ' +
 			'ON CONFLICT(owner_email, collection, id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at'
-	).bind(owner, params.collection, params.id, JSON.stringify(data), Date.now()).run();
+	).bind(owner, params.collection, params.id, JSON.stringify(data), updatedAt).run();
 
 	// Dispara sync para o Nextgoals em background (não bloqueia a resposta).
 	// A escrita local já foi confirmada acima — o sync é best-effort.
 	if (isSyncable(params.collection)) {
-		const syncPromise = triggerSyncToNextgoals(db, owner, 'PUT', params.collection, params.id, data, env);
+		const syncPromise = triggerSyncToNextgoals(db, owner, 'PUT', params.collection, params.id, data, env, updatedAt);
 		// Usa waitUntil quando disponível para que o Worker não seja encerrado
 		// antes de o fetch de sync completar.
-		platform?.ctx?.waitUntil(syncPromise);
+		if (platform?.ctx) platform.ctx.waitUntil(syncPromise);
+		else await syncPromise;
 	}
 
 	return json({ ok: true });
@@ -120,7 +122,8 @@ export async function DELETE({ locals, params, platform }) {
 	// Dispara sync em background
 	if (isSyncable(params.collection)) {
 		const syncPromise = triggerSyncToNextgoals(db, owner, 'DELETE', params.collection, params.id, null, env);
-		platform?.ctx?.waitUntil(syncPromise);
+		if (platform?.ctx) platform.ctx.waitUntil(syncPromise);
+		else await syncPromise;
 	}
 
 	return json({ ok: true });

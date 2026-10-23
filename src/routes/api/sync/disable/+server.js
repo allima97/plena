@@ -16,6 +16,7 @@
 
 import { json } from '@sveltejs/kit';
 import { env } from 'cloudflare:workers';
+import { nextgoalsFetch } from '$lib/server/sync.js';
 import { dataOwner } from '$lib/server/data-owner.js';
 
 export const prerender = false;
@@ -60,7 +61,7 @@ export async function POST({ locals, request }) {
   const ngUrl = env.NEXTGOALS_URL;
   const syncSecret = env.SYNC_SECRET;
   if (ngUrl && syncSecret) {
-    fetch(`${ngUrl}/api/sync/deregister`, {
+    await nextgoalsFetch(env, '/api/sync/deregister', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

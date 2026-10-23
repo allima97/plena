@@ -18,11 +18,9 @@
 import { json } from '@sveltejs/kit';
 import { env } from 'cloudflare:workers';
 import { dataOwner } from '$lib/server/data-owner.js';
-import { hashOtp, timingSafeEqual, randomId } from '$lib/server/sync.js';
+import { hashOtp, timingSafeEqual, randomId, nextgoalsFetch } from '$lib/server/sync.js';
 
 export const prerender = false;
-
-const MAX_OTP_ATTEMPTS = 5;
 
 export async function POST({ locals, request }) {
   const db = env.DB;
@@ -44,8 +42,8 @@ export async function POST({ locals, request }) {
   // Busca OTP válido mais recente para este e-mail
   const otp = await db
     .prepare(
-      'SELECT id, code_hash FROM sync_otps ' +
-      'WHERE owner_email = ? AND used = 0 AND expires_at > ? ' +
+      'SELECT id, code_hash, attempts FROM sync_otps ' +
+      'WHERE owner_email = ? AND used = 0 AND attempts < 5 AND expires_at > ? ' +
       'ORDER BY created_at DESC LIMIT 1'
     )
     .bind(owner, now)
@@ -57,17 +55,19 @@ export async function POST({ locals, request }) {
 
   const inputHash = await hashOtp(code);
   if (!timingSafeEqual(inputHash, otp.code_hash)) {
+    await db.prepare('UPDATE sync_otps SET attempts = attempts + 1 WHERE id = ? AND used = 0').bind(otp.id).run();
     return json({ error: 'Código incorreto.' }, { status: 400 });
   }
-
-  // Marca OTP como usado (idempotente)
-  await db.prepare('UPDATE sync_otps SET used = 1 WHERE id = ?').bind(otp.id).run();
 
   const ngUrl = env.NEXTGOALS_URL;
   const syncSecret = env.SYNC_SECRET;
   if (!ngUrl || !syncSecret) {
     return json({ error: 'Serviço de sync não configurado.' }, { status: 503 });
   }
+
+  const claim = await db.prepare('UPDATE sync_otps SET used = 1 WHERE id = ? AND used = 0 AND attempts < 5')
+    .bind(otp.id).run();
+  if (claim.meta.changes !== 1) return json({ error: 'Código já utilizado. Solicite um novo.' }, { status: 400 });
 
   // Cria ou re-habilita o sync_link no Plena
   const existingLink = await db
@@ -96,7 +96,7 @@ export async function POST({ locals, request }) {
 
   // Registra o sync no Nextgoals
   try {
-    const ngResp = await fetch(`${ngUrl}/api/sync/register`, {
+    const ngResp = await nextgoalsFetch(env, '/api/sync/register', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

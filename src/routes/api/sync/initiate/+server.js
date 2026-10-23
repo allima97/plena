@@ -17,7 +17,7 @@
 import { json } from '@sveltejs/kit';
 import { env } from 'cloudflare:workers';
 import { dataOwner } from '$lib/server/data-owner.js';
-import { randomId, randomSyncOtpCode, hashOtp, timingSafeEqual } from '$lib/server/sync.js';
+import { randomId, randomSyncOtpCode, hashOtp, nextgoalsFetch } from '$lib/server/sync.js';
 
 export const prerender = false;
 
@@ -60,7 +60,7 @@ export async function POST({ locals }) {
   // 3. Verifica se a conta Nextgoals existe
   let ngResp;
   try {
-    ngResp = await fetch(`${ngUrl}/api/sync/check`, {
+    ngResp = await nextgoalsFetch(env, '/api/sync/check', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -76,7 +76,7 @@ export async function POST({ locals }) {
   if (!ngResp.ok) {
     if (ngResp.status === 404) {
       return json(
-        { error: 'Conta Nextgoals não encontrada para este e-mail. Crie uma conta em nextgoals.app primeiro.' },
+        { error: 'Conta Nextgoals não encontrada para este e-mail. Acesse o NextGoals com o mesmo e-mail primeiro.' },
         { status: 404 }
       );
     }
@@ -93,35 +93,18 @@ export async function POST({ locals }) {
     'INSERT INTO sync_otps (id, owner_email, code_hash, expires_at, used, created_at) VALUES (?, ?, ?, ?, 0, ?)'
   ).bind(otpId, owner, codeHash, expiresAt, now).run();
 
-  // Envia e-mail usando o mesmo binding de e-mail do Plena
-  const email = env.EMAIL;
-  const from = env.AUTH_EMAIL_FROM || 'conta@salaonamao.com';
-  if (email) {
-    try {
-      const { EmailMessage } = await import('cloudflare:email');
-      const { createMimeMessage } = await import('mimetext');
-      const msg = createMimeMessage();
-      msg.setSender({ name: 'Plena', addr: from });
-      msg.setRecipient(owner);
-      msg.setSubject('Código de confirmação — Sincronização Plena ↔ Nextgoals');
-      msg.addMessage({
-        contentType: 'text/html',
-        data: `
-<p>Olá,</p>
-<p>Você solicitou a sincronização entre o <strong>Plena</strong> e o <strong>Nextgoals</strong>.</p>
-<p>Seu código de confirmação é:</p>
-<h2 style="letter-spacing:8px;font-size:36px">${code}</h2>
-<p>Este código expira em <strong>10 minutos</strong>.</p>
-<p>Se não foi você que solicitou, ignore este e-mail.</p>
-<p>— Equipe Plena</p>
-        `.trim(),
-      });
-      await email.send(new EmailMessage(from, owner, msg.asRaw()));
-    } catch (e) {
-      // E-mail falhou, mas não bloqueamos o fluxo — o código foi salvo no DB.
-      console.error('[sync/initiate] erro ao enviar e-mail:', e.message);
-    }
+  try {
+    if (!env.EMAIL || !env.AUTH_EMAIL_FROM) throw new Error('email_unavailable');
+    await env.EMAIL.send({
+      to: owner, from: env.AUTH_EMAIL_FROM,
+      subject: 'Código de confirmação — Sincronização Plena ↔ NextGoals',
+      text: `Seu código para ativar a sincronização entre Plena e NextGoals é ${code}. Expira em 10 minutos. Se você não solicitou, ignore esta mensagem.`,
+      html: `<p>Confirme a sincronização entre Plena e NextGoals:</p><h2 style="letter-spacing:8px">${code}</h2><p>Expira em 10 minutos. Se você não solicitou, ignore esta mensagem.</p>`,
+    });
+  } catch (e) {
+    await db.prepare('DELETE FROM sync_otps WHERE id = ?').bind(otpId).run();
+    console.error('[sync/initiate] envio de e-mail falhou:', e.message);
+    return json({ error: 'Não foi possível enviar o código por e-mail. Tente novamente.' }, { status: 502 });
   }
-
   return json({ ok: true });
 }

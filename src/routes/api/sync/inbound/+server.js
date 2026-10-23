@@ -23,6 +23,7 @@
  *    → last-write-wins com base no timestamp da escrita original.
  */
 
+import { validateSale, validatePlan, validateSaleType } from '$lib/goals/sales.js';
 import { json } from '@sveltejs/kit';
 import { env } from 'cloudflare:workers';
 import { verifySyncSecret, nextgoalsToPlena } from '$lib/server/sync.js';
@@ -69,7 +70,7 @@ export async function POST({ request }) {
   // 2. Verifica sync_link ativo
   const link = await db
     .prepare(
-      'SELECT id FROM sync_links WHERE nextgoals_user_id = ? AND enabled = 1'
+      'SELECT id, plena_user_id FROM sync_links WHERE nextgoals_user_id = ? AND enabled = 1'
     )
     .bind(source_user_id)
     .first();
@@ -80,7 +81,7 @@ export async function POST({ request }) {
   }
 
   // O plena_user_id é o mesmo e-mail (ambos usam o mesmo identificador)
-  const ownerEmail = source_user_id;
+  const ownerEmail = link.plena_user_id;
 
   if (operation === 'DELETE') {
     // Para DELETE: mapeia a coleção e o ID
@@ -102,6 +103,13 @@ export async function POST({ request }) {
 
   const mapped = nextgoalsToPlena(collection, id, data);
   if (!mapped) return json({ ok: true, skipped: 'unmappable' });
+
+  try {
+    if (mapped.data.id !== undefined && mapped.data.id !== mapped.id) throw new Error('Identificador inválido.');
+    if (mapped.collection === 'sales') validateSale(mapped.data);
+    if (mapped.collection === 'salesPlans') validatePlan(mapped.data);
+    if (mapped.collection === 'salesTypes') validateSaleType(mapped.data);
+  } catch (error) { return json({ error: error.message }, { status: 400 }); }
 
   const updatedAt = Number.isFinite(source_updated_at) ? source_updated_at : Date.now();
 

@@ -62,16 +62,14 @@ export function plenaToNextgoals(plenaCollection, plenaId, plenaData) {
   if (!ngCollection) return null;
 
   if (plenaCollection === 'salesPlans') {
-    // Plena: { id: "YYYY-MM", target, superTarget, ... }
-    // Nextgoals: { id: "sectionId:YYYY-MM", month: "YYYY-MM", sectionId, ... }
-    const month = plenaId;                              // "YYYY-MM"
+    const month = plenaData.month || plenaId.split(':').at(-1);
     const sectionId = plenaData.sectionId || 'default';
     const ngId = `${sectionId}:${month}`;
-    const ngData = { ...plenaData, id: ngId, month, sectionId };
-    return { ngCollection, ngId, ngData };
+    return { ngCollection, ngId, ngData: { ...plenaData, id: ngId, month, sectionId } };
   }
-
-  return { ngCollection, ngId: plenaId, ngData: plenaData };
+  const ngData = ['sales', 'salesTypes'].includes(plenaCollection)
+    ? { ...plenaData, sectionId: plenaData.sectionId || 'default' } : plenaData;
+  return { ngCollection, ngId: plenaId, ngData };
 }
 
 /**
@@ -83,17 +81,13 @@ export function nextgoalsToPlena(ngCollection, ngId, ngData) {
   if (!collection) return null;
 
   if (ngCollection === 'salesPlans') {
-    // Apenas planos da seção "default" mapeiam para o Plena,
-    // pois o Plena usa um plano por mês (id = YYYY-MM, sem seção no ID).
-    const sectionId = ngData.sectionId || 'default';
-    if (sectionId !== 'default') return null;
-    const month = ngData.month;
-    if (!month || !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return null;
-    // Remove os campos exclusivos do Nextgoals
-    const { month: _m, sectionId: _s, ...rest } = ngData;
-    return { collection, id: month, data: { ...rest, id: month } };
+    const month = ngData.month || ngId.split(':').at(-1);
+    const sectionId = ngData.sectionId || (ngId.includes(':') ? ngId.slice(0, ngId.lastIndexOf(':')) : 'default');
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return null;
+    const id = sectionId === 'default' ? month : `${sectionId}:${month}`;
+    const { month: _month, ...rest } = ngData;
+    return { collection, id, data: { ...rest, id, sectionId } };
   }
-
   return { collection, id: ngId, data: ngData };
 }
 
@@ -131,7 +125,7 @@ export async function getActiveSyncLink(db, ownerEmail) {
  * @param {object|null} data        - null em DELETE
  * @param {object}      env         - env bindings do Worker
  */
-export async function triggerSyncToNextgoals(db, ownerEmail, operation, collection, id, data, env) {
+export async function triggerSyncToNextgoals(db, ownerEmail, operation, collection, id, data, env, sourceUpdatedAt = Date.now()) {
   if (!isSyncable(collection)) return;
 
   const link = await getActiveSyncLink(db, ownerEmail);
@@ -155,7 +149,7 @@ export async function triggerSyncToNextgoals(db, ownerEmail, operation, collecti
     if (!ngCollection) return;
     if (collection === 'salesPlans') {
       // Plena id = YYYY-MM → Nextgoals id = default:YYYY-MM
-      ngId = `default:${id}`;
+      ngId = id.includes(':') ? id : `default:${id}`;
     } else {
       ngId = id;
     }
@@ -163,7 +157,7 @@ export async function triggerSyncToNextgoals(db, ownerEmail, operation, collecti
   }
 
   try {
-    const resp = await fetch(`${ngUrl}/api/sync/inbound`, {
+    const resp = await nextgoalsFetch(env, '/api/sync/inbound', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -175,7 +169,7 @@ export async function triggerSyncToNextgoals(db, ownerEmail, operation, collecti
         collection: ngCollection,
         id: ngId,
         data: ngData,
-        source_updated_at: Date.now(),
+        source_updated_at: sourceUpdatedAt,
       }),
       signal: AbortSignal.timeout(10_000),
     });
@@ -243,4 +237,15 @@ export function verifySyncSecret(request, env) {
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
   if (!env.SYNC_SECRET || !token) return false;
   return timingSafeEqual(token, env.SYNC_SECRET);
+}
+
+// Service bindings keep Worker calls independent of browser login redirects.
+export function nextgoalsFetch(env, path, options) {
+  const request = new Request(new URL(path, env.NEXTGOALS_URL), { ...options, redirect: 'manual' });
+  return env.NEXTGOALS ? env.NEXTGOALS.fetch(request) : fetch(request);
+}
+
+export function isMachineSyncPath(path) {
+  return new Set(['/api/sync/inbound', '/api/sync/m2m/initiate', '/api/sync/m2m/verify',
+    '/api/sync/m2m/disable', '/api/sync/m2m/status']).has(path);
 }

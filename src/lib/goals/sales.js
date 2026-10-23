@@ -12,7 +12,9 @@ export function validateSale(s) {
 }
 export function validatePlan(p) {
  if (p.commissionBase !== undefined && !['net', 'gross'].includes(p.commissionBase)) throw new Error('Selecione a base da comissão: com taxas ou sem taxas.');
- if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(p.id) || !Number.isFinite(p.target) || !Number.isFinite(p.superTarget) || p.target <= 0 || cents(p.superTarget) <= cents(p.target)) throw new Error('A meta deve ser positiva e a supermeta deve ser maior que a meta.');
+ const month = typeof p.id === 'string' ? p.id.split(':').at(-1) : '';
+ const validId = p.id === month || (typeof p.sectionId === 'string' && p.sectionId.length > 0 && p.id === `${p.sectionId}:${month}`);
+ if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !validId || !Number.isFinite(p.target) || !Number.isFinite(p.superTarget) || p.target <= 0 || cents(p.superTarget) <= cents(p.target)) throw new Error('A meta deve ser positiva e a supermeta deve ser maior que a meta.');
  if (!p.rates || typeof p.rates !== 'object' || Array.isArray(p.rates)) throw new Error('Configuração de comissões inválida.');
  for (const type of Object.keys(p.rates)) for (const tier of Object.keys(TIERS)) {
   const rate = p.rates?.[type]?.[tier];
