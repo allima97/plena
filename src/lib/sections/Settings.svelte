@@ -23,7 +23,8 @@
 		{ id: 'lingua', label: () => t('settings_tab_lingua') },
 		{ id: 'backup', label: () => t('settings_tab_backup') },
 		{ id: 'apagar', label: () => t('settings_tab_apagar') },
-		{ id: 'integracoes', label: () => 'Integrações' }
+		{ id: 'integracoes', label: () => t('settings_tab_integracoes') },
+		{ id: 'privacidade', label: () => t('settings_tab_privacidade') }
 	];
 	let secaoAtiva = $state('geral');
 
@@ -140,8 +141,6 @@
 		<button type="button" class:active={secaoAtiva === s.id} onclick={() => (secaoAtiva = s.id)}>{s.label()}</button>
 	{/each}
 </div>
-
-<p class="field-hint"><a href="/privacidade" data-sveltekit-reload>Privacidade e meus dados</a> · <a href="/api/privacy/export">Baixar meus dados pessoais</a></p>
 
 {#if secaoAtiva === 'geral'}
 	<div class="card" style="max-width:560px">
@@ -295,6 +294,25 @@
 {:else if secaoAtiva === 'integracoes'}
 	<div class="card" style="max-width:560px">
 		<SyncSettings />
+	</div>
+{:else if secaoAtiva === 'privacidade'}
+	<div class="card" style="max-width:560px">
+		<p class="stat-label" style="margin:0 0 4px">{t('settings_priv_dadosTitulo')}</p>
+		<p class="movement-meta" style="margin:0 0 18px">{t('settings_priv_dadosSub')}</p>
+		<div class="modal-footer" style="justify-content:flex-start;gap:12px">
+			<a class="btn" href="/api/privacy/export"><Download size={16} /> {t('settings_priv_baixar')}</a>
+			<a class="btn btn-ghost" href="/privacidade" data-sveltekit-reload>{t('settings_priv_politica')}</a>
+		</div>
+	</div>
+
+	<div class="card" style="max-width:560px;margin-top:16px">
+		<p class="stat-label" style="margin:0 0 4px">{t('settings_priv_integracaoTitulo')}</p>
+		<p class="movement-meta" style="margin:0">{t('settings_priv_integracaoSub')}</p>
+	</div>
+
+	<div class="card" style="max-width:560px;margin-top:16px">
+		<p class="stat-label" style="margin:0 0 4px">{t('settings_priv_contatoTitulo')}</p>
+		<p class="movement-meta" style="margin:0">{t('settings_priv_contatoSub')}</p>
 	</div>
 {/if}
 

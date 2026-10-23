@@ -72,6 +72,22 @@ const dict = {
 		settings_tab_lingua: 'Língua',
 		settings_tab_backup: 'Exportar/Importar',
 		settings_tab_apagar: 'Apagar dados',
+		settings_tab_integracoes: 'Integrações',
+		settings_tab_privacidade: 'Privacidade e LGPD',
+
+		settings_priv_dadosTitulo: 'Seus dados',
+		settings_priv_dadosSub:
+			'O Plena guarda seu e-mail, seu nome e os dados financeiros que você registra, tudo vinculado ao seu e-mail e hospedado na Cloudflare. Você pode baixar uma cópia completa a qualquer momento (direito de acesso e portabilidade -- LGPD, art. 18).',
+		settings_priv_baixar: 'Baixar meus dados (JSON)',
+		settings_priv_politica: 'Ler a política de privacidade',
+
+		settings_priv_integracaoTitulo: 'Integração Plena ↔ NextGoals',
+		settings_priv_integracaoSub:
+			'Quando você ativa a sincronização, compartilhamos com o NextGoals o seu e-mail e os dados dos seus objetivos, mediante o seu consentimento (registrado com data e versão). Você pode revogar a qualquer momento desativando a integração na aba Integrações -- o consentimento fica marcado como revogado e a sincronização para.',
+
+		settings_priv_contatoTitulo: 'Contato e direitos',
+		settings_priv_contatoSub:
+			'Controlador dos dados: nxapps. Encarregado/contato: nxapps01@gmail.com. Você pode solicitar acesso, correção, portabilidade, revogação de consentimento ou exclusão dos seus dados pessoais -- a exclusão também pode ser feita por você na aba Apagar dados.',
 
 		settings_geral_titulo: 'Preferências gerais',
 		settings_geral_sub: 'Como o Plena se comporta pra você.',
@@ -185,6 +201,22 @@ const dict = {
 		settings_tab_lingua: 'Language',
 		settings_tab_backup: 'Export/Import',
 		settings_tab_apagar: 'Delete data',
+		settings_tab_integracoes: 'Integrations',
+		settings_tab_privacidade: 'Privacy & LGPD',
+
+		settings_priv_dadosTitulo: 'Your data',
+		settings_priv_dadosSub:
+			'Plena stores your e-mail, your name and the financial data you record, all tied to your e-mail and hosted on Cloudflare. You can download a full copy at any time (right of access and portability -- LGPD, art. 18).',
+		settings_priv_baixar: 'Download my data (JSON)',
+		settings_priv_politica: 'Read the privacy policy',
+
+		settings_priv_integracaoTitulo: 'Plena ↔ NextGoals integration',
+		settings_priv_integracaoSub:
+			'When you enable sync, we share your e-mail and your goals data with NextGoals, with your consent (recorded with date and version). You can revoke it at any time by disabling the integration in the Integrations tab -- the consent is marked as revoked and syncing stops.',
+
+		settings_priv_contatoTitulo: 'Contact and rights',
+		settings_priv_contatoSub:
+			'Data controller: nxapps. Contact: nxapps01@gmail.com. You may request access, correction, portability, consent revocation or deletion of your personal data -- deletion can also be done by you in the Delete data tab.',
 
 		settings_geral_titulo: 'General preferences',
 		settings_geral_sub: 'How Plena behaves for you.',

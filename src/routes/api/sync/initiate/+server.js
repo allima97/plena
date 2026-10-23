@@ -23,7 +23,6 @@ import { randomId, randomSyncOtpCode, hashOtp, nextgoalsFetch } from '$lib/serve
 export const prerender = false;
 
 const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutos
-const OTP_RATE_LIMIT_MS = 60 * 1000; // 1 OTP por minuto
 
 export async function POST({ locals, request }) {
   const db = env.DB;
@@ -48,19 +47,12 @@ export async function POST({ locals, request }) {
     return json({ error: 'Sync já está ativo para esta conta.' }, { status: 409 });
   }
 
-  // 2. Rate limit: não permite disparar OTP mais de 1x/min
+  // 2. Rate limit atômico (upsert em statement único): 1 OTP/min por usuário.
+  // É a ÚNICA fonte de verdade do limite — um SELECT separado aqui seria uma
+  // condição de corrida (TOCTOU) e deixaria requisições simultâneas passarem juntas.
   const now = Date.now();
   if (!(await rateLimit(db, 'sync-start:' + await hashOtp('rate', owner, env.AUTH_SECRET || env.SYNC_SECRET), 1, 60_000))) return json({error:'Aguarde 1 minuto antes de solicitar outro código.'}, {status:429});
   await db.prepare('DELETE FROM sync_otps WHERE expires_at <= ? OR used = 1').bind(now).run();
-  const recentOtp = await db
-    .prepare(
-      'SELECT created_at FROM sync_otps WHERE owner_email = ? AND used = 0 AND expires_at > ? ORDER BY created_at DESC LIMIT 1'
-    )
-    .bind(owner, now)
-    .first();
-  if (recentOtp && now - Number(recentOtp.created_at) < OTP_RATE_LIMIT_MS) {
-    return json({ error: 'Aguarde 1 minuto antes de solicitar um novo código.' }, { status: 429 });
-  }
 
   // 3. Verifica se a conta Nextgoals existe
   let ngResp;
