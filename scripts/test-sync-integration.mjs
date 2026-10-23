@@ -52,7 +52,7 @@ try {
   const secret='integration-only-secret';
   const penv=globalThis.__integrationEnv={DB:pdb,SYNC_SECRET:secret,NEXTGOALS_URL:'https://ng.test',AUTH_EMAIL_FROM:'test@example.test',EMAIL:{async send(message){otp=message.text.match(/\d{6}/)[0];}}};
   const nenv={DB:ndb,SYNC_SECRET:secret,PLENA_URL:'https://plena.test',TEAM_DOMAIN:`http://127.0.0.1:${server.address().port}`,POLICY_AUD:'integration'};
-  const routes={pexport:'privacy/export',pstate:'plena/state',pdoc:'[collection]/[id]',initiate:'sync/m2m/initiate',verify:'sync/m2m/verify',reconcile:'sync/m2m/reconcile',inbound:'sync/inbound',status:'sync/m2m/status',disable:'sync/m2m/disable'};
+  const routes={psessions:'privacy/sessions',pexport:'privacy/export',pstate:'plena/state',pdoc:'[collection]/[id]',initiate:'sync/m2m/initiate',verify:'sync/m2m/verify',reconcile:'sync/m2m/reconcile',inbound:'sync/inbound',status:'sync/m2m/status',disable:'sync/m2m/disable'};
   const contents=Object.entries(routes).map(([name,route])=>`export * as ${name} from '${plenaRoot}/src/routes/api/${route}/+server.js';`).join('\n')+`\nexport {handle} from '${plenaRoot}/src/hooks.server.js';`;
   const outfile=path.join(dir,'api.mjs');
   await build({stdin:{contents,resolveDir:plenaRoot},outfile,bundle:true,platform:'node',format:'esm',alias:{'$lib':path.join(plenaRoot,'src/lib')},plugins:[{name:'env',setup(b){b.onResolve({filter:/^cloudflare:workers$/},()=>({path:'env',namespace:'test'}));b.onLoad({filter:/.*/,namespace:'test'},()=>({contents:'export const env=globalThis.__integrationEnv;'}));}}]});
@@ -121,6 +121,19 @@ try {
     const blocked=await plena(new Request('https://plena.test/api/goals/test',{method:'PUT',headers:{Cookie:'__Host-plena_session='+session,'content-type':'application/json',...headers},body:'{"id":"test","name":"blocked"}'}));assert.equal(blocked.status,status);
   }
   const anonymousExport=await plena(new Request('https://plena.test/api/privacy/export'));assert.equal(anonymousExport.status,401);
+  const listed = await (await pRequest('/api/privacy/sessions')).json(); assert.equal(listed.sessions.length,1); assert.equal(listed.sessions[0].current,true); assert.equal(listed.sessions[0].id,undefined);
+  assert.equal((await pRequest('/api/privacy/sessions','POST',{confirm:false})).status,400);
+  assert.equal((await pRequest('/api/privacy/sessions','POST',{confirm:true})).status,200);
+  const previousPeer = penv.NEXTGOALS;
+  penv.NEXTGOALS = { fetch: async request => {
+    const result = await previousPeer.fetch(request);
+    if (request.url.endsWith('/reconcile')) psql.prepare('UPDATE sync_links SET enabled=0 WHERE plena_user_id=?').run(owner);
+    return result;
+  }};
+  seed(nsql,'user_id',owner,'goals','revoked-response',{name:'Must not import after revocation'},Date.now());
+  const revoked = await reconcileSync(pdb,owner,penv,{force:true});assert.equal(revoked.linked,false);
+  assert.equal(psql.prepare("SELECT count(*) n FROM documents WHERE owner_email=? AND id='revoked-response'").get(owner).n,0);
+  console.log('PASS: in-flight reconciliation cannot import a response after local revocation.');
   console.log('PASS: privacy export isolation, no password/session disclosure, CSRF and stale-account rejection.');
   console.log('PASS: permanent type/control deletion, confirmation counts, peer cascade, legacy plan cleanup, reconciliation and duplicate-name isolation.');
   console.log('PASS: authenticated activation, existing goals, newest conflict, section plans, changes in both directions, deletion, repeat reconciliation and account/privacy isolation.');

@@ -15,6 +15,7 @@
 	import { showToast } from '$lib/toast.svelte.js';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import SyncSettings from '$lib/components/SyncSettings.svelte';
+	import PrivacySettings from '$lib/components/PrivacySettings.svelte';
 	import { Save, Download, Upload, Trash2, ShieldAlert } from 'lucide-svelte';
 
 	const SECOES = [
@@ -296,24 +297,7 @@
 		<SyncSettings />
 	</div>
 {:else if secaoAtiva === 'privacidade'}
-	<div class="card" style="max-width:560px">
-		<p class="stat-label" style="margin:0 0 4px">{t('settings_priv_dadosTitulo')}</p>
-		<p class="movement-meta" style="margin:0 0 18px">{t('settings_priv_dadosSub')}</p>
-		<div class="modal-footer" style="justify-content:flex-start;gap:12px">
-			<a class="btn" href="/api/privacy/export"><Download size={16} /> {t('settings_priv_baixar')}</a>
-			<a class="btn btn-ghost" href="/privacidade" data-sveltekit-reload>{t('settings_priv_politica')}</a>
-		</div>
-	</div>
-
-	<div class="card" style="max-width:560px;margin-top:16px">
-		<p class="stat-label" style="margin:0 0 4px">{t('settings_priv_integracaoTitulo')}</p>
-		<p class="movement-meta" style="margin:0">{t('settings_priv_integracaoSub')}</p>
-	</div>
-
-	<div class="card" style="max-width:560px;margin-top:16px">
-		<p class="stat-label" style="margin:0 0 4px">{t('settings_priv_contatoTitulo')}</p>
-		<p class="movement-meta" style="margin:0">{t('settings_priv_contatoSub')}</p>
-	</div>
+	<PrivacySettings onManageIntegration={() => secaoAtiva = 'integracoes'} />
 {/if}
 
 <ConfirmDialog

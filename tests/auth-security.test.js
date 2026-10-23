@@ -1,9 +1,10 @@
 import test from 'node:test';import assert from 'node:assert/strict';
+import {pbkdf2Sync} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';import {readFile} from 'node:fs/promises';
-import {handleAuthRoute,getSessionUser,sessionCookieName} from '../src/lib/server/auth.js';
+import {handleAuthRoute,getSessionUser,sessionCookieName,listAccountSessions,revokeOtherSessions} from '../src/lib/server/auth.js';
 test('password + email code, one-use challenges, reset revocation, cookies and origins',async t=>{
  const sql=new DatabaseSync(':memory:');t.after(()=>sql.close());sql.exec(await readFile(new URL('../migrations/0002_email_password_auth.sql',import.meta.url),'utf8'));sql.exec(await readFile(new URL('../migrations/0003_auth_email_quota.sql',import.meta.url),'utf8'));
- const db={prepare(query){const st=sql.prepare(query);let a=[];return{bind(...v){a=v;return this;},async first(){return st.get(...a)||null;},async run(){return st.run(...a);}};},async batch(statements){sql.exec('BEGIN');try{for(const st of statements)await st.run();sql.exec('COMMIT');}catch(e){sql.exec('ROLLBACK');throw e;}}};
+ const db={prepare(query){const st=sql.prepare(query);let a=[];return{bind(...v){a=v;return this;},async first(){return st.get(...a)||null;},async run(){return st.run(...a);},async all(){return {results:st.all(...a)};}};},async batch(statements){sql.exec('BEGIN');try{for(const st of statements)await st.run();sql.exec('COMMIT');}catch(e){sql.exec('ROLLBACK');throw e;}}};
  let code;const env={DB:db,AUTH_SECRET:'test-only-secret-with-at-least-32-characters',AUTH_EMAIL_FROM:'test@example.test',EMAIL:{send:async message=>{code=message.text.match(/\d{6}/)[0];}}};
  const req=(path,body,cookie='',origin='https://plena.test')=>{const url=new URL('https://plena.test/api/auth/'+path);return{url,request:new Request(url,{method:'POST',headers:{Origin:origin,'content-type':'application/json',Cookie:cookie},body:JSON.stringify(body)})};};
  const send=(...args)=>handleAuthRoute(req(...args),env);
@@ -14,7 +15,11 @@ test('password + email code, one-use challenges, reset revocation, cookies and o
  assert.match(response.headers.get('set-cookie'),/HttpOnly; Secure; SameSite=Lax/);
  response=await send('verify',{code},challenge);assert.equal(response.status,200);let session=cookie(response,sessionCookieName);
  assert.equal((await getSessionUser(new Request('https://plena.test',{headers:{Cookie:session}}),env)).email,'alice@example.test');
- const stored=sql.prepare('SELECT password_hash FROM auth_users').get().password_hash;assert.ok(!stored.includes(credentials.password));assert.match(stored,/^pbkdf2-sha256/);
+ const stored=sql.prepare('SELECT password_hash FROM auth_users').get().password_hash;assert.ok(!stored.includes(credentials.password));assert.match(stored,/^pbkdf2-sha256\$600000\$/);
+ const salt=Buffer.alloc(16,1);const legacy='pbkdf2-sha256$100000$'+salt.toString('base64url')+'$'+pbkdf2Sync(credentials.password,salt,100000,32,'sha256').toString('base64url');
+ sql.prepare('UPDATE auth_users SET password_hash=?').run(legacy);
+ assert.equal((await send('start',{...credentials,mode:'login'})).status,200);
+ assert.match(sql.prepare('SELECT password_hash FROM auth_users').get().password_hash,/^pbkdf2-sha256\$600000\$/,'legacy passwords upgrade transparently');
  assert.equal((await send('verify',{code:originalCode},challenge)).status,401);
  assert.equal((await send('start',{...credentials,mode:'login',password:'wrong-password-123'})).status,401);
  response=await send('start',{mode:'reset',email:credentials.email});const reset=cookie(response,'__Host-plena_challenge');
@@ -25,6 +30,20 @@ test('password + email code, one-use challenges, reset revocation, cookies and o
  for(let i=0;i<5;i++){const failed=await send('verify',{code:correct==='000000'?'000001':'000000'},login);assert.equal(failed.status,i===4?429:400);}
  assert.equal((await send('verify',{code:correct},login)).status,401);
  response=await send('start',{...credentials,mode:'login',password:'new-test-password-12345'});response=await send('verify',{code},cookie(response,'__Host-plena_challenge'));session=cookie(response,sessionCookieName);
+ response=await send('start',{...credentials,mode:'login',password:'new-test-password-12345'});const fifth=cookie(response,'__Host-plena_challenge');const fifthCode=code;
+ for(let i=0;i<4;i++) assert.equal((await send('verify',{code:fifthCode==='000000'?'000001':'000000'},fifth)).status,400);
+ response=await send('verify',{code:fifthCode},fifth);assert.equal(response.status,200,'the fifth guess can succeed');const secondSession=cookie(response,sessionCookieName);
+ sql.prepare('INSERT INTO auth_users VALUES(?,?,?,?,?)').run('bob@example.test','Bob','private',Date.now(),Date.now());
+ sql.prepare('INSERT INTO auth_sessions VALUES(?,?,?,?,?)').run('other-account-session','bob@example.test',Date.now(),Date.now()+60000,Date.now());
+ const request=new Request('https://plena.test',{headers:{Cookie:session}});
+ const sessions=await listAccountSessions(request,env,'alice@example.test');assert.equal(sessions.length,2);assert.equal(sessions.filter(s=>s.current).length,1);assert.equal(sessions[0].id,undefined);
+ assert.equal(await revokeOtherSessions(request,env,'alice@example.test'),1);
+ assert.equal(await getSessionUser(new Request('https://plena.test',{headers:{Cookie:secondSession}}),env),null);
+ assert.equal(sql.prepare("SELECT count(*) n FROM auth_sessions WHERE email='bob@example.test'").get().n,1);
+ response=await send('start',{...credentials,mode:'login',password:'new-test-password-12345'});const concurrent=cookie(response,'__Host-plena_challenge');const wrong=code==='000000'?'000001':'000000';
+ const guesses=await Promise.all(Array.from({length:20},()=>send('verify',{code:wrong},concurrent)));
+ assert.equal(guesses.filter(r=>r.status===400).length,4,'concurrent guesses reserve attempts atomically');
+ assert.equal(guesses.filter(r=>r.status===429).length,1);
  assert.equal((await send('logout',{},session)).status,204);
  assert.equal(await getSessionUser(new Request('https://plena.test',{headers:{Cookie:session}}),env),null);
 });

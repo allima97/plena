@@ -274,6 +274,9 @@ export async function reconcileSync(db, owner, env, { force = false } = {}) {
     });
     if (!response.ok) throw new Error(`NextGoals: HTTP ${response.status}`);
     const result = await response.json();
+    // A remote request may finish after the user has revoked the integration.
+    const active = await getActiveSyncLink(db, owner);
+    if (!active || active.id !== link.id) return { linked: false };
     if (!Array.isArray(result.records)) throw new Error('Resposta de sincronização inválida.');
     const statements = [];
     for (const record of result.records) {

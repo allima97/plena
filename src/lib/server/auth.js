@@ -3,8 +3,8 @@ const SESSION_COOKIE = '__Host-plena_session';
 const CHALLENGE_COOKIE = '__Host-plena_challenge';
 const SESSION_TTL = 30 * 24 * 60 * 60 * 1000;
 const CHALLENGE_TTL = 5 * 60 * 1000;
-// Cloudflare Workers rejects PBKDF2 iteration counts above 100,000.
-const PASSWORD_ITERATIONS = 100_000;
+// Validated against the configured workerd runtime; follows OWASP PBKDF2-SHA256 guidance.
+const PASSWORD_ITERATIONS = 600_000;
 // The account-wide included email quota is shared with Salão na Mão. Reserve
 // 500 of its 3,000 monthly messages for that app.
 const MONTHLY_EMAIL_LIMIT = 2_500;
@@ -183,6 +183,13 @@ async function requestCode(event, env) {
 		if (!existing || !(await verifyPassword(password, existing.password_hash)))
 			return json({ error: 'invalid_credentials', message: 'E-mail ou senha incorretos.' }, 401);
 		passwordHash = existing.password_hash;
+    if (Number(passwordHash.split('$')[1]) < PASSWORD_ITERATIONS) {
+      const upgraded = await hashPassword(password);
+      const changed = await db.prepare('UPDATE auth_users SET password_hash = ?, updated_at = ? WHERE email = ? AND password_hash = ? RETURNING email')
+        .bind(upgraded, Date.now(), email, passwordHash).first();
+      if (!changed) return json({ error: 'invalid_credentials', message: 'Sua conta mudou. Tente entrar novamente.' }, 401);
+      passwordHash = upgraded;
+    }
 		accountName = existing.name;
 	} else if (body.mode === 'register') {
 		if (existing) return json({ error: 'account_exists', message: 'Já existe uma conta com este e-mail. Entre com sua senha.' }, 409);

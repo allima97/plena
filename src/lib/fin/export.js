@@ -15,7 +15,7 @@ export function filterForReport(transactions, filters) {
 function csvEscape(value) {
 	let s = String(value ?? '');
 	// Spreadsheet apps execute formula-like cells even when CSV-quoted.
-	if ((/^[\s\u0000-\u001f]*[=+@-]/.test(s) && !/^-?\d+(?:[.,]\d+)?$/.test(s)) || /^[\t\r\n]/.test(s)) s = "'" + s;
+	if ((/^[\s\u0000-\u001f]*[=+@＝＋＠－-]/.test(s) && !/^-?\d+(?:[.,]\d+)?$/.test(s)) || /^[\t\r\n]/.test(s)) s = "'" + s;
 	return /[",\r\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
