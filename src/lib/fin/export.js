@@ -13,8 +13,10 @@ export function filterForReport(transactions, filters) {
 }
 
 function csvEscape(value) {
-	const s = String(value ?? '');
-	return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+	let s = String(value ?? '');
+	// Spreadsheet apps execute formula-like cells even when CSV-quoted.
+	if ((/^[\s\u0000-\u001f]*[=+@-]/.test(s) && !/^-?\d+(?:[.,]\d+)?$/.test(s)) || /^[\t\r\n]/.test(s)) s = "'" + s;
+	return /[",\r\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 export function toCSV(rows, categories, accounts) {

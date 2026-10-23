@@ -130,7 +130,7 @@ function emailBillingPeriod(now) {
 	return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${EMAIL_BILLING_CYCLE_DAY}`;
 }
 
-async function reserveMonthlyEmail(db, now) {
+export async function reserveMonthlyEmail(db, now = Date.now()) {
 	const period = emailBillingPeriod(now);
 	return db.prepare(
 		`INSERT INTO auth_email_usage (billing_period, count) VALUES (?, 1)
@@ -228,15 +228,15 @@ async function verifyCode(event, env) {
 	const token = cookie(event.request, CHALLENGE_COOKIE);
 	if (!token || !env.DB || typeof env.AUTH_SECRET !== 'string' || env.AUTH_SECRET.length < 32) return json({ error: 'challenge_expired', message: 'Sua solicitação expirou. Informe sua senha novamente.' }, 401);
 	const id = await sha256(token);
-	const challenge = await env.DB.prepare('SELECT * FROM auth_challenges WHERE id = ?').bind(id).first();
 	const now = Date.now();
-	if (!challenge || challenge.expires_at <= now || challenge.attempts >= 5)
+	// Reserve a guess before comparing the code, including under concurrent requests.
+	const challenge = await env.DB.prepare('UPDATE auth_challenges SET attempts = attempts + 1 WHERE id = ? AND expires_at > ? AND attempts < 5 RETURNING *').bind(id, now).first();
+	if (!challenge)
 		return json({ error: 'challenge_expired', message: 'Sua solicitação expirou. Informe sua senha novamente.' }, 401);
 
 	const received = await hmac(`${id}:${code}`, env.AUTH_SECRET);
 	if (!equal(received, challenge.code_hash)) {
-		const attempts = await env.DB.prepare('UPDATE auth_challenges SET attempts = attempts + 1 WHERE id = ? AND attempts < 5 RETURNING attempts').bind(id).first();
-		if (Number(attempts?.attempts) >= 5) {
+		if (challenge.attempts >= 5) {
 			await env.DB.prepare('DELETE FROM auth_challenges WHERE id = ?').bind(id).run();
 			const headers = new Headers();
 			clearCookie(headers, CHALLENGE_COOKIE);
@@ -254,7 +254,7 @@ async function verifyCode(event, env) {
 		newPasswordHash = await hashPassword(newPassword);
 	}
 
-	const consumed = await env.DB.prepare('DELETE FROM auth_challenges WHERE id = ? AND code_hash = ? AND expires_at > ? AND attempts < 5 RETURNING email, name, password_hash, purpose')
+	const consumed = await env.DB.prepare('DELETE FROM auth_challenges WHERE id = ? AND code_hash = ? AND expires_at > ? AND attempts <= 5 RETURNING email, name, password_hash, purpose')
 		.bind(id, challenge.code_hash, now).first();
 	if (!consumed) return json({ error: 'challenge_expired', message: 'Sua solicitação expirou. Faça login novamente.' }, 401);
 
@@ -330,3 +330,16 @@ async function logout(event, env) {
 }
 
 export const sessionCookieName = SESSION_COOKIE;
+
+// Session identifiers and token hashes never leave the server.
+export async function listAccountSessions(request, env, owner) {
+  const currentId = await sha256(cookie(request, SESSION_COOKIE) || '');
+  const { results } = await env.DB.prepare('SELECT id, created_at, last_seen_at, expires_at FROM auth_sessions WHERE email = ? AND expires_at > ? ORDER BY last_seen_at DESC').bind(owner, Date.now()).all();
+  return results.map(row => ({ current: row.id === currentId, createdAt: row.created_at, lastSeenAt: row.last_seen_at, expiresAt: row.expires_at }));
+}
+export async function revokeOtherSessions(request, env, owner) {
+  const currentId = await sha256(cookie(request, SESSION_COOKIE) || '');
+  // Check the caller's session again in the same SQL statement as the revocation.
+  const result = await env.DB.prepare('DELETE FROM auth_sessions WHERE email = ? AND id <> ? AND EXISTS (SELECT 1 FROM auth_sessions WHERE id = ? AND email = ? AND expires_at > ?) RETURNING id').bind(owner, currentId, currentId, owner, Date.now()).all();
+  return result.results.length;
+}

@@ -36,7 +36,7 @@ self.addEventListener('fetch', (event) => {
 	// Chamadas de API e páginas renderizadas pelo servidor não são interceptadas:
 	// deixa o browser fazer a requisição diretamente para evitar que uma falha
 	// de rede rejeite a promise do FetchEvent e produza um "network error".
-	if (url.pathname.startsWith('/api/') || !ASSETS.includes(url.pathname)) return;
+	if (url.origin !== self.location.origin || url.pathname.startsWith('/api/') || !ASSETS.includes(url.pathname)) return;
 
 	// Assets conhecidos do build: serve do cache, atualiza em background.
 	event.respondWith(

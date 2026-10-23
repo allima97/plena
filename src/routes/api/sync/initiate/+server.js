@@ -1,4 +1,4 @@
-import { rateLimit } from '$lib/server/auth.js';
+import { rateLimit, reserveMonthlyEmail } from '$lib/server/auth.js';
 /**
  * POST /api/sync/initiate
  *
@@ -87,6 +87,8 @@ export async function POST({ locals, request }) {
     }
     return json({ error: 'Erro ao verificar conta Nextgoals.' }, { status: 502 });
   }
+
+  if (!(await reserveMonthlyEmail(db))) return json({error:'O limite mensal de envio de códigos foi atingido.'}, {status:429});
 
   // 4. Gera OTP e envia por e-mail
   const code = randomSyncOtpCode();
