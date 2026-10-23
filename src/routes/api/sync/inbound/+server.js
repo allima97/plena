@@ -24,6 +24,7 @@
  */
 
 import { validateSale, validatePlan, validateSaleType } from '$lib/goals/sales.js';
+import { syncRecordStatements, runSyncStatements } from '$lib/server/sync-records.js';
 import { json } from '@sveltejs/kit';
 import { env } from 'cloudflare:workers';
 import { verifySyncSecret, nextgoalsToPlena } from '$lib/server/sync.js';
@@ -87,9 +88,7 @@ export async function POST({ request }) {
     // Para DELETE: mapeia a coleção e o ID
     const mapped = nextgoalsToPlena(collection, id, { id });
     if (!mapped) return json({ ok: true, skipped: 'unmappable' });
-    await db.prepare(
-      'DELETE FROM documents WHERE owner_email = ? AND collection = ? AND id = ?'
-    ).bind(ownerEmail, mapped.collection, mapped.id).run();
+    await runSyncStatements(db, syncRecordStatements(db, ownerEmail, 'owner_email', { collection: mapped.collection, id: mapped.id, deleted: true, updatedAt: source_updated_at ?? Date.now() }));
     return json({ ok: true });
   }
 
@@ -113,16 +112,8 @@ export async function POST({ request }) {
 
   const updatedAt = Number.isFinite(source_updated_at) ? source_updated_at : Date.now();
 
-  // Last-write-wins: só atualiza se o registro recebido for mais recente
-  // (ou se não existir localmente ainda)
-  await db.prepare(`
-    INSERT INTO documents (owner_email, collection, id, data, updated_at)
-    VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(owner_email, collection, id) DO UPDATE SET
-      data = excluded.data,
-      updated_at = excluded.updated_at
-    WHERE excluded.updated_at >= documents.updated_at
-  `).bind(ownerEmail, mapped.collection, mapped.id, JSON.stringify(mapped.data), updatedAt).run();
-
+  await runSyncStatements(db, syncRecordStatements(db, ownerEmail, 'owner_email', {
+    collection: mapped.collection, id: mapped.id, data: mapped.data, updatedAt,
+  }));
   return json({ ok: true });
 }

@@ -46,6 +46,7 @@ test('sync routes retain authentication, deliver OTP, confirm once and isolate i
     NEXTGOALS: { async fetch(request) {
       assert.equal(request.headers.get('Authorization'), `Bearer ${env.SYNC_SECRET}`);
       calls.push(new URL(request.url).pathname);
+      if (request.url.endsWith('/reconcile')) return Response.json({ records: [] });
       return Response.json({ ok: true, exists: true });
     } },
   };

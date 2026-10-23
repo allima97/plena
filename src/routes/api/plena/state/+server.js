@@ -1,3 +1,4 @@
+import { reconcileSync } from '$lib/server/sync.js';
 import { json } from '@sveltejs/kit';
 import { env } from 'cloudflare:workers';
 import { claimLegacyData, dataOwner } from '$lib/server/data-owner.js';
@@ -31,6 +32,7 @@ export async function GET({ locals }) {
 	const owner = dataOwner(locals);
 	if (!owner) return json({ error: 'unauthorized' }, { status: 401 });
 	await claimLegacyData(db, owner, env);
+	await reconcileSync(db, owner, env);
 
 	const { results } = await db
 		.prepare('SELECT collection, id, data FROM documents WHERE owner_email = ? AND collection IN (' + [...ARRAY_COLLECTIONS, ...SINGLETON_COLLECTIONS].map(() => '?').join(',') + ')')
@@ -64,6 +66,8 @@ export async function GET({ locals }) {
 		salesSections: [],
 		budgetGlobal: null
 	};
+	const deleted = await db.prepare('SELECT collection, id FROM sync_tombstones WHERE owner = ?').bind(owner).all();
+	state.deletedRecords = deleted.results || [];
 
 	for (const row of results) {
 		const value = JSON.parse(row.data);

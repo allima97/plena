@@ -55,6 +55,7 @@ let salesSections = $state([]);
 let mode = $state(/** @type {'loading'|'api'|'local'} */ ('loading'));
 let syncStatus = $state(/** @type {'synced'|'saving'|'error'} */ ('synced'));
 let pendingWrites = 0;
+let localRevision = 0;
 let lastFailedOp = /** @type {{collection:string,id:string,data?:any,remove?:boolean}|null} */ (null);
 let ready = $state(false);
 let user = $state(/** @type {{email:string,name:string|null,logoutUrl:string|null}|null} */ (null));
@@ -316,10 +317,11 @@ export async function boot() {
 			'purchaseInstallments', 'sales', 'salesPlans', 'salesTypes', 'salesSections'
 		];
 		const pushOps = [];
+		const deletedIds = new Set((remote.deletedRecords || []).map(item => `${item.collection}/${item.id}`));
 		for (const key of SYNC_KEYS) {
 			const remoteIds = new Set((remote[key] || []).map((i) => i.id));
 			for (const item of local[key] || []) {
-				if (!remoteIds.has(item.id)) pushOps.push(apiPut(key, item.id, item));
+				if (!remoteIds.has(item.id) && !deletedIds.has(`${key}/${item.id}`)) pushOps.push(apiPut(key, item.id, item));
 			}
 		}
 		if (pushOps.length > 0) await Promise.all(pushOps);
@@ -333,6 +335,7 @@ function afterSync(ok, opIfFailed) {
 }
 
 function write(collection, id, data) {
+	localRevision++;
 	persistLocalSnapshot();
 	if (mode !== 'api') return;
 	pendingWrites++;
@@ -341,6 +344,7 @@ function write(collection, id, data) {
 }
 
 function erase(collection, id) {
+	localRevision++;
 	persistLocalSnapshot();
 	if (mode !== 'api') return;
 	pendingWrites++;
@@ -1180,4 +1184,25 @@ export function saveSalesSection(data) {
 	if (!section.deleted && salesSections.some(s => !s.deleted && s.id !== section.id && s.name.toLocaleLowerCase('pt-BR') === section.name.toLocaleLowerCase('pt-BR'))) throw new Error('Já existe uma seção com esse nome.');
 	salesSections = [...salesSections.filter(s => s.id !== section.id), section];
 	write('salesSections', section.id, section);
+}
+
+// Updating the shared collections must never repeat boot/seeding or touch private finance data.
+export async function refreshSharedState(canRefresh = () => true) {
+  if (mode !== 'api' || pendingWrites || lastFailedOp || !user?.email) return;
+  const revision = localRevision;
+  const owner = user.email;
+  const remote = await fetchRemoteState(owner);
+  if (!remote || user?.email !== owner || revision !== localRevision || pendingWrites || !canRefresh()) return;
+  const replace = (current, next) => Array.isArray(next) && JSON.stringify(current) !== JSON.stringify(next) ? next : current;
+  goals = replace(goals, remote.goals);
+  resources = replace(resources, remote.resources);
+  resourceMoves = replace(resourceMoves, remote.resourceMoves);
+  goalCategories = replace(goalCategories, remote.goalCategories);
+  installments = replace(installments, remote.installments);
+  amortizations = replace(amortizations, remote.amortizations);
+  salesSections = replace(salesSections, remote.salesSections);
+  salesTypes = replace(salesTypes, remote.salesTypes);
+  sales = replace(sales, remote.sales);
+  salesPlans = replace(salesPlans, remote.salesPlans);
+  persistLocalSnapshot();
 }

@@ -1,3 +1,4 @@
+import { readSyncRecords, syncRecordStatements, runSyncStatements } from './sync-records.js';
 /**
  * Sincronismo Plena ↔ Nextgoals
  *
@@ -247,5 +248,42 @@ export function nextgoalsFetch(env, path, options) {
 
 export function isMachineSyncPath(path) {
   return new Set(['/api/sync/inbound', '/api/sync/m2m/initiate', '/api/sync/m2m/verify',
-    '/api/sync/m2m/disable', '/api/sync/m2m/status']).has(path);
+    '/api/sync/m2m/disable', '/api/sync/m2m/status', '/api/sync/m2m/reconcile']).has(path);
+}
+
+export async function reconcileSync(db, owner, env, { force = false } = {}) {
+  const link = await db.prepare('SELECT id, nextgoals_user_id, reconciled_at FROM sync_links WHERE plena_user_id = ? AND enabled = 1').bind(owner).first();
+  if (!link) return { linked: false };
+  if (!force && link.reconciled_at && Date.now() - link.reconciled_at < 30_000) return { linked: true };
+  try {
+    const local = await readSyncRecords(db, owner, 'owner_email', SYNCABLE_PLENA);
+    const legacySection = local.find(record => record.collection === 'salesSections' && !record.deleted && !record.data.deleted && record.data.name === 'Turismo')?.id;
+    const records = local.map(record => {
+      const data = record.data && legacySection && ['salesPlans', 'salesTypes', 'sales'].includes(record.collection) && !record.data.sectionId
+        ? { ...record.data, sectionId: legacySection } : record.data;
+      const mapped = plenaToNextgoals(record.collection, record.id, data || { id: record.id });
+      return { ...record, collection: mapped.ngCollection, id: mapped.ngId, ...(record.deleted ? {} : { data: mapped.ngData }) };
+    });
+    const response = await nextgoalsFetch(env, '/api/sync/reconcile', {
+      method: 'POST', headers: { 'content-type': 'application/json', Authorization: `Bearer ${env.SYNC_SECRET}` },
+      body: JSON.stringify({ target_user_id: link.nextgoals_user_id, records }), signal: AbortSignal.timeout(25_000),
+    });
+    if (!response.ok) throw new Error(`NextGoals: HTTP ${response.status} ${(await response.text()).slice(0, 180)}`);
+    const result = await response.json();
+    if (!Array.isArray(result.records)) throw new Error('Resposta de sincronização inválida.');
+    const statements = [];
+    for (const record of result.records) {
+      const mapped = nextgoalsToPlena(record.collection, record.id, record.data || { id: record.id });
+      if (!mapped) continue;
+      statements.push(...syncRecordStatements(db, owner, 'owner_email', { ...record, collection: mapped.collection, id: mapped.id, data: mapped.data }));
+    }
+    await runSyncStatements(db, statements);
+    await db.prepare('UPDATE sync_links SET reconciled_at = ?, last_sync_at = ?, last_sync_error = NULL WHERE id = ?')
+      .bind(Date.now(), new Date().toISOString(), link.id).run();
+    return { linked: true, ok: true };
+  } catch (error) {
+    await db.prepare('UPDATE sync_links SET last_sync_error = ? WHERE id = ?').bind(error.message.slice(0, 400), link.id).run();
+    console.error('[sync/reconcile]', error.message);
+    return { linked: true, error: 'Não foi possível atualizar todos os dados da integração. Uma nova tentativa será feita automaticamente.' };
+  }
 }

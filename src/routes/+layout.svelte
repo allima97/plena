@@ -2,7 +2,8 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import '../app.css';
-	import { appState, boot, retrySync } from '$lib/fin/store.svelte.js';
+	import { appState, boot, retrySync, refreshSharedState } from '$lib/fin/store.svelte.js';
+	import { startStateRefresh } from '$lib/fin/sync-refresh.js';
 	import { t } from '$lib/i18n.js';
 	import {
 		LayoutDashboard,
@@ -169,7 +170,9 @@
 
 	onMount(() => {
 		window.addEventListener('keydown', handleGlobalKeydown);
-		return () => window.removeEventListener('keydown', handleGlobalKeydown);
+		const stopRefresh = startStateRefresh({ refresh: refreshSharedState, canRefresh: () =>
+			!document.querySelector('[role="dialog"], .modal-backdrop') && !document.activeElement?.matches('input, textarea, select, [contenteditable="true"]') });
+		return () => { window.removeEventListener('keydown', handleGlobalKeydown); stopRefresh(); };
 	});
 
 	// Layout/tema (Configurações > Layout): aplica tema claro/escuro e as cores custom (primária,

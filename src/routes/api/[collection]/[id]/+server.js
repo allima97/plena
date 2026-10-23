@@ -2,6 +2,7 @@ import { validateSale, validatePlan, validateSaleType } from '$lib/goals/sales.j
 import { json } from '@sveltejs/kit';
 import { env } from 'cloudflare:workers';
 import { claimLegacyData, dataOwner } from '$lib/server/data-owner.js';
+import { syncRecordStatements, runSyncStatements } from '$lib/server/sync-records.js';
 import { isSyncable, triggerSyncToNextgoals } from '$lib/server/sync.js';
 
 export const prerender = false;
@@ -117,11 +118,14 @@ export async function DELETE({ locals, params, platform }) {
 	if (!validDocumentId(params.id)) return json({ error: 'Identificador inválido' }, { status: 400 });
 
 	await claimLegacyData(db, owner, env);
-	await db.prepare('DELETE FROM documents WHERE owner_email = ? AND collection = ? AND id = ?').bind(owner, params.collection, params.id).run();
+	const deletedAt = Date.now();
+	if (isSyncable(params.collection)) {
+		await runSyncStatements(db, syncRecordStatements(db, owner, 'owner_email', { collection: params.collection, id: params.id, deleted: true, updatedAt: deletedAt }));
+	} else await db.prepare('DELETE FROM documents WHERE owner_email = ? AND collection = ? AND id = ?').bind(owner, params.collection, params.id).run();
 
 	// Dispara sync em background
 	if (isSyncable(params.collection)) {
-		const syncPromise = triggerSyncToNextgoals(db, owner, 'DELETE', params.collection, params.id, null, env);
+		const syncPromise = triggerSyncToNextgoals(db, owner, 'DELETE', params.collection, params.id, null, env, deletedAt);
 		if (platform?.ctx) platform.ctx.waitUntil(syncPromise);
 		else await syncPromise;
 	}

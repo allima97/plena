@@ -18,7 +18,7 @@
 import { json } from '@sveltejs/kit';
 import { env } from 'cloudflare:workers';
 import { dataOwner } from '$lib/server/data-owner.js';
-import { hashOtp, timingSafeEqual, randomId, nextgoalsFetch } from '$lib/server/sync.js';
+import { hashOtp, timingSafeEqual, randomId, nextgoalsFetch, reconcileSync } from '$lib/server/sync.js';
 
 export const prerender = false;
 
@@ -118,5 +118,6 @@ export async function POST({ locals, request }) {
     return json({ error: 'Não foi possível contactar o Nextgoals. Tente novamente.' }, { status: 502 });
   }
 
-  return json({ ok: true });
+  const reconciliation = await reconcileSync(db, owner, env, { force: true });
+  return json({ ok: true, ...(reconciliation.error ? { warning: reconciliation.error } : {}) });
 }
