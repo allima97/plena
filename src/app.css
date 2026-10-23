@@ -39,6 +39,9 @@
 	--radius-md: 16px;
 	--radius-lg: 26px;
 	--radius-xl: 30px;
+	/* Card and KPI corners follow the NextGoals design. */
+	--radius-card: 12px;
+	--radius-kpi: 10px;
 	--shadow-card: 0 10px 30px rgba(43, 61, 70, 0.04);
 	--shadow-pill: 0 4px 12px rgba(43, 61, 70, 0.06);
 	--shadow-hero: 0 18px 40px rgba(23, 33, 43, 0.13);
@@ -165,7 +168,7 @@ a {
 .card {
 	background: var(--card);
 	border: 1px solid var(--border);
-	border-radius: var(--radius-lg);
+	border-radius: var(--radius-card);
 	box-shadow: var(--shadow-card);
 	padding: 24px;
 }
@@ -1581,9 +1584,12 @@ table.list .num {
 .stat-card {
 	background: var(--card);
 	border: 1px solid var(--border);
-	border-radius: var(--radius-lg);
+	border-radius: var(--radius-kpi);
 	box-shadow: var(--shadow-card);
 	padding: 20px;
+}
+.kpi-card {
+	border-radius: var(--radius-kpi);
 }
 .stat-label {
 	margin: 0;
@@ -1685,7 +1691,7 @@ table.list .num {
 	margin-bottom: 20px;
 	background: var(--card);
 	border: 1px solid var(--border);
-	border-radius: var(--radius-lg);
+	border-radius: var(--radius-card);
 	box-shadow: var(--shadow-card);
 	padding: 18px 20px;
 }
@@ -2431,7 +2437,7 @@ table.list .num {
 	   nome do objetivo + selo "Pausado" lado a lado) e "estoura" além da coluna 1fr da grade
 	   quando o nome é comprido, em vez de deixar o nome truncar com reticências como já previsto. */
 	min-width: 0;
-	border-radius: var(--radius-lg);
+	border-radius: var(--radius-kpi);
 	border: 1px solid var(--border);
 	background: var(--card);
 	cursor: pointer;
@@ -2579,7 +2585,7 @@ table.list .num {
 
 .resource-block {
 	border: 1px solid var(--border);
-	border-radius: var(--radius-md);
+	border-radius: var(--radius-kpi);
 	overflow: hidden;
 	margin-bottom: 10px;
 }
@@ -2696,7 +2702,7 @@ table.list .num {
 }
 .inst-card {
 	border: 1px solid var(--border);
-	border-radius: var(--radius-md);
+	border-radius: var(--radius-kpi);
 	overflow: hidden;
 	margin-bottom: 10px;
 	cursor: pointer;
@@ -2905,7 +2911,7 @@ table.list .num {
 }
 .account-tile {
 	position: relative;
-	border-radius: var(--radius-lg);
+	border-radius: var(--radius-card);
 	padding: 22px;
 	min-height: 176px;
 	display: flex;
@@ -3277,7 +3283,7 @@ table.list .num {
 	align-items: center;
 	gap: 20px;
 	background: linear-gradient(160deg, #e9f1ff, #dce7ff);
-	border-radius: var(--radius-lg);
+	border-radius: var(--radius-card);
 	padding: 18px 22px;
 	margin-bottom: 20px;
 }
@@ -3405,7 +3411,7 @@ table.list .num {
 .balance-hero {
 	background: var(--ink-solid);
 	color: #fff;
-	border-radius: var(--radius-lg);
+	border-radius: var(--radius-kpi);
 	padding: 22px;
 	position: relative;
 	overflow: hidden;
@@ -3455,7 +3461,7 @@ table.list .num {
 .mini-stat {
 	background: var(--card);
 	border: 1px solid var(--border);
-	border-radius: var(--radius-lg);
+	border-radius: var(--radius-kpi);
 	padding: 18px;
 	box-shadow: var(--shadow-card);
 }
@@ -3526,7 +3532,7 @@ table.list .num {
 .hero-greeting {
 	background: var(--ink-solid);
 	color: #fff;
-	border-radius: var(--radius-lg);
+	border-radius: var(--radius-card);
 	padding: 22px;
 	box-shadow: var(--shadow-card);
 	display: flex;
@@ -3635,7 +3641,7 @@ table.list .num {
 .control-center {
 	background: var(--card);
 	border: 1px solid var(--border);
-	border-radius: var(--radius-lg);
+	border-radius: var(--radius-card);
 	box-shadow: var(--shadow-card);
 	padding: 26px;
 	margin-bottom: 20px;
@@ -3809,7 +3815,7 @@ table.list .num {
 }
 .projection-point {
 	background: var(--surface-3);
-	border-radius: var(--radius-lg);
+	border-radius: var(--radius-kpi);
 	padding: 12px 14px;
 }
 .projection-label {
@@ -3908,7 +3914,7 @@ table.list .num {
 }
 .insight-card {
 	background: linear-gradient(160deg, #e9f1ff, #dce7ff);
-	border-radius: var(--radius-lg);
+	border-radius: var(--radius-card);
 	padding: 26px;
 	position: relative;
 	overflow: hidden;
@@ -4380,7 +4386,7 @@ table.list .num {
 	}
 }
 .move-summary-card {
-	border-radius: var(--radius-lg);
+	border-radius: var(--radius-kpi);
 	padding: 18px 20px;
 }
 .move-summary-card.dark {
