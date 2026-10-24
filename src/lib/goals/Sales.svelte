@@ -361,8 +361,8 @@
  .sales-primary-actions { grid-template-columns:minmax(0,1fr); max-width:254px; }
  .sales-primary-actions .field { min-width:0; }
  .sales-primary-actions .field-input { width:100%; min-width:0; height:44px; min-height:44px; box-sizing:border-box; }
- .sales-floating-actions { position:fixed; z-index:40; left:16px; right:16px; bottom:calc(90px + env(safe-area-inset-bottom, 0px)); }
- .sales-floating-actions .btn { width:100%; min-height:44px; justify-content:flex-start; border-radius:8px; box-shadow:var(--shadow-cta); }
+ .sales-floating-actions { position:fixed; z-index:40; left:16px; right:16px; bottom:calc(90px + env(safe-area-inset-bottom, 0px)); display:flex; justify-content:center; pointer-events:none; }
+ .sales-floating-actions .btn { width:auto; min-height:36px; padding:0 12px; gap:6px; font-size:12px; font-weight:600; border-radius:8px; box-shadow:var(--shadow-card); pointer-events:auto; }
  @media(min-width:640px) { .sales-floating-actions { left:24px; right:24px; } }
  @media(min-width:1024px) { .sales-floating-actions { left:288px; right:40px; bottom:calc(24px + env(safe-area-inset-bottom, 0px)); } }
  .sales-settings-actions .btn { min-width:0; min-height:44px; padding:8px; gap:6px; }
