@@ -1,3 +1,4 @@
+import { validateTypeSettings } from './sales-type-settings.js';
 export const SALE_TYPES = ['Fretamento', 'Pacote', 'Hotel', 'Facial', 'Serviços', 'Ingressos', 'Cruzeiro', 'Disney/Universal', 'Seguro viagem'];
 export const TIERS = { below: 'Meta não batida', target: 'Meta batida', super: 'Supermeta' };
 export const cents = (value) => Math.round(Number(value) * 100);
@@ -79,6 +80,7 @@ export function saleTypesCatalog(overrides = [], sales = [], plans = []) {
 }
 export function validateSaleType(type) {
  if (!type || typeof type.id !== 'string' || !type.id.trim() || type.id.length > 120 || typeof type.name !== 'string' || !type.name.trim() || type.name.trim().length > 80 || typeof type.deleted !== 'boolean') throw new Error('Informe um nome de tipo com até 80 caracteres.');
+ validateTypeSettings(type);
 }
 
 export function validateSalesSection(section) {

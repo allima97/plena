@@ -1,5 +1,6 @@
 <script>
  import { tick } from 'svelte';
+ import { salesTypeSettings, withSalesTypeSettings, salesPlanWithTypeSettings } from './sales-type-settings.js';
  import Modal from '$lib/components/Modal.svelte';
  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
  import { showToast } from '$lib/toast.svelte.js';
@@ -17,25 +18,30 @@
  const scopedSales = $derived(forSection(sectionId, { sales: appState.sales, salesPlans: appState.salesPlans, salesTypes: appState.salesTypes }));
 
  let managingTypes = $state(false);
- let typeDraft = $state({ name: '' });
+ const newTypeDraft = () => ({ name: '', rates: { below: null, target: null, super: null }, hasTarget: false, target: null });
+ let typeDraft = $state(newTypeDraft());
  let deletingType = $state(null);
  const types = $derived(saleTypesCatalog(scopedSales.salesTypes, scopedSales.sales, scopedSales.salesPlans));
  const activeTypes = $derived(types.filter(t => !t.deleted));
- const configTypes = $derived(types.filter(t => !t.deleted || Object.hasOwn(config?.rates || {}, t.id) || summary.items.some(s => s.type === t.id)));
  function typeName(id) { return types.find(t => t.id === id)?.name || id; }
  function openConfig() {
-  config = structuredClone($state.snapshot(plan || emptyPlan(month, [])));
+  config = structuredClone($state.snapshot(rawPlan || emptyPlan(month, [])));
   config.commissionBase ??= 'net';
   config.typeTargets ??= {};
-  for (const type of types.filter(t => !t.deleted || summary.items.some(s => s.type === t.id))) {
-   if (!Object.hasOwn(config.rates, type.id)) config.rates[type.id] = { below: null, target: null, super: null };
-   if (!Object.hasOwn(config.typeTargets, type.id)) config.typeTargets[type.id] = '';
-  }
+  error = '';
+ }
+ function editType(type) {
+  const settings = salesTypeSettings(type, month, rawPlan);
+  typeDraft = { ...type, rates: { ...settings.rates }, hasTarget: settings.hasTarget, target: settings.target };
   error = '';
  }
  function submitType(e) {
   e.preventDefault();
-  try { saveSaleType({ ...typeDraft, sectionId }); typeDraft = { name: '' }; error = ''; showToast({ message: 'Tipo salvo.' }); } catch(e) { error = e.message; }
+  try {
+   const { rates, hasTarget, target, ...type } = typeDraft;
+   saveSaleType(withSalesTypeSettings({ ...type, sectionId }, month, { rates: { ...rates }, hasTarget, target: hasTarget ? target : null }));
+   typeDraft = newTypeDraft(); error = ''; showToast({ message: 'Tipo, comissões e meta específica salvos.' });
+  } catch(e) { error = e.message; }
  }
  let month = $state(todayISO().slice(0,7));
  let editing = $state(null);
@@ -45,10 +51,11 @@
  let deleting = $state(null);
  // For new plans, id = 'sectionId:YYYY-MM'; for migrated plans (legacy), id = 'YYYY-MM'
  const planId = $derived(sectionId === 'default' ? month : `${sectionId}:${month}`);
- const plan = $derived(
+ const rawPlan = $derived(
   scopedSales.salesPlans.find(p => p.id === planId) ||
   scopedSales.salesPlans.find(p => p.id === month) // fallback: plano migrado
  );
+ const plan = $derived(salesPlanWithTypeSettings(rawPlan, scopedSales.salesTypes));
  const summary = $derived(monthSummary(scopedSales.sales, month, plan));
  const tableScope = $derived(`${sectionId}:${month}`);
  let tableFilters = $state({ scope: '', type: '', query: '', page: 0 });
@@ -111,7 +118,7 @@
  }
  function submitPlan(e) {
   e.preventDefault();
-  try { saveSalesPlan({ ...config, sectionId, id: planId }); config = null; error = ''; showToast({ message: 'Metas e comissões salvas.' }); } catch(e) { error = e.message; }
+  try { saveSalesPlan({ ...config, sectionId, id: planId }); config = null; error = ''; showToast({ message: 'Metas mensais salvas.' }); } catch(e) { error = e.message; }
  }
 </script>
 <div class="page-head sales-page-head">
@@ -130,17 +137,23 @@
 </div>
 
 <div class="sales-settings-actions">
- <button class="btn btn-ghost" disabled={!month || !appState.ready || managingTypes} onclick={() => { openConfig(); }}><Settings2 size={16} /> Metas e comissões</button>
-<button class="btn btn-ghost" disabled={!appState.ready || !!editing || !!config} onclick={() => { managingTypes = !managingTypes; error = ''; }}><Tags size={16} /> Tipos de venda</button>
+ <button class="btn btn-ghost" disabled={!month || !appState.ready || managingTypes} onclick={() => { openConfig(); }}><Settings2 size={16} /> Metas mensais</button>
+<button class="btn btn-ghost" disabled={!appState.ready || !!editing || !!config} onclick={() => { managingTypes = !managingTypes; typeDraft = newTypeDraft(); error = ''; }}><Tags size={16} /> Tipos de venda</button>
 </div>
 {#if managingTypes}
- <Modal open={managingTypes} onClose={() => { managingTypes = false; error = ''; }} title="Tipos de venda" eyebrow="Organização" maxWidth="640px">
+ <Modal open={managingTypes} onClose={() => { managingTypes = false; typeDraft = newTypeDraft(); error = ''; }} title="Tipos de venda" eyebrow="Organização" maxWidth="700px">
   <p>Personalize os tipos para seu comércio. Ao excluir um tipo, ele deixa de aparecer em novas vendas; o histórico e as comissões são preservados.</p>
   {#if error}<p role="alert" class="field-error">{error}</p>{/if}
- <form class="toolbar" onsubmit={submitType}>
+ <form class="movement-form" onsubmit={submitType}>
    <label class="field"><span>Nome do tipo</span><input class="field-input" required maxlength="80" placeholder="Ex.: Roupas, Alimentos, Consultoria" bind:value={typeDraft.name} /></label>
-   <button class="btn btn-primary">{typeDraft.id ? 'Salvar nome' : 'Incluir tipo'}</button>
-   {#if typeDraft.id}<button type="button" class="btn btn-ghost" onclick={() => typeDraft = { name: '' }}>Cancelar edição</button>{/if}
+   <p class="field-hint">Configuração para {month.split('-').reverse().join('/')}. As faixas usam a meta mensal do controle. Alterações preservam os meses anteriores.</p>
+   <fieldset class="type-rate-card"><legend>Comissionamento do produto</legend><div class="type-rate-grid">
+    {#each Object.entries(TIERS) as [tier, label]}<label class="field"><span>{label} (%)</span><input class="field-input" aria-label={`${label} (%)`} type="number" min="0" max="100" step="0.01" required bind:value={typeDraft.rates[tier]} /></label>{/each}
+   </div></fieldset>
+   <label class="field"><span>Possui meta específica?</span><select class="field-input" bind:value={typeDraft.hasTarget}><option value={false}>Não</option><option value={true}>Sim</option></select></label>
+   {#if typeDraft.hasTarget}<label class="field"><span>Meta específica mensal (R$)</span><input class="field-input" type="number" min="0.01" step="0.01" required bind:value={typeDraft.target} /></label>{/if}
+   <div class="modal-footer"><button class="btn btn-primary">{typeDraft.id ? 'Salvar tipo' : 'Incluir tipo'}</button>
+   {#if typeDraft.id}<button type="button" class="btn btn-ghost" onclick={() => typeDraft = newTypeDraft()}>Cancelar edição</button>{/if}</div>
   </form>
   <div class="types-list-head"><h3>Tipos cadastrados</h3><span class="badge badge-gray">{activeTypes.length}</span></div>
   <div class="table-wrap types-table-wrap">
@@ -151,7 +164,7 @@
       <tr class="type-row" class:editing-type={typeDraft.id === type.id}>
        <td data-label="Tipo de venda" class="type-name">{type.name}</td>
        <td class="actions-cell"><div class="actions-row">
-        <button class="btn btn-ghost sm" aria-label={`Editar tipo ${type.name}`} onclick={() => { typeDraft = { ...type }; error = ''; }}><Pencil size={14} /> Editar</button>
+        <button class="btn btn-ghost sm" aria-label={`Editar tipo ${type.name}`} onclick={() => editType(type)}><Pencil size={14} /> Editar</button>
         <button class="btn btn-danger sm" aria-label={`Excluir tipo ${type.name}`} onclick={() => deletingType = type}><Trash2 size={14} /> Excluir</button>
        </div></td>
       </tr>
@@ -161,31 +174,22 @@
   </div>
  </Modal>
 {/if}
-<p class="field-hint sales-explanation">Meta calculada sobre o valor líquido das vendas do mês. Comissão = {plan?.commissionBase === 'gross' ? 'valor total (com taxas)' : '(valor total − taxas)'} × percentual do tipo na faixa atingida.</p>
+<p class="field-hint sales-explanation">Meta calculada sobre o total vendido do mês. Comissão = {plan?.commissionBase === 'gross' ? 'valor total (com taxas)' : '(valor total − taxas)'} × percentual do tipo na faixa atingida.</p>
 
 
 {#if config}
- <Modal open={!!config} onClose={() => { config = null; error = ''; }} title="Metas e comissões" subtitle={month} maxWidth="760px">
+ <Modal open={!!config} onClose={() => { config = null; error = ''; }} title="Metas mensais" subtitle={month} maxWidth="760px">
  {#if error}<p role="alert" class="field-error">{error}</p>{/if}
  <form class="movement-form" onsubmit={submitPlan}>
-  <p>Percentuais aplicados a todas as vendas deste mês. Alterações recalculam a comissão mensal. Valores em reais (R$).</p>
+  <p>Defina a meta e a supermeta deste mês. Cadastre os percentuais de comissão e a meta específica de cada produto em Tipos de venda. Valores em reais (R$).</p>
   <label class="field"><span>Receber comissão sobre
    </span><select class="field-input" bind:value={config.commissionBase} required>
     <option value="net">Valor líquido (sem taxas)</option>
     <option value="gross">Valor total (com taxas)</option>
    </select>
   </label>
-  <p>A escolha vale para as comissões <strong>e para o atingimento da meta</strong> deste mês: se "valor total", a meta compara o total bruto vendido; se "valor líquido", compara as vendas sem taxas.</p>
+  <p>A base escolhida vale para o cálculo da comissão. A meta e a supermeta acompanham o total vendido, antes das taxas.</p>
   <div class="form-grid"><label class="field"><span>Meta (R$)</span><input class="field-input" type="number" min="0.01" step="0.01" required bind:value={config.target} /></label><label class="field"><span>Supermeta (R$)</span><input class="field-input" type="number" min="0.02" step="0.01" required bind:value={config.superTarget} /></label></div>
-  <h3 class="config-section-title">Meta por tipo <span class="field-hint" style="display:inline">(opcional)</span></h3>
-  <p class="field-hint">Defina uma meta líquida por tipo para acompanhar o KPI individual. Deixe em branco para não exibir o KPI.</p>
-  <div class="table-wrap"><table class="list type-target-table"><thead><tr><th>Tipo</th><th>Meta líquida (R$)</th></tr></thead><tbody>
-  {#each configTypes as type}<tr><td>{type.name}{type.deleted ? " (excluído)" : ""}</td><td><input class="field-input" aria-label={`Meta de ${type.name}`} type="number" min="0" step="0.01" placeholder="Sem meta" bind:value={config.typeTargets[type.id]} /></td></tr>{/each}
-  </tbody></table></div>
-  <h3 class="config-section-title">Comissões por tipo e faixa</h3>
-  <div class="table-wrap"><table class="list rates-table"><thead><tr><th>Tipo</th>{#each Object.values(TIERS) as label}<th>{label} (%)</th>{/each}</tr></thead><tbody>
-  {#each configTypes as type}<tr><td data-label="Tipo">{type.name}{type.deleted ? " (excluído)" : ""}</td>{#each Object.entries(TIERS) as [tier, label]}<td data-label={`${label} (%)`}><input class="field-input" aria-label={`${type.name}: ${label} (%)`} type="number" min="0" max="100" step="0.01" required bind:value={config.rates[type.id][tier]} /></td>{/each}</tr>{/each}
-  </tbody></table></div>
   <div class="modal-footer"><button class="btn btn-primary">Salvar configuração</button><button type="button" class="btn btn-ghost" onclick={() => { config = null; error = ''; }}>Cancelar</button></div>
  </form>
  </Modal>
@@ -304,7 +308,7 @@
  </div>
 </section>
 <ConfirmDialog open={!!deleting} title="Excluir venda?" message="A venda será excluída e a comissão do mês será recalculada." confirmLabel="Excluir venda" onCancel={() => deleting = null} onConfirm={() => { removeSale(deleting); deleting = null; showToast({ message: 'Venda excluída.' }); }} />
-<ConfirmDialog open={!!deletingType} title="Excluir tipo de venda?" message={`O tipo “${deletingType?.name || ''}” deixará de aparecer em novas vendas. O histórico e as comissões serão preservados.`} confirmLabel="Excluir tipo" onCancel={() => deletingType = null} onConfirm={() => { saveSaleType({ ...deletingType, deleted: true }); deletingType = null; typeDraft = { name: '' }; showToast({ message: 'Tipo excluído. Histórico preservado.' }); }} />
+<ConfirmDialog open={!!deletingType} title="Excluir tipo de venda?" message={`O tipo “${deletingType?.name || ''}” deixará de aparecer em novas vendas. O histórico e as comissões serão preservados.`} confirmLabel="Excluir tipo" onCancel={() => deletingType = null} onConfirm={() => { saveSaleType({ ...deletingType, deleted: true }); deletingType = null; typeDraft = newTypeDraft(); showToast({ message: 'Tipo excluído. Histórico preservado.' }); }} />
 <style>
  .sales-table-filters { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr) auto; gap:12px; align-items:end; margin-bottom:12px; }
  .sales-table-filters .field { min-width:0; }
@@ -340,6 +344,10 @@
 
  .types-list-head { display:flex; align-items:center; gap:10px; margin:24px 0 12px; }
  .types-list-head h3 { margin:0; font-size:14px; font-weight:700; }
+ .type-rate-card { border:1px solid var(--border); border-radius:var(--radius-md); padding:14px; margin:0; min-width:0; }
+ .type-rate-card legend { font-size:13px; font-weight:600; padding:0 6px; }
+ .type-rate-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+ @media(max-width:480px) { .type-rate-grid { grid-template-columns:1fr; } }
  .types-table { min-width:0; table-layout:fixed; }
  .types-table th { background:var(--surface-3); }
  .types-table .types-actions-heading { width:200px; text-align:center; }
@@ -371,17 +379,11 @@
  .sales-goal-percent strong { font-size:24px; font-variant-numeric:tabular-nums; }
  .sales-goal .goal-progress-track { height:10px; }
 
- .toolbar { display:flex; flex-wrap:wrap; gap:12px; align-items:end; margin:16px 0; }
- .toolbar .field { flex:1; min-width:160px; }
  .editor { padding:20px; margin:16px 0; }
  .totals { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin:20px 0; }
  .stat-value { display:block; overflow-wrap:anywhere; }
  .sales-list { padding:20px; margin-top:20px; min-width:0; }
  .sales-explanation { margin-top:16px; line-height:1.6; }
- .rates-table input { min-width:0; }
- .rates-table { min-width:0; }
- .type-target-table input { min-width:0; max-width:160px; }
- .config-section-title { font-size:14px; font-weight:700; margin:24px 0 6px; }
 
  .kpi-row { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin:20px 0; }
  .kpi-card { padding:18px 20px; }
@@ -408,8 +410,6 @@
   .sales-goal-value { font-size:18px; }
   .sales-goal-percent strong { font-size:20px; }
   .sales-list { padding:0; background:transparent; border:0; box-shadow:none; }
-  .rates-table input { width:110px; flex-shrink:0; }
-  .toolbar .btn { flex:1; }
  }
 
  /* Sales table: column header/data alignment + icon action buttons */
