@@ -844,6 +844,10 @@ table.list .num {
 .bottom-nav-fab:active {
 	transform: translateY(-10px) scale(0.94);
 }
+.bottom-nav-fab:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
 
 /* ---------- toast (desfazer) ---------- */
 

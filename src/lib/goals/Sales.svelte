@@ -2,6 +2,7 @@
 	import { moneyInput } from '$lib/money-input.js';
  import { templateSuggestedProductRate } from './sales-templates.js';
  import { tick } from 'svelte';
+ import { getNavigationContext } from '$lib/navigation-context.js';
  import { salesTypeSettings, withSalesTypeSettings, salesPlanWithTypeSettings } from './sales-type-settings.js';
  import Modal from '$lib/components/Modal.svelte';
  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -15,6 +16,7 @@
 
  /** @type {{ sectionId?: string, onBack?: () => void }} */
  let { sectionId = 'default', onBack = null } = $props();
+ const navigation = getNavigationContext();
 
  // Scope sales data to this section
  const scopedSales = $derived(forSection(sectionId, { sales: appState.sales, salesPlans: appState.salesPlans, salesTypes: appState.salesTypes }));
@@ -51,6 +53,16 @@
  let error = $state('');
 
  let deleting = $state(null);
+ const canCreateSale = $derived(!!month && appState.ready && !managingTypes && !!activeTypes.length && !editing && !config && !deleting && !deletingType);
+ function openNewSale() {
+  if (!canCreateSale) return;
+  editing = { date: month === todayISO().slice(0,7) ? todayISO() : `${month}-01`, total: 0, fees: 0, type: activeTypes[0].id, orderNumber: '' };
+  error = '';
+ }
+ $effect(() => {
+  navigation.saleAction = { onClick: openNewSale, disabled: !canCreateSale };
+  return () => { navigation.saleAction = null; };
+ });
  // For new plans, id = 'sectionId:YYYY-MM'; for migrated plans (legacy), id = 'YYYY-MM'
  const planId = $derived(sectionId === 'default' ? month : `${sectionId}:${month}`);
  const rawPlan = $derived(
@@ -332,7 +344,7 @@
  </div>
 </section>
 <div class="sales-floating-actions">
- <button class="btn btn-primary" disabled={!month || !appState.ready || managingTypes || !activeTypes.length} onclick={() => { editing = { date: month === todayISO().slice(0,7) ? todayISO() : `${month}-01`, total: 0, fees: 0, type: activeTypes[0]?.id || '', orderNumber: '' }; error = ''; }}><Plus size={16} /> Nova venda</button>
+ <button class="btn btn-primary" disabled={!canCreateSale} onclick={openNewSale}><Plus size={16} /> Nova venda</button>
 </div>
 <ConfirmDialog open={!!deleting} title="Excluir venda?" message="A venda será excluída e a comissão do mês será recalculada." confirmLabel="Excluir venda" onCancel={() => deleting = null} onConfirm={() => { removeSale(deleting); deleting = null; showToast({ message: 'Venda excluída.' }); }} />
 <ConfirmDialog open={!!deletingType} title="Excluir tipo de venda?" message={`O tipo “${deletingType?.name || ''}” deixará de aparecer em novas vendas. O histórico e as comissões serão preservados.`} confirmLabel="Excluir tipo" onCancel={() => deletingType = null} onConfirm={() => { saveSaleType({ ...deletingType, deleted: true }); deletingType = null; typeDraft = newTypeDraft(); showToast({ message: 'Tipo excluído. Histórico preservado.' }); }} />
@@ -420,6 +432,7 @@
  .stat-value { display:block; overflow-wrap:anywhere; }
  .sales-list { padding:20px; margin-top:20px; margin-bottom:72px; min-width:0; }
  .sales-explanation { margin-top:16px; line-height:1.6; }
+ @media(max-width:1023px) { .sales-floating-actions { display:none; } .sales-list { margin-bottom:0; } }
 
  .kpi-row { display:grid; grid-template-columns:repeat(var(--kpi-columns, 3),minmax(0,1fr)); gap:14px; margin:20px 0; }
  .kpi-total { background:var(--kpi-blue-soft); }

@@ -37,7 +37,7 @@
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 
 	let { children } = $props();
-	const navigation = $state({ salesActive: false });
+	const navigation = $state({ salesActive: false, saleAction: null });
 	setNavigationContext(navigation);
 
 	let searchOpen = $state(false);
@@ -340,7 +340,13 @@
 			<span>{item.label}</span>
 		</a>
 	{/each}
-	{#if !isSalesSection}
+	{#if isSalesSection}
+		{#if navigation.saleAction}
+			<button class="bottom-nav-fab" disabled={navigation.saleAction.disabled} onclick={() => navigation.saleAction?.onClick()} aria-label={t('nav_novaVenda')}>
+				<Plus size={22} />
+			</button>
+		{/if}
+	{:else}
 		<button class="bottom-nav-fab" onclick={() => (showNewGlobal = true)} aria-label={t('nav_novoLancamento')}>
 			<Plus size={22} />
 		</button>
