@@ -252,12 +252,6 @@
    {/each}
   </section>
  {/if}
- <div class="product-commission-kpis">
- {#each typeKPIs.filter(kpi => kpi.done && summary.typeCommissions[kpi.typeId]?.productRate !== null && summary.typeCommissions[kpi.typeId]?.generalRate !== null) as kpi (kpi.typeId)}
-  {@const result = summary.typeCommissions[kpi.typeId]}
-  <section class="card kpi-card kpi-type" aria-label={`Comissão de ${kpi.typeName}`}><p class="stat-label">Comissão · {kpi.typeName}</p><strong class="font-display kpi-value privacy-value">{fmtMoney(result.productCommission)}</strong><p class="kpi-sub">Meta do produto atingida · {new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(result.productRate)}% − {new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(result.generalRate)}% = {new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(result.extraRate)}% de complemento</p></section>
- {/each}
- </div>
 
  <div class="kpi-row">
   {#if dailyKPI && dailyKPI.isCurrentMonth}
@@ -270,10 +264,18 @@
    <section class="card kpi-card kpi-commission" aria-label="Comissão do mês">
     <p class="stat-label">Comissão das vendas</p>
     <strong class="font-display kpi-value privacy-value">{summary.generalCommission === null ? 'A configurar' : fmtMoney(summary.generalCommission)}</strong>
-    {#if summary.productCommission > 0}<p class="kpi-sub">Vendas + produtos: {fmtMoney(summary.commission)}</p>{/if}
     {#if summary.commission === null}<p class="kpi-sub">Configure os percentuais de comissão</p>{/if}
    </section>
+   {#each typeKPIs.filter(kpi => summary.typeCommissions[kpi.typeId]?.productRate !== null) as kpi (kpi.typeId)}
+    {@const result = summary.typeCommissions[kpi.typeId]}
+    <section class="card kpi-card kpi-type" aria-label={`Comissão de ${kpi.typeName}`}>
+     <p class="stat-label">Comissão · {kpi.typeName}</p>
+     <strong class="font-display kpi-value privacy-value">{!kpi.done ? fmtMoney(0) : result.productCommission === null ? 'A configurar' : fmtMoney(result.productCommission)}</strong>
+     <p class="kpi-sub">{#if !kpi.done}Meta do produto não atingida{:else if result.generalRate === null}Configure os percentuais de comissão{:else}Meta do produto atingida · {new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(result.productRate)}% − {new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(result.generalRate)}% = {new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(result.extraRate)}% de complemento{/if}</p>
+    </section>
+   {/each}
   </div>
+  {#if summary.productCommission > 0}<p class="kpi-sub commission-total">Vendas + produtos: {fmtMoney(summary.commission)}</p>{/if}
   {#if typeDistribution.length > 0}
    <div class="types-row">
     <section class="card kpi-card kpi-types-dist" aria-label="Distribuição por tipo de venda">
@@ -364,7 +366,6 @@
  .type-goals h2 { font-size:16px; margin:0 0 18px; }
  .type-goal-item + .type-goal-item { margin-top:20px; }
  .type-goal-item .sales-goal-head { margin-bottom:8px; }
- .product-commission-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); gap:14px; }
  .type-rate-card { border:1px solid var(--border); border-radius:var(--radius-md); padding:14px; margin:0; min-width:0; }
  .type-rate-card legend { font-size:13px; font-weight:600; padding:0 6px; }
  .type-rate-grid { display:grid; align-items:end; grid-template-columns:repeat(5,minmax(0,1fr)); gap:12px; }
@@ -406,8 +407,9 @@
  .sales-list { padding:20px; margin-top:20px; min-width:0; }
  .sales-explanation { margin-top:16px; line-height:1.6; }
 
- .kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr)); gap:14px; margin:20px 0; }
- .kpi-card { padding:18px 20px; }
+ .kpi-row { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin:20px 0; }
+ .commission-total { margin:-8px 0 20px; }
+ .kpi-card { min-width:0; padding:18px 20px; }
  .kpi-value { display:block; font-size:22px; margin:6px 0 10px; overflow-wrap:anywhere; }
  .kpi-sub { font-size:12px; color:var(--text-2); margin:6px 0 0; line-height:1.5; }
  .kpi-progress-track { height:6px; background:var(--surface-3,#f0e8de); border-radius:99px; overflow:hidden; margin:8px 0 2px; }

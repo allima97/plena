@@ -16,7 +16,7 @@ Para um produto de 10%, numa venda de R$ 100 sem taxas:
 | 1,15% = R$ 1,15 | 8,85% = R$ 8,85 | R$ 10,00 |
 | 1,35% = R$ 1,35 | 8,65% = R$ 8,65 | R$ 10,00 |
 
-O KPI **Comissão das vendas** mostra somente a parcela geral. O KPI **Comissão · [produto]** mostra somente o complemento e **não é renderizado enquanto a meta específica não tiver sido atingida**. Uma correção ou exclusão de venda que reduza o acumulado abaixo da meta remove esse KPI. A tabela identifica a comissão total (geral + complemento); componentes arredondados sempre somam exatamente esse total.
+O KPI **Comissão das vendas** mostra somente a parcela geral. O KPI **Comissão · [produto]** mostra somente o complemento e permanece visível com **R$ 0,00 enquanto a meta específica não tiver sido atingida**. Uma correção ou exclusão de venda que reduza o acumulado abaixo da meta zera esse KPI. No desktop, a linha apresenta **Valor diário necessário → Comissão das vendas → Comissão do produto**, em três colunas iguais; no mobile, os cards ficam empilhados. A tabela identifica a comissão total (geral + complemento); componentes arredondados sempre somam exatamente esse total.
 
 **Metas por tipo** aparece imediatamente abaixo da meta do mês. Produtos existentes sem comissão específica configurada mantêm seus cálculos anteriores: não se presume 10% nem se altera a configuração do usuário.
 
