@@ -1,5 +1,6 @@
+import { buildSalesTemplate } from '$lib/goals/sales-templates.js';
 import { validateSale, validatePlan, validateSaleType, saleTypesCatalog, validateSalesSection, forSection } from '$lib/goals/sales.js';
-import { loadLocal, saveLocal, fetchRemoteState, apiPut, apiRemove, fetchMe, setLocalIdentity } from './persist.js';
+import { loadLocal, saveLocal, fetchRemoteState, apiPut, apiRemove, apiImportSalesTemplate, fetchMe, setLocalIdentity } from './persist.js';
 import { seedCategories, uid } from './seed.js';
 import { todayISO } from '../format.js';
 import { downloadBlob } from './export.js';
@@ -1205,4 +1206,20 @@ export async function refreshSharedState(canRefresh = () => true) {
   sales = replace(sales, remote.sales);
   salesPlans = replace(salesPlans, remote.salesPlans);
   persistLocalSnapshot();
+}
+
+export async function createSalesSectionFromTemplate(input) {
+  const built = buildSalesTemplate(input);
+  if (salesSections.some(section => !section.deleted && section.id !== built.section.id && section.name.toLocaleLowerCase('pt-BR') === built.section.name.toLocaleLowerCase('pt-BR'))) throw new Error('Já existe uma seção com esse nome.');
+  let result;
+  const remote = mode === 'api';
+  if (remote) { pendingWrites++; syncStatus = 'saving'; }
+  try { result = remote ? await apiImportSalesTemplate(input) : built; }
+  finally { if (remote) { pendingWrites = Math.max(0, pendingWrites - 1); syncStatus = pendingWrites ? 'saving' : lastFailedOp ? 'error' : 'synced'; } }
+  salesSections = [...salesSections.filter(section => section.id !== result.section.id), result.section];
+  const ids = new Set(result.types.map(type => type.id));
+  salesTypes = [...salesTypes.filter(type => !ids.has(type.id)), ...result.types];
+  localRevision++;
+  persistLocalSnapshot();
+  return result.section;
 }

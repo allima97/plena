@@ -113,3 +113,17 @@ function inspectSession(response) {
   }
   return response;
 }
+
+/** Import only a public template into the currently authenticated account. */
+export async function apiImportSalesTemplate(input) {
+  const owner = activeIdentity;
+  if (!owner) throw new Error('Entre novamente para importar o modelo.');
+  const response = await fetch('/api/sales-templates/import', {
+    method: 'POST', headers: { 'content-type': 'application/json', 'X-Plena-Owner': owner }, body: JSON.stringify(input)
+  });
+  const result = await response.json();
+  if (response.status === 401 || result.error === 'account_changed') inspectSession(response);
+  if (owner !== activeIdentity || result.owner !== owner && response.ok) throw new Error('A conta foi alterada. Atualize a página.');
+  if (!response.ok) throw new Error(result.error || 'Não foi possível importar o modelo.');
+  return result;
+}

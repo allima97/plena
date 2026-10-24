@@ -1,5 +1,6 @@
 <script>
 	import { moneyInput } from '$lib/money-input.js';
+ import { templateSuggestedProductRate } from './sales-templates.js';
  import { tick } from 'svelte';
  import { salesTypeSettings, withSalesTypeSettings, salesPlanWithTypeSettings } from './sales-type-settings.js';
  import Modal from '$lib/components/Modal.svelte';
@@ -33,7 +34,7 @@
  }
  function editType(type) {
   const settings = salesTypeSettings(type, month, rawPlan);
-  typeDraft = { ...type, rates: { ...settings.rates }, hasTarget: settings.hasTarget, target: settings.target, productRate: settings.productRate ?? null, scaleStepBelow: settings.scaleStepBelow ?? null, scaleStepAbove: settings.scaleStepAbove ?? null };
+  typeDraft = { ...type, rates: { ...settings.rates }, hasTarget: settings.hasTarget, target: settings.target, productRate: settings.productRate ?? templateSuggestedProductRate(type), scaleStepBelow: settings.scaleStepBelow ?? null, scaleStepAbove: settings.scaleStepAbove ?? null };
   error = '';
  }
  function submitType(e) {

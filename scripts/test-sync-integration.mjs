@@ -16,10 +16,10 @@ const { default: nextgoals } = await import(pathToFileURL(path.join(nextgoalsRoo
 const { generateKeyPair, exportJWK, SignJWT } = await import(pathToFileURL(path.join(nextgoalsRoot, 'node_modules/jose/dist/webapi/index.js')));
 const owner='alice@example.test', other='bob@example.test';
 const psql=new DatabaseSync(':memory:'), nsql=new DatabaseSync(':memory:');
-const adapter = sql => ({ prepare(query) { const statement=sql.prepare(query);let args=[];return {
+const adapter = sql => { let transaction = Promise.resolve(); return { prepare(query) { const statement=sql.prepare(query);let args=[];return {
   bind(...values){args=values;return this;},async first(){return statement.get(...args)||null;},
   async all(){return {results:statement.all(...args)};},async run(){const result=statement.run(...args);return {meta:{changes:result.changes}};}
-};}, async batch(statements){sql.exec('BEGIN');try{const results=[];for(const statement of statements)results.push(await statement.run());sql.exec('COMMIT');return results;}catch(error){sql.exec('ROLLBACK');throw error;}} });
+};}, async batch(statements){const run=transaction.then(async()=>{sql.exec('BEGIN');try{const results=[];for(const statement of statements)results.push(await statement.run());sql.exec('COMMIT');return results;}catch(error){sql.exec('ROLLBACK');throw error;}});transaction=run.catch(()=>{});return run;} }; };
 const pdb=adapter(psql), ndb=adapter(nsql);
 const dir=await mkdtemp(path.join(tmpdir(),'sync-two-apps-'));
 const {privateKey,publicKey}=await generateKeyPair('RS256');
@@ -52,7 +52,7 @@ try {
   const secret='integration-only-secret';
   const penv=globalThis.__integrationEnv={DB:pdb,SYNC_SECRET:secret,NEXTGOALS_URL:'https://ng.test',AUTH_EMAIL_FROM:'test@example.test',EMAIL:{async send(message){otp=message.text.match(/\d{6}/)[0];}}};
   const nenv={DB:ndb,SYNC_SECRET:secret,PLENA_URL:'https://plena.test',TEAM_DOMAIN:`http://127.0.0.1:${server.address().port}`,POLICY_AUD:'integration'};
-  const routes={psessions:'privacy/sessions',pexport:'privacy/export',pstate:'plena/state',pdoc:'[collection]/[id]',initiate:'sync/m2m/initiate',verify:'sync/m2m/verify',reconcile:'sync/m2m/reconcile',inbound:'sync/inbound',status:'sync/m2m/status',disable:'sync/m2m/disable'};
+  const routes={psessions:'privacy/sessions',pexport:'privacy/export',pstate:'plena/state',pdoc:'[collection]/[id]',ptemplate:'sales-templates/import',initiate:'sync/m2m/initiate',verify:'sync/m2m/verify',reconcile:'sync/m2m/reconcile',inbound:'sync/inbound',status:'sync/m2m/status',disable:'sync/m2m/disable'};
   const contents=Object.entries(routes).map(([name,route])=>`export * as ${name} from '${plenaRoot}/src/routes/api/${route}/+server.js';`).join('\n')+`\nexport {handle} from '${plenaRoot}/src/hooks.server.js';`;
   const outfile=path.join(dir,'api.mjs');
   await build({stdin:{contents,resolveDir:plenaRoot},outfile,bundle:true,platform:'node',format:'esm',alias:{'$lib':path.join(plenaRoot,'src/lib')},plugins:[{name:'env',setup(b){b.onResolve({filter:/^cloudflare:workers$/},()=>({path:'env',namespace:'test'}));b.onLoad({filter:/.*/,namespace:'test'},()=>({contents:'export const env=globalThis.__integrationEnv;'}));}}]});
@@ -84,6 +84,32 @@ try {
     assert.equal((await nRequest('/api/salesTypes/product-settings','PUT',invalid)).status,400);
     assert.equal((await pRequest('/api/salesTypes/product-settings','PUT',invalid)).status,400);
   }
+  for(const send of [request=>plena(request),request=>nextgoals.fetch(request,nenv)]) {
+    const unauthenticated=await send(new Request('https://plena.test/api/sales-templates/import',{method:'POST',headers:{'content-type':'application/json'},body:'{}'}));
+    assert.equal(unauthenticated.status,401,'template imports require an authenticated account');
+  }
+  assert.equal((await plena(new Request('https://plena.test/api/sales-templates/import',{method:'POST',headers:{Cookie:'__Host-plena_session='+session,Origin:'https://evil.test','X-Plena-Owner':owner,'content-type':'application/json'},body:'{}'}))).status,403);
+  assert.equal((await nextgoals.fetch(new Request('https://ng.test/api/sales-templates/import',{method:'POST',headers:{'Cf-Access-Jwt-Assertion':token,Origin:'https://evil.test','X-NextGoals-Owner':owner,'content-type':'application/json'},body:'{}'}),nenv)).status,403);
+  const templateRequest={sectionId:'template-plena',name:'Modelo Turismo Plena',month:'2026-10',templateId:'tourism',version:1,types:['insurance','airfare','charter']};
+  response=await pRequest('/api/sales-templates/import','POST',templateRequest);
+  const imported=await response.json();assert.equal(response.status,200,JSON.stringify(imported));assert.equal(imported.owner,owner);assert.equal(imported.types.length,3);
+  const importedType=imported.types.find(type=>type.template.key==='insurance');
+  assert.equal(importedType.monthlySettings['2026-10'].hasTarget,false);assert.equal(importedType.monthlySettings['2026-10'].target,null);
+  assert.equal(nsql.prepare("SELECT count(*) AS n FROM documents WHERE user_id=? AND collection='salesTypes' AND json_extract(data,'$.sectionId')='template-plena'").get(owner).n,3);
+  const peerTemplate={...templateRequest,sectionId:'template-nextgoals',name:'Modelo Turismo NextGoals'};
+  response=await nRequest('/api/sales-templates/import','POST',peerTemplate);assert.equal(response.status,200,await response.text());
+  assert.equal(psql.prepare("SELECT count(*) AS n FROM documents WHERE owner_email=? AND collection='salesTypes' AND json_extract(data,'$.sectionId')='template-nextgoals'").get(owner).n,3);
+  response=await pRequest('/api/sales-templates/import','POST',templateRequest);assert.equal(response.status,200,await response.text());
+  assert.equal(psql.prepare("SELECT count(*) AS n FROM documents WHERE owner_email=? AND collection='salesTypes' AND json_extract(data,'$.sectionId')='template-plena'").get(owner).n,3);
+  for(const [send,url] of [[pRequest,'/api/sales-templates/import'],[nRequest,'/api/sales-templates/import']]) {
+    assert.equal((await send(url,'POST',{...templateRequest,sectionId:'invalid-template',name:'Invalid',types:[]})).status,400);
+    assert.equal((await send(url,'POST',{...templateRequest,sectionId:'private-template',name:'Invalid',owner:other})).status,400);
+  }
+  const noOwner=await plena(new Request('https://plena.test/api/sales-templates/import',{method:'POST',headers:{Cookie:'__Host-plena_session='+session,Origin:'https://plena.test','content-type':'application/json'},body:JSON.stringify(templateRequest)}));assert.equal(noOwner.status,409);
+  const duplicateTemplate=await nRequest('/api/sales-templates/import','POST',{...peerTemplate,sectionId:'cross-tenant'});
+  assert.equal(duplicateTemplate.status,409,'duplicate name cannot create another control');
+  assert.equal(psql.prepare("SELECT count(*) AS n FROM documents WHERE owner_email=? AND id LIKE 'template-%'").get(other).n,0);
+  console.log('PASS: optional tourism templates create only new account-owned controls/types, synchronize both ways, retry without duplicates and reject invalid selections/owner injection.');
   console.log('PASS: per-product commission settings and optional targets synchronize in both directions, retain previous months and reject invalid writes.');
   let ng=await (await nRequest('/api/state')).json();let pl=await (await pRequest('/api/plena/state')).json();
   assert.equal(ng.goals.length,3);assert.equal(pl.goals.length,3);assert.equal(pl.goals.find(g=>g.id==='shared').name,'Newest');

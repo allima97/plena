@@ -1,9 +1,12 @@
 <script>
+ import SalesTemplatePicker from './SalesTemplatePicker.svelte';
+ import { uid } from '$lib/fin/seed.js';
+
  import Modal from '$lib/components/Modal.svelte';
  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
  import { showToast } from '$lib/toast.svelte.js';
  import { Plus, Pencil, Trash2, ShoppingBag, Car, Package, ChevronRight } from 'lucide-svelte';
- import { appState, saveSalesSection } from '$lib/fin/store.svelte.js';
+ import { appState, saveSalesSection, createSalesSectionFromTemplate } from '$lib/fin/store.svelte.js';
  import { monthSummary, forSection, saleTypesCatalog } from './sales.js';
  import { todayISO, fmtMoney } from '$lib/format.js';
  import Sales from './Sales.svelte';
@@ -16,6 +19,10 @@
  let deleting = $state(null);
  let draft = $state({ name: '' });
  let formError = $state('');
+ let importing = $state(false);
+ let templateId = $state('');
+ let templateTypes = $state([]);
+ let importId = $state('');
 
  const month = todayISO().slice(0, 7);
 
@@ -41,16 +48,23 @@
  function openCreate() {
   draft = { name: '' };
   formError = '';
+  templateId = ''; templateTypes = []; importId = uid();
   creating = true;
  }
 
- function submitSection(e) {
+ async function submitSection(e) {
   e.preventDefault();
+  if (importing) return;
   try {
    if (editing) {
     saveSalesSection({ ...editing, name: draft.name });
     showToast({ message: 'Seção atualizada.' });
     editing = null;
+   } else if (templateId === 'tourism') {
+    importing = true;
+    const created = await createSalesSectionFromTemplate({sectionId:importId,name:draft.name,month,templateId:'tourism',version:1,types:[...templateTypes]});
+    creating = false; sectionId = created.id;
+    showToast({ message: 'Modelo Turismo importado. Defina suas metas e personalize os tipos quando quiser.' });
    } else {
     saveSalesSection({ name: draft.name });
     showToast({ message: 'Seção criada.' });
@@ -59,6 +73,7 @@
    draft = { name: '' };
    formError = '';
   } catch(err) { formError = err.message; }
+  finally { importing = false; }
  }
 
  function startEdit(section) {
@@ -147,18 +162,21 @@
 
  <!-- Modal criar/editar seção -->
  {#if creating || editing}
-  <Modal open={creating || !!editing} onClose={() => { creating = false; editing = null; formError = ''; }} title={editing ? 'Renomear seção' : 'Nova seção de vendas'} eyebrow="Vendas" maxWidth="480px">
+  <Modal open={creating || !!editing} onClose={() => { if (!importing) { creating = false; editing = null; formError = ''; } }} title={editing ? 'Renomear seção' : 'Nova seção de vendas'} eyebrow="Vendas" maxWidth={templateId === 'tourism' && !editing ? '760px' : '480px'}>
    <p>Dê um nome para identificar este tipo de comércio. Ex.: Roupas, Carros, Consultoria, Alimentos.</p>
    {#if formError}<p role="alert" class="field-error">{formError}</p>{/if}
    <form onsubmit={submitSection}>
+    <fieldset class="section-form-fields" disabled={importing}>
     <label class="field">
      <span>Nome da seção</span>
      <input class="field-input" required maxlength="80" placeholder="Ex.: Roupas" bind:value={draft.name} />
     </label>
+    {#if !editing}<SalesTemplatePicker bind:templateId bind:selected={templateTypes} disabled={importing} onChoose={value => { if (value === 'tourism' && !draft.name.trim()) draft.name = 'Turismo'; }} />{/if}
     <div class="modal-footer">
-     <button class="btn btn-primary">{editing ? 'Salvar nome' : 'Criar seção'}</button>
+     <button class="btn btn-primary">{importing ? 'Importando…' : editing ? 'Salvar nome' : templateId === 'tourism' ? 'Criar e importar tipos' : 'Criar seção'}</button>
      <button type="button" class="btn btn-ghost" onclick={() => { creating = false; editing = null; formError = ''; }}>Cancelar</button>
     </div>
+    </fieldset>
    </form>
   </Modal>
  {/if}
@@ -174,6 +192,7 @@
 {/if}
 
 <style>
+ .section-form-fields { border:0; padding:0; margin:0; min-width:0; display:grid; gap:14px; }
  .page-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
  .add-section-btn { align-self:flex-end; white-space:nowrap; }
 
