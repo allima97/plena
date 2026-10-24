@@ -71,6 +71,9 @@
  }
  const goalPercent = $derived(plan?.target > 0 ? Math.max(0, summary.goalBase / plan.target * 100) : 0);
  const goalFill = $derived(Math.min(100, goalPercent));
+ const superPercent = $derived(plan?.superTarget > 0 ? Math.max(0, summary.goalBase / plan.superTarget * 100) : 0);
+ const superFill = $derived(Math.min(100, superPercent));
+ const superPercentLabel = $derived(new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1, roundingMode: 'floor' }).format(superPercent));
  const goalColor = $derived(`hsl(${goalFill * 1.2} 65% 38%)`);
  const percentLabel = $derived(new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1, roundingMode: 'floor' }).format(goalPercent));
  // Daily pace KPI — only meaningful in the current month
@@ -259,6 +262,18 @@
    <div class="goal-progress-fill" style:width={`${goalFill}%`} style:background={goalColor}></div>
   </div>
   <p class="stat-sub">Total vendido: <span class="privacy-value">{fmtMoney(summary.goalBase)}</span>{#if goalPercent < 100} · Faltam <span class="privacy-value">{fmtMoney(Math.max(0, plan.target - summary.goalBase))}</span>{/if}</p>
+  {#if summary.tier === 'target' || summary.tier === 'super'}
+   <div class="super-goal">
+    <div class="sales-goal-head">
+     <div><p class="stat-label">Supermeta</p><p class="sales-goal-value privacy-value">{fmtMoney(plan.superTarget)}</p></div>
+     <div class="sales-goal-percent"><strong>{superPercentLabel}%</strong><span class="field-hint">{summary.tier === 'super' ? 'Supermeta atingida' : 'da supermeta atingida'}</span></div>
+    </div>
+    <div class="goal-progress-track" role="progressbar" aria-label="Atingimento da supermeta" aria-valuemin="0" aria-valuemax="100" aria-valuenow={superFill} aria-valuetext={`${superPercentLabel}% da supermeta atingida`}>
+     <div class="goal-progress-fill" style:width={`${superFill}%`} style:background={`hsl(${superFill * 1.2} 65% 38%)`}></div>
+    </div>
+    <p class="stat-sub">Total vendido: <span class="privacy-value">{fmtMoney(summary.goalBase)}</span>{#if summary.tier !== 'super'} · Faltam <span class="privacy-value">{fmtMoney(Math.max(0, plan.superTarget - summary.goalBase))}</span>{/if}</p>
+   </div>
+  {/if}
  </section>
 {/if}
 {#snippet salesPagination(position)}
@@ -348,6 +363,7 @@
   .types-table .actions-row :global(svg) { display:none; }
  }
 
+ .super-goal { margin-top:20px; padding-top:20px; border-top:1px solid var(--border-soft); }
  .sales-goal { padding:20px; margin:20px 0; }
  .sales-goal-head { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:16px; }
  .sales-goal-value { font-size:20px; font-weight:700; margin:8px 0 0; overflow-wrap:anywhere; }
