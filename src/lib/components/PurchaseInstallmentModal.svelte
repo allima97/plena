@@ -1,4 +1,5 @@
 <script>
+	import { moneyInput } from '$lib/money-input.js';
 	import Modal from '$lib/components/Modal.svelte';
 	import { appState, addPurchaseInstallment, updatePurchaseInstallment } from '$lib/fin/store.svelte.js';
 	import { todayISO } from '$lib/format.js';
@@ -84,7 +85,7 @@
 		<div class="form-grid">
 			<label class="field">
 				<span>Valor total (R$)</span>
-				<input class="field-input" type="number" step="0.01" min="0" required bind:value={form.totalValue} placeholder="ex: 1000.00" />
+				<input class="field-input" type="text" inputmode="decimal" min="0" required use:moneyInput={{ value: form.totalValue, setValue: (value) => form.totalValue = value }} placeholder="Ex.: 1.000,00" />
 			</label>
 			<label class="field">
 				<span>Número de parcelas</span>

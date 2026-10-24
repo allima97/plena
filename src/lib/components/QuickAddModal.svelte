@@ -1,4 +1,5 @@
 <script>
+	import { moneyInput } from '$lib/money-input.js';
 	import { appState, addTransaction, removeTransaction } from '$lib/fin/store.svelte.js';
 	import { todayISO, fmtMoney } from '$lib/format.js';
 	import { showToast } from '$lib/toast.svelte.js';
@@ -135,7 +136,7 @@
 					<button type="button" class="quick-add-type-btn" class:active={form.tipo === 'despesa'} onclick={() => (form = { ...form, tipo: 'despesa', categoriaId: '' })}>Despesa</button>
 					<button type="button" class="quick-add-type-btn" class:active={form.tipo === 'receita'} onclick={() => (form = { ...form, tipo: 'receita', categoriaId: '' })}>Receita</button>
 				</div>
-				<input bind:this={valorEl} class="quick-add-value" type="number" step="0.01" min="0" placeholder="R$ 0,00" bind:value={form.valor} required />
+				<input bind:this={valorEl} class="quick-add-value" type="text" inputmode="decimal" min="0" placeholder="R$ 0,00" use:moneyInput={{ value: form.valor, setValue: (value) => form.valor = value }} required />
 				<input class="field-input" type="text" placeholder="Descrição (ex: Mercado)" bind:value={form.descricao} />
 				{#if sugestao}
 					<button type="button" class="quick-add-suggestion" onclick={usarSugestao}>

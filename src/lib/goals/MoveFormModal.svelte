@@ -1,4 +1,5 @@
 <script>
+	import { moneyInput } from '$lib/money-input.js';
 	import Modal from '$lib/components/Modal.svelte';
 	import { appState, addResourceMove, updateResourceMove, removeResourceMove, resolveGoalCategoryId, goalCategoryName } from '$lib/fin/store.svelte.js';
 	import { todayISO, fmtMoney } from '$lib/format.js';
@@ -85,7 +86,7 @@
 			</datalist>
 			<span class="field-hint">categorias marcadas para o ritmo entram no cálculo da Média Geral</span>
 		</label>
-		<label class="field"><span>Valor ({moedaObjetivo})</span><input class="field-input" type="number" step="0.01" min="0" required bind:value={form.amount} /></label>
+		<label class="field"><span>Valor ({moedaObjetivo})</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0" required use:moneyInput={{ value: form.amount, setValue: (value) => form.amount = value }} /></label>
 		{#if moedaDiferente}
 			<label class="field">
 				<span>Câmbio do dia (1 {moedaObjetivo} = quantos {moedaPadrao}?)</span>

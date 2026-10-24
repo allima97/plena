@@ -1,4 +1,5 @@
 <script>
+	import { moneyInput } from '$lib/money-input.js';
 	import { appState } from '$lib/fin/store.svelte.js';
 	import { totals, monthTransactions, currentMonthKey } from '$lib/fin/derived.js';
 	import { computeMetrics } from '$lib/goals/metrics.js';
@@ -112,7 +113,7 @@
 	<div class="form-grid">
 		<label class="field">
 			<span>Quanto a menos por mês?</span>
-			<input class="field-input" type="number" min="0" step="10" placeholder="Ex.: 300" bind:value={gastaMenosInput} />
+			<input class="field-input" type="text" inputmode="decimal" min="0" placeholder="Ex.: 300,00" use:moneyInput={{ value: gastaMenosInput, setValue: (value) => gastaMenosInput = value }} />
 		</label>
 	</div>
 	{#if gastaMenosValor > 0}
@@ -152,7 +153,7 @@
 			</label>
 			<label class="field">
 				<span>Aporte extra por mês</span>
-				<input class="field-input" type="number" min="0" step="10" placeholder="Ex.: 500" bind:value={aporteExtraInput} />
+				<input class="field-input" type="text" inputmode="decimal" min="0" placeholder="Ex.: 500,00" use:moneyInput={{ value: aporteExtraInput, setValue: (value) => aporteExtraInput = value }} />
 			</label>
 		</div>
 		{#if cenarioAporte && Number(aporteExtraInput) > 0}

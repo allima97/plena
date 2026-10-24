@@ -1,4 +1,5 @@
 <script>
+	import { moneyInput } from '$lib/money-input.js';
  import { tick } from 'svelte';
  import { salesTypeSettings, withSalesTypeSettings, salesPlanWithTypeSettings } from './sales-type-settings.js';
  import Modal from '$lib/components/Modal.svelte';
@@ -151,7 +152,7 @@
     {#each Object.entries(TIERS) as [tier, label]}<label class="field"><span>{label} (%)</span><input class="field-input" aria-label={`${label} (%)`} type="number" min="0" max="100" step="0.01" required bind:value={typeDraft.rates[tier]} /></label>{/each}
    </div></fieldset>
    <label class="field"><span>Possui meta específica?</span><select class="field-input" bind:value={typeDraft.hasTarget}><option value={false}>Não</option><option value={true}>Sim</option></select></label>
-   {#if typeDraft.hasTarget}<label class="field"><span>Meta específica mensal (R$)</span><input class="field-input" type="number" min="0.01" step="0.01" required bind:value={typeDraft.target} /></label>{/if}
+   {#if typeDraft.hasTarget}<label class="field"><span>Meta específica mensal (R$)</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0.01" required use:moneyInput={{ value: typeDraft.target, setValue: (value) => typeDraft.target = value }} /></label>{/if}
    <div class="modal-footer"><button class="btn btn-primary">{typeDraft.id ? 'Salvar tipo' : 'Incluir tipo'}</button>
    {#if typeDraft.id}<button type="button" class="btn btn-ghost" onclick={() => typeDraft = newTypeDraft()}>Cancelar edição</button>{/if}</div>
   </form>
@@ -189,7 +190,7 @@
    </select>
   </label>
   <p>A base escolhida vale para o cálculo da comissão. A meta e a supermeta acompanham o total vendido, antes das taxas.</p>
-  <div class="form-grid"><label class="field"><span>Meta (R$)</span><input class="field-input" type="number" min="0.01" step="0.01" required bind:value={config.target} /></label><label class="field"><span>Supermeta (R$)</span><input class="field-input" type="number" min="0.02" step="0.01" required bind:value={config.superTarget} /></label></div>
+  <div class="form-grid"><label class="field"><span>Meta (R$)</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0.01" required use:moneyInput={{ value: config.target, setValue: (value) => config.target = value }} /></label><label class="field"><span>Supermeta (R$)</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0.02" required use:moneyInput={{ value: config.superTarget, setValue: (value) => config.superTarget = value }} /></label></div>
   <div class="modal-footer"><button class="btn btn-primary">Salvar configuração</button><button type="button" class="btn btn-ghost" onclick={() => { config = null; error = ''; }}>Cancelar</button></div>
  </form>
  </Modal>
@@ -201,8 +202,8 @@
  <div class="form-grid">
   <label class="field"><span>Data da venda</span><input class="field-input" type="date" required bind:value={editing.date} /></label>
   <label class="field"><span>Tipo</span><select class="field-input" bind:value={editing.type}>{#each types.filter(t => !t.deleted || t.id === editing.type) as type}<option value={type.id}>{type.name}{type.deleted ? " (excluído)" : ""}</option>{/each}</select></label>
-  <label class="field"><span>Valor total (R$)</span><input class="field-input" type="number" min="0.01" step="0.01" required bind:value={editing.total} /></label>
-  <label class="field"><span>Valor das taxas (R$)</span><input class="field-input" type="number" min="0" max={editing.total} step="0.01" required bind:value={editing.fees} /></label>
+  <label class="field"><span>Valor total (R$)</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0.01" required use:moneyInput={{ value: editing.total, setValue: (value) => editing.total = value }} /></label>
+  <label class="field"><span>Valor das taxas (R$)</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0" max={editing.total} required use:moneyInput={{ value: editing.fees, setValue: (value) => editing.fees = value }} /></label>
   <label class="field"><span>Pedido <span class="field-hint" style="display:inline">(opcional)</span></span><input class="field-input" type="text" maxlength="80" placeholder="Ex.: 1234" bind:value={editing.orderNumber} /></label>
   </div><div class="modal-footer"><button class="btn btn-primary">Salvar venda</button><button type="button" class="btn btn-ghost" onclick={() => { editing = null; error = ''; }}>Cancelar</button></div>
  </form>

@@ -1,4 +1,5 @@
 <script>
+	import { moneyInput } from '$lib/money-input.js';
 	import Modal from '$lib/components/Modal.svelte';
 	import { addAmortization, updateAmortization, removeAmortization } from '$lib/fin/store.svelte.js';
 	import { AMORT_TIPOS } from './constants.js';
@@ -40,7 +41,7 @@
 	<form onsubmit={submit} class="movement-form">
 		<div class="form-grid">
 			<label class="field"><span>Data</span><input class="field-input" type="date" required bind:value={form.date} /></label>
-			<label class="field"><span>Valor</span><input class="field-input" type="number" step="0.01" min="0" required bind:value={form.amount} /></label>
+			<label class="field"><span>Valor</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0" required use:moneyInput={{ value: form.amount, setValue: (value) => form.amount = value }} /></label>
 		</div>
 		<label class="field">
 			<span>Tipo de amortização</span>

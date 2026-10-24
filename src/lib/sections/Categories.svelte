@@ -1,4 +1,5 @@
 <script>
+	import { moneyInput } from '$lib/money-input.js';
 	import {
 		appState,
 		addCategory,
@@ -53,6 +54,7 @@
 	// Orçamento mensal por categoria (só para despesas): progresso de uso no mês corrente.
 	let editandoOrcamento = $state(null);
 	let orcamentoInput = $state('');
+	let orcamentoEl = $state(null);
 	function pctOrcamento(cat) {
 		if (!cat.orcamentoMensal) return null;
 		return Math.min(100, Math.round((valorDoMes(cat) / cat.orcamentoMensal) * 100));
@@ -67,6 +69,7 @@
 		orcamentoInput = cat.orcamentoMensal || '';
 	}
 	function salvarOrcamento(cat) {
+		if (!orcamentoEl?.reportValidity()) return;
 		setCategoryBudget(cat.id, orcamentoInput);
 		editandoOrcamento = null;
 	}
@@ -191,11 +194,11 @@
 									<input
 										class="field-input"
 										style="flex:1"
-										type="number"
+										type="text" inputmode="decimal"
+										bind:this={orcamentoEl}
 										min="0"
-										step="0.01"
-										placeholder="Ex.: 500"
-										bind:value={orcamentoInput}
+										placeholder="Ex.: 500,00"
+										use:moneyInput={{ value: orcamentoInput, setValue: (value) => orcamentoInput = value }}
 										onkeydown={(e) => { if (e.key === 'Enter') salvarOrcamento(cat); }}
 									/>
 									<button class="btn sm" onclick={() => salvarOrcamento(cat)}>Salvar</button>

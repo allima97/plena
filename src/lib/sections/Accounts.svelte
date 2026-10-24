@@ -1,4 +1,5 @@
 <script>
+	import { moneyInput } from '$lib/money-input.js';
 	import { appState, addAccount, updateAccount, removeAccount, restoreAccount } from '$lib/fin/store.svelte.js';
 	import { currentMonthKey, faturaDoCartao, limiteUtilizadoCartao, nextMonthKey, saldoContaAte } from '$lib/fin/derived.js';
 	import { fmtMoney, todayISO } from '$lib/format.js';
@@ -263,14 +264,14 @@
 		</div>
 		{#if form.tipo === 'cartao'}
 			<div class="form-grid">
-				<label class="field"><span>Limite</span><input class="field-input" type="number" step="0.01" bind:value={form.limite} /></label>
+				<label class="field"><span>Limite</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" use:moneyInput={{ value: form.limite, setValue: (value) => form.limite = value }} /></label>
 				<label class="field">
 					<span>Dia de vencimento</span>
 					<input class="field-input" type="number" min="1" max="28" placeholder="ex: 21" bind:value={form.fechamento} />
 				</label>
 			</div>
 		{:else}
-			<label class="field"><span>Saldo inicial</span><input class="field-input" type="number" step="0.01" bind:value={form.saldoInicial} /></label>
+			<label class="field"><span>Saldo inicial</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" use:moneyInput={{ value: form.saldoInicial, setValue: (value) => form.saldoInicial = value }} /></label>
 		{/if}
 		<label class="field">
 			<span>Cor</span>

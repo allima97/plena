@@ -1,4 +1,5 @@
 <script>
+	import { moneyInput } from '$lib/money-input.js';
 	import Modal from './Modal.svelte';
 	import { appState, addTransfer, removeTransfer } from '$lib/fin/store.svelte.js';
 	import { todayISO, fmtMoney } from '$lib/format.js';
@@ -70,7 +71,7 @@
 		{/if}
 		<div class="field">
 			<label for="transfer-valor">Valor</label>
-			<input id="transfer-valor" class="field-input" type="number" step="0.01" min="0" placeholder="R$ 0,00" bind:value={form.valor} required />
+			<input id="transfer-valor" class="field-input" type="text" inputmode="decimal" min="0" placeholder="R$ 0,00" use:moneyInput={{ value: form.valor, setValue: (value) => form.valor = value }} required />
 		</div>
 		<div class="field">
 			<label for="transfer-data">Data</label>

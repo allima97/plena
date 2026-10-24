@@ -1,4 +1,5 @@
 <script>
+	import { moneyInput } from '$lib/money-input.js';
 	import Modal from './Modal.svelte';
 	import { appState, addTransactionSeries, updateTransaction, editSeries, removeTransaction, seriesOf } from '$lib/fin/store.svelte.js';
 	import { FORMAS_PAGAMENTO_PADRAO } from '$lib/fin/seed.js';
@@ -184,7 +185,7 @@
 		<div class="form-grid">
 			<label class="field">
 				<span>Valor (R$)</span>
-				<input class="field-input" type="number" step="0.01" min="0" required disabled={locked} bind:value={form.valor} />
+				<input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0" required disabled={locked} use:moneyInput={{ value: form.valor, setValue: (value) => form.valor = value }} />
 			</label>
 			<label class="field">
 				<span>Data</span>

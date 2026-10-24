@@ -1,4 +1,5 @@
 <script>
+	import { moneyInput } from '$lib/money-input.js';
 	import {
 		appState,
 		removeGoal,
@@ -598,7 +599,7 @@
 						</div>
 						<label class="field" style="max-width:280px">
 							<span>Valor do aporte extra</span>
-							<input class="field-input" type="number" step="0.01" min="0" max={simBase.saldo} placeholder="R$ 0,00" bind:value={simAporte} />
+							<input class="field-input" type="text" inputmode="decimal" min="0" max={simBase.saldo} placeholder="R$ 0,00" use:moneyInput={{ value: simAporte, setValue: (value) => simAporte = value }} />
 						</label>
 						{#if simResult.valido && simResult.aporte > 0}
 							<div class="table-wrap" style="margin-bottom:16px">
@@ -674,7 +675,7 @@
 								</label>
 								<label class="field">
 									<span>Valor do aporte</span>
-									<input class="field-input" type="number" step="0.01" min="0" placeholder="R$ 0,00" bind:value={ap.valor} />
+									<input class="field-input" type="text" inputmode="decimal" min="0" placeholder="R$ 0,00" use:moneyInput={{ value: ap.valor, setValue: (value) => ap.valor = value }} />
 								</label>
 								<button type="button" class="icon-btn" onclick={() => removeSimAporteMultiplo(ap.id)} aria-label="Remover aporte">
 									<Trash2 size={16} />

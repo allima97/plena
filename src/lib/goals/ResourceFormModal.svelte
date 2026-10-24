@@ -1,4 +1,5 @@
 <script>
+	import { moneyInput } from '$lib/money-input.js';
 	import Modal from '$lib/components/Modal.svelte';
 	import { addResource, updateResource } from '$lib/fin/store.svelte.js';
 	import { RESOURCE_GROUPS } from './constants.js';
@@ -39,7 +40,7 @@
 			</select>
 		</label>
 		{#if !editing}
-			<label class="field"><span>Saldo inicial (opcional)</span><input class="field-input" type="number" step="0.01" placeholder="0,00" bind:value={form.balance} /></label>
+			<label class="field"><span>Saldo inicial (opcional)</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" use:moneyInput={{ value: form.balance, setValue: (value) => form.balance = value }} /></label>
 		{/if}
 		<div class="modal-footer">
 			<button type="submit" class="btn btn-primary">{editing ? 'Salvar' : 'Adicionar'}</button>

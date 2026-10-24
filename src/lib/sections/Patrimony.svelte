@@ -1,4 +1,5 @@
 <script>
+	import { moneyInput } from '$lib/money-input.js';
 	import { appState, addPatrimonyItem, updatePatrimonyItem, removePatrimonyItem, restorePatrimonyItem, restorePatrimonyItemMove, upsertPatrimonySnapshot, addPatrimonyItemMove, removePatrimonyItemMove } from '$lib/fin/store.svelte.js';
 	import { currentMonthKey, faturaDoCartao, saldoContaAte } from '$lib/fin/derived.js';
 	import { financialMonthKey } from '$lib/format.js';
@@ -343,7 +344,7 @@
 					<option value="outro">Outro ativo</option>
 				</select>
 			</label>
-			<label class="field"><span>Valor atual</span><input class="field-input" type="number" step="0.01" min="0" required bind:value={form.valor} /></label>
+			<label class="field"><span>Valor atual</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0" required use:moneyInput={{ value: form.valor, setValue: (value) => form.valor = value }} /></label>
 		</div>
 		<div class="modal-footer">
 			<button type="submit" class="btn btn-primary">Salvar</button>
@@ -402,7 +403,7 @@
 		</div>
 		<div class="form-grid">
 			<label class="field"><span>Data</span><input class="field-input" type="date" bind:value={moveForm.data} /></label>
-			<label class="field"><span>Valor</span><input class="field-input" type="number" step="0.01" min="0" required bind:value={moveForm.valor} /></label>
+			<label class="field"><span>Valor</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0" required use:moneyInput={{ value: moveForm.valor, setValue: (value) => moveForm.valor = value }} /></label>
 		</div>
 		<label class="field"><span>Descrição (opcional)</span><input class="field-input" placeholder="Ex.: Rendimento do mês" bind:value={moveForm.descricao} /></label>
 		<div class="modal-footer">

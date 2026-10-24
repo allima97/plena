@@ -1,4 +1,5 @@
 <script>
+	import { moneyInput } from '$lib/money-input.js';
 	import Modal from '$lib/components/Modal.svelte';
 	import { appState, addInstallment, updateInstallment, removeInstallment } from '$lib/fin/store.svelte.js';
 	import { todayISO, fmtMoney } from '$lib/format.js';
@@ -102,7 +103,7 @@
 		</div>
 		<div class="form-grid">
 			{#each fields as [key, label] (key)}
-				<label class="field"><span>{label}</span><input class="field-input" type="number" step="0.01" bind:value={form[key]} /></label>
+				<label class="field"><span>{label}</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" use:moneyInput={{ value: form[key], setValue: (value) => form[key] = value }} /></label>
 			{/each}
 		</div>
 		<div class="modal-footer">

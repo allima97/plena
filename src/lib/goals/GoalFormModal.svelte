@@ -1,4 +1,5 @@
 <script>
+	import { moneyInput } from '$lib/money-input.js';
 	import Modal from '$lib/components/Modal.svelte';
 	import { appState, addGoal, updateGoal } from '$lib/fin/store.svelte.js';
 	import { GOAL_TYPE_OPTIONS } from './constants.js';
@@ -101,7 +102,7 @@
 					{/each}
 				</select>
 			</label>
-			<label class="field"><span>Valor alvo ({form.currency || 'BRL'})</span><input class="field-input" type="number" step="0.01" bind:value={form.targetAmount} /></label>
+			<label class="field"><span>Valor alvo ({form.currency || 'BRL'})</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" use:moneyInput={{ value: form.targetAmount, setValue: (value) => form.targetAmount = value }} /></label>
 		</div>
 
 		{#if moedaDiferente}
