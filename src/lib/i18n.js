@@ -37,7 +37,7 @@ const dict = {
 		nav_fecharMenu: 'Fechar menu',
 		nav_maisOpcoes: 'Mais opções',
 		nav_mais: 'Mais',
-		nav_novoLancamento: 'Novo lançamento',
+		nav_novoLancamento: 'Novo movimento',
 		nav_cliqueSair: 'clique para sair',
 		nav_loginNaoConfigurado: 'Login não configurado',
 		brand_tag: 'finanças pessoais',

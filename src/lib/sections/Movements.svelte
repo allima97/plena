@@ -200,7 +200,7 @@ import TransferModal from '$lib/components/TransferModal.svelte';
 		<button class="btn" onclick={exportarPDFRapido}><FileDown size={16} /> Exportar PDF</button>
 		<button class="btn" onclick={exportarCSVRapido}><Download size={16} /> Exportar CSV</button>
 		<button class="btn" onclick={() => (showTransfer = true)}><ArrowLeftRight size={16} /> Transferência</button>
-		<button class="btn btn-primary" onclick={openNew}><Plus size={16} /> Novo lançamento</button>
+		<button class="btn btn-primary" onclick={openNew}><Plus size={16} /> Novo movimento</button>
 	</div>
 </div>
 

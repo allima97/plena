@@ -3,6 +3,7 @@
 	import { clearPrivateLocalData } from '$lib/fin/persist.js';
 	import { showToast } from '$lib/toast.svelte.js';
 	import { page } from '$app/state';
+	import { setNavigationContext } from '$lib/navigation-context.js';
 	import '../app.css';
 	import { appState, boot, retrySync, refreshSharedState } from '$lib/fin/store.svelte.js';
 	import { startStateRefresh } from '$lib/fin/sync-refresh.js';
@@ -36,6 +37,8 @@
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 
 	let { children } = $props();
+	const navigation = $state({ salesActive: false });
+	setNavigationContext(navigation);
 
 	let searchOpen = $state(false);
 	let notifOpen = $state(false);
@@ -118,6 +121,11 @@
 
 	const alertCount = $derived(upcomingDue(appState.transactions, appState.alertThresholds).total);
 	const isLoginPage = $derived(page.url.pathname === '/login');
+	const isSalesSection = $derived(page.url.pathname === '/objetivos' && navigation.salesActive);
+
+	$effect(() => {
+		if (isSalesSection) showNewGlobal = false;
+	});
 
 	const initials = $derived.by(() => {
 		const src = appState.user?.name || appState.user?.email || '';
@@ -306,7 +314,9 @@
 </div>
 
 <GlobalSearch open={searchOpen} onClose={() => (searchOpen = false)} />
+{#if !isSalesSection}
 <QuickAddModal open={showNewGlobal} onClose={() => (showNewGlobal = false)} />
+{/if}
 <OnboardingModal open={showOnboarding} onClose={() => (showOnboarding = false)} />
 <ConfirmDialog
 	open={confirmSairOpen}
@@ -330,9 +340,11 @@
 			<span>{item.label}</span>
 		</a>
 	{/each}
-	<button class="bottom-nav-fab" onclick={() => (showNewGlobal = true)} aria-label={t('nav_novoLancamento')}>
-		<Plus size={22} />
-	</button>
+	{#if !isSalesSection}
+		<button class="bottom-nav-fab" onclick={() => (showNewGlobal = true)} aria-label={t('nav_novoLancamento')}>
+			<Plus size={22} />
+		</button>
+	{/if}
 	{#each bottomNavItemsEnd as item (item.href)}
 		<a href={item.href} class="bottom-nav-item" class:active={isActive(item.href)}>
 			<item.icon size={20} strokeWidth={isActive(item.href) ? 2.2 : 1.8} />

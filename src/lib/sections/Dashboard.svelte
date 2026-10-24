@@ -495,7 +495,7 @@
 	<div class="actions-row">
 		<a class="btn" href="/simulador"><Wand2 size={16} /> Simular</a>
 		<button class="btn" onclick={() => (showCalendar = true)}><CalendarRange size={16} /> Calendário</button>
-		<button class="btn btn-primary" onclick={() => (showNew = true)}><Plus size={16} /> Novo lançamento</button>
+		<button class="btn btn-primary" onclick={() => (showNew = true)}><Plus size={16} /> Novo movimento</button>
 	</div>
 	<div class="dash-filters">
 		<select class="field-input" style="height:40px;width:auto" bind:value={contaFiltro}>
