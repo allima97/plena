@@ -101,6 +101,7 @@
      })
    : []
  );
+ const commissionKPIs = $derived(typeKPIs.filter(kpi => summary.typeCommissions[kpi.typeId]?.productRate !== null));
  // Distribuição percentual de vendas por tipo (sempre pelo bruto)
  const typeDistribution = $derived(
   summary.total > 0
@@ -111,7 +112,7 @@
       amount,
       pct: Math.round(amount / summary.total * 1000) / 10
      }))
-     .sort((a, b) => b.pct - a.pct)
+     .sort((a, b) => b.amount - a.amount || a.typeName.localeCompare(b.typeName, 'pt-BR'))
    : []
  );
  function submitSale(e) {
@@ -135,7 +136,6 @@
 </div>
 <div class="sales-primary-actions">
  <label class="field"><span>Mês </span><input class="field-input" type="month" bind:value={month} onchange={e => tableFilters = { scope: `${sectionId}:${e.currentTarget.value}`, type: '', query: '', page: 0 }} required disabled={!!editing || !!config} /></label>
- <button class="btn btn-primary" disabled={!month || !appState.ready || managingTypes || !activeTypes.length} onclick={() => { editing = { date: month === todayISO().slice(0,7) ? todayISO() : `${month}-01`, total: 0, fees: 0, type: activeTypes[0]?.id || '', orderNumber: '' }; error = ''; }}><Plus size={16} /> Nova venda</button>
 </div>
 
 <div class="sales-settings-actions">
@@ -247,14 +247,14 @@
   <section class="card type-goals" aria-label="Metas por tipo"><h2>Metas por tipo</h2>
    {#each typeKPIs as kpi (kpi.typeId)}
     <div class="type-goal-item"><div class="sales-goal-head"><strong>{kpi.typeName}</strong><span>{new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(kpi.sold / kpi.target * 100)}%</span></div>
-    <div class="kpi-progress-track" role="progressbar" aria-label={`Meta ${kpi.typeName}`} aria-valuemin="0" aria-valuemax="100" aria-valuenow={kpi.pct}><div class="kpi-progress-fill" style:width={`${kpi.pct}%`} style:background={kpi.done ? 'hsl(140 55% 38%)' : 'hsl(30 70% 42%)'}></div></div>
+    <div class="kpi-progress-track" role="progressbar" aria-label={`Meta ${kpi.typeName}`} aria-valuemin="0" aria-valuemax="100" aria-valuenow={kpi.pct}><div class="kpi-progress-fill" style:width={`${kpi.pct}%`} style:background={`hsl(${kpi.pct * 1.2} 65% 38%)`}></div></div>
     <div class="sales-goal-head kpi-sub"><span class="privacy-value">{fmtMoney(kpi.sold)}</span><span>de {fmtMoney(kpi.target)}</span></div>
     </div>
    {/each}
   </section>
  {/if}
 
- <div class="kpi-row">
+ <div class="kpi-row" style:--kpi-columns={Number(!!dailyKPI?.isCurrentMonth) + 1 + commissionKPIs.length + Number(summary.productCommission > 0)}>
   {#if dailyKPI && dailyKPI.isCurrentMonth}
    <section class="card kpi-card kpi-daily" aria-label="Ritmo diário necessário">
     <p class="stat-label">Valor diário necessário</p>
@@ -267,7 +267,7 @@
     <strong class="font-display kpi-value privacy-value">{summary.generalCommission === null ? 'A configurar' : fmtMoney(summary.generalCommission)}</strong>
     {#if summary.commission === null}<p class="kpi-sub">Configure os percentuais de comissão</p>{/if}
    </section>
-   {#each typeKPIs.filter(kpi => summary.typeCommissions[kpi.typeId]?.productRate !== null) as kpi (kpi.typeId)}
+   {#each commissionKPIs as kpi (kpi.typeId)}
     {@const result = summary.typeCommissions[kpi.typeId]}
     <section class="card kpi-card kpi-type" aria-label={`Comissão de ${kpi.typeName}`}>
      <p class="stat-label">Comissão · {kpi.typeName}</p>
@@ -275,8 +275,14 @@
      <p class="kpi-sub">{#if !kpi.done}Meta do produto não atingida{:else if result.generalRate === null}Configure os percentuais de comissão{:else}Meta do produto atingida · {new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(result.productRate)}% − {new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(result.generalRate)}% = {new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(result.extraRate)}% de complemento{/if}</p>
     </section>
    {/each}
+   {#if summary.productCommission > 0}
+    <section class="card kpi-card kpi-total" aria-label="Comissão total de vendas e produtos">
+     <p class="stat-label">Vendas + produtos</p>
+     <strong class="font-display kpi-value privacy-value">{fmtMoney(summary.commission)}</strong>
+     <p class="kpi-sub">Comissão total do mês</p>
+    </section>
+   {/if}
   </div>
-  {#if summary.productCommission > 0}<p class="kpi-sub commission-total">Vendas + produtos: {fmtMoney(summary.commission)}</p>{/if}
   {#if typeDistribution.length > 0}
    <div class="types-row">
     <section class="card kpi-card kpi-types-dist" aria-label="Distribuição por tipo de venda">
@@ -325,6 +331,9 @@
  {#if tablePage.total}{@render salesPagination('inferior')}{/if}
  </div>
 </section>
+<div class="sales-floating-actions">
+ <button class="btn btn-primary" disabled={!month || !appState.ready || managingTypes || !activeTypes.length} onclick={() => { editing = { date: month === todayISO().slice(0,7) ? todayISO() : `${month}-01`, total: 0, fees: 0, type: activeTypes[0]?.id || '', orderNumber: '' }; error = ''; }}><Plus size={16} /> Nova venda</button>
+</div>
 <ConfirmDialog open={!!deleting} title="Excluir venda?" message="A venda será excluída e a comissão do mês será recalculada." confirmLabel="Excluir venda" onCancel={() => deleting = null} onConfirm={() => { removeSale(deleting); deleting = null; showToast({ message: 'Venda excluída.' }); }} />
 <ConfirmDialog open={!!deletingType} title="Excluir tipo de venda?" message={`O tipo “${deletingType?.name || ''}” deixará de aparecer em novas vendas. O histórico e as comissões serão preservados.`} confirmLabel="Excluir tipo" onCancel={() => deletingType = null} onConfirm={() => { saveSaleType({ ...deletingType, deleted: true }); deletingType = null; typeDraft = newTypeDraft(); showToast({ message: 'Tipo excluído. Histórico preservado.' }); }} />
 <style>
@@ -349,13 +358,17 @@
  .sales-page-head { display:flex; flex-direction:column; gap:8px; margin-bottom:4px; align-items:flex-start; }
  .back-btn { align-self:flex-start; padding:6px 10px; gap:6px; font-size:13px; }
  .sales-primary-actions, .sales-settings-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; max-width:520px; margin:16px 0; align-items:end; }
+ .sales-primary-actions { grid-template-columns:minmax(0,1fr); max-width:254px; }
  .sales-primary-actions .field { min-width:0; }
- .sales-primary-actions .field-input, .sales-primary-actions .btn { width:100%; min-width:0; height:44px; min-height:44px; box-sizing:border-box; }
+ .sales-primary-actions .field-input { width:100%; min-width:0; height:44px; min-height:44px; box-sizing:border-box; }
+ .sales-floating-actions { position:fixed; z-index:40; left:16px; right:16px; bottom:calc(90px + env(safe-area-inset-bottom, 0px)); }
+ .sales-floating-actions .btn { width:100%; min-height:44px; justify-content:flex-start; border-radius:8px; box-shadow:var(--shadow-cta); }
+ @media(min-width:640px) { .sales-floating-actions { left:24px; right:24px; } }
+ @media(min-width:1024px) { .sales-floating-actions { left:288px; right:40px; bottom:calc(24px + env(safe-area-inset-bottom, 0px)); } }
  .sales-settings-actions .btn { min-width:0; min-height:44px; padding:8px; gap:6px; }
  @media(max-width:480px) {
   .sales-primary-actions, .sales-settings-actions { gap:8px; }
   .sales-primary-actions .field-input { padding-inline:10px; font-size:12px; }
-  .sales-primary-actions .btn { padding-inline:10px; }
   .sales-settings-actions .btn { font-size:11px; }
   .sales-settings-actions :global(svg) { flex-shrink:0; }
  }
@@ -405,11 +418,12 @@
  .editor { padding:20px; margin:16px 0; }
  .totals { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin:20px 0; }
  .stat-value { display:block; overflow-wrap:anywhere; }
- .sales-list { padding:20px; margin-top:20px; min-width:0; }
+ .sales-list { padding:20px; margin-top:20px; margin-bottom:72px; min-width:0; }
  .sales-explanation { margin-top:16px; line-height:1.6; }
 
- .kpi-row { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin:20px 0; }
- .commission-total { margin:-8px 0 20px; }
+ .kpi-row { display:grid; grid-template-columns:repeat(var(--kpi-columns, 3),minmax(0,1fr)); gap:14px; margin:20px 0; }
+ .kpi-total { background:var(--kpi-blue-soft); }
+ .kpi-total .kpi-value { color:var(--kpi-blue); }
  .kpi-card { min-width:0; padding:18px 20px; }
  .kpi-value { display:block; font-size:22px; margin:6px 0 10px; overflow-wrap:anywhere; }
  .kpi-sub { font-size:12px; color:var(--text-2); margin:6px 0 0; line-height:1.5; }
