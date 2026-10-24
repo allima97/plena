@@ -1,3 +1,4 @@
+import { validateCommissionSettings } from './sales-commissions.js';
 // Product settings are versioned by reference month. Legacy monthly plans remain
 // the fallback, so editing a product never rewrites previous months.
 const TIERS = ['below', 'target', 'super'];
@@ -13,6 +14,7 @@ export function validateTypeSettings(type) {
     if (settings.hasTarget) {
       if (!Number.isFinite(settings.target) || !Number.isSafeInteger(Math.round(settings.target * 100)) || Math.round(settings.target * 100) <= 0) throw new Error('Informe uma meta específica maior que zero.');
     } else if (settings.target != null) throw new Error('Produtos sem meta específica não devem ter valor de meta.');
+    validateCommissionSettings(settings);
   }
 }
 export function salesTypeSettings(type, month, plan) {
@@ -28,7 +30,10 @@ export function salesTypeSettings(type, month, plan) {
   return { rates: { below: null, target: null, super: null }, hasTarget: false, target: null, configured: false };
 }
 export function withSalesTypeSettings(type, month, settings) {
-  const next = { ...type, monthlySettings: { ...type.monthlySettings, [month]: { rates: { ...settings.rates }, hasTarget: settings.hasTarget, target: settings.hasTarget ? settings.target : null } } };
+  const extra = {};
+  if (settings.productRate !== undefined) extra.productRate = settings.hasTarget ? settings.productRate : null;
+  for (const key of ['scaleStepBelow', 'scaleStepAbove']) if (settings[key] !== undefined) extra[key] = settings[key] === '' ? null : settings[key];
+  const next = { ...type, monthlySettings: { ...type.monthlySettings, [month]: { rates: { ...settings.rates }, hasTarget: settings.hasTarget, target: settings.hasTarget ? settings.target : null, ...extra } } };
   validateTypeSettings(next);
   return next;
 }
@@ -36,13 +41,15 @@ export function salesPlanWithTypeSettings(plan, types = []) {
   if (!plan) return null;
   const month = plan.month || plan.id.split(':').at(-1);
   const rates = new Map(Object.entries(plan.rates || {}));
+  const productRules = new Map();
   const targets = new Map(Object.entries(plan.typeTargets || {}));
   for (const type of types) {
     const settings = salesTypeSettings(type, month, plan);
     if (!settings.configured) continue;
+    productRules.set(type.id, settings);
     if (TIERS.every(tier => Number.isFinite(settings.rates[tier]))) rates.set(type.id, { ...settings.rates });
     if (settings.hasTarget) targets.set(type.id, settings.target);
     else targets.delete(type.id);
   }
-  return { ...plan, rates: Object.fromEntries(rates), typeTargets: Object.fromEntries(targets) };
+  return { ...plan, rates: Object.fromEntries(rates), typeTargets: Object.fromEntries(targets), productRules: Object.fromEntries(productRules) };
 }

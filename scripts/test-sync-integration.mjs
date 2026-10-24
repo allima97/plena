@@ -70,15 +70,20 @@ try {
   const nRequest=(route,method='GET',body)=>nextgoals.fetch(new Request('https://ng.test'+route,{method,headers:{'Cf-Access-Jwt-Assertion':token,'content-type':'application/json',Origin:'https://ng.test','X-NextGoals-Owner':owner},...(body===undefined?{}:{body:JSON.stringify(body)})}),nenv);
   let response=await nRequest('/api/user-sync/initiate','POST',{plenaEmail:owner,confirm:true});assert.equal(response.status,200,await response.text());
   response=await nRequest('/api/user-sync/verify','POST',{code:otp});const activation=await response.json();assert.equal(response.status,200,JSON.stringify(activation));assert.equal(activation.warning,undefined,JSON.stringify(activation));
-  const productSettings = { id:'product-settings', sectionId:section, name:'Configuração de produto', deleted:false, monthlySettings:{'2026-10':{rates:{below:1,target:2,super:3},hasTarget:true,target:5000}} };
+  const productSettings = { id:'product-settings', sectionId:section, name:'Configuração de produto', deleted:false, monthlySettings:{'2026-10':{rates:{below:1,target:2,super:3},hasTarget:true,target:5000,productRate:10,scaleStepBelow:1,scaleStepAbove:1}} };
   response=await pRequest('/api/salesTypes/product-settings','PUT',productSettings);assert.equal(response.status,200,await response.text());
   assert.deepEqual(JSON.parse(nsql.prepare("SELECT data FROM documents WHERE user_id=? AND collection='salesTypes' AND id='product-settings'").get(owner).data).monthlySettings,productSettings.monthlySettings);
-  const changedProduct = {...productSettings,monthlySettings:{...productSettings.monthlySettings,'2026-11':{rates:{below:4,target:5,super:6},hasTarget:false,target:null}}};
+  const changedProduct = {...productSettings,monthlySettings:{...productSettings.monthlySettings,'2026-11':{rates:{below:4,target:5,super:6},hasTarget:false,target:null,productRate:null,scaleStepBelow:2,scaleStepAbove:3}}};
   response=await nRequest('/api/salesTypes/product-settings','PUT',changedProduct);assert.equal(response.status,200,await response.text());
   assert.deepEqual(JSON.parse(psql.prepare("SELECT data FROM documents WHERE owner_email=? AND collection='salesTypes' AND id='product-settings'").get(owner).data).monthlySettings,changedProduct.monthlySettings);
   const invalidProduct={...changedProduct,monthlySettings:{'2026-11':{rates:{below:-1,target:5,super:6},hasTarget:false,target:null}}};
   assert.equal((await nRequest('/api/salesTypes/product-settings','PUT',invalidProduct)).status,400);
   assert.equal((await pRequest('/api/salesTypes/product-settings','PUT',invalidProduct)).status,400);
+  for (const patch of [{productRate:101},{scaleStepAbove:0}]) {
+    const invalid={...productSettings,monthlySettings:{'2026-10':{...productSettings.monthlySettings['2026-10'],...patch}}};
+    assert.equal((await nRequest('/api/salesTypes/product-settings','PUT',invalid)).status,400);
+    assert.equal((await pRequest('/api/salesTypes/product-settings','PUT',invalid)).status,400);
+  }
   console.log('PASS: per-product commission settings and optional targets synchronize in both directions, retain previous months and reject invalid writes.');
   let ng=await (await nRequest('/api/state')).json();let pl=await (await pRequest('/api/plena/state')).json();
   assert.equal(ng.goals.length,3);assert.equal(pl.goals.length,3);assert.equal(pl.goals.find(g=>g.id==='shared').name,'Newest');

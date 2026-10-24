@@ -1,3 +1,4 @@
+import { summarizeSalesMonth } from './sales-commissions.js';
 import { validateTypeSettings } from './sales-type-settings.js';
 export const SALE_TYPES = ['Fretamento', 'Pacote', 'Hotel', 'Facial', 'Serviços', 'Ingressos', 'Cruzeiro', 'Disney/Universal', 'Seguro viagem'];
 export const TIERS = { below: 'Meta não batida', target: 'Meta batida', super: 'Supermeta' };
@@ -29,25 +30,7 @@ export function validatePlan(p) {
  }
 }
 export function monthSummary(sales, month, plan) {
- const rows = sales.filter(s => s.date.slice(0,7) === month);
- const total = rows.reduce((a,s) => a+cents(s.total),0);
- const fees = rows.reduce((a,s) => a+cents(s.fees),0);
- const net = total-fees;
- const goalBase = total; // meta sempre comparada ao total vendido (bruto)
- const tier = !plan ? null : goalBase >= cents(plan.superTarget) ? 'super' : goalBase >= cents(plan.target) ? 'target' : 'below';
- const items = rows.map(s => {
-  const rate = tier && Object.hasOwn(plan.rates, s.type) ? plan.rates[s.type]?.[tier] : null;
-  const configured = Number.isFinite(rate);
-  const base = plan?.commissionBase === 'gross' ? cents(s.total) : cents(s.total)-cents(s.fees);
-  return { ...s, rate: configured ? rate : null, commission: configured ? Math.round(base*rate/100)/100 : null };
- });
- // Per-type net totals for type-level KPIs
- const byType = {};
- for (const s of rows) {
-  const typeBase = cents(s.total); // KPI de tipo: total vendido (bruto)
-  byType[s.type] = (byType[s.type] || 0) + typeBase;
- }
- return { total: total/100, fees: fees/100, net: net/100, goalBase: goalBase/100, tier, items, byType: Object.fromEntries(Object.entries(byType).map(([k,v]) => [k, v/100])), commission: tier && items.every(s => s.commission !== null) ? items.reduce((a,s) => a+cents(s.commission),0)/100 : null };
+ return summarizeSalesMonth(sales, month, plan);
 }
 
 /**

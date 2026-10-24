@@ -19,7 +19,7 @@
  const scopedSales = $derived(forSection(sectionId, { sales: appState.sales, salesPlans: appState.salesPlans, salesTypes: appState.salesTypes }));
 
  let managingTypes = $state(false);
- const newTypeDraft = () => ({ name: '', rates: { below: null, target: null, super: null }, hasTarget: false, target: null });
+ const newTypeDraft = () => ({ name: '', rates: { below: null, target: null, super: null }, hasTarget: false, target: null, productRate: null, scaleStepBelow: null, scaleStepAbove: null });
  let typeDraft = $state(newTypeDraft());
  let deletingType = $state(null);
  const types = $derived(saleTypesCatalog(scopedSales.salesTypes, scopedSales.sales, scopedSales.salesPlans));
@@ -33,14 +33,14 @@
  }
  function editType(type) {
   const settings = salesTypeSettings(type, month, rawPlan);
-  typeDraft = { ...type, rates: { ...settings.rates }, hasTarget: settings.hasTarget, target: settings.target };
+  typeDraft = { ...type, rates: { ...settings.rates }, hasTarget: settings.hasTarget, target: settings.target, productRate: settings.productRate ?? null, scaleStepBelow: settings.scaleStepBelow ?? null, scaleStepAbove: settings.scaleStepAbove ?? null };
   error = '';
  }
  function submitType(e) {
   e.preventDefault();
   try {
-   const { rates, hasTarget, target, ...type } = typeDraft;
-   saveSaleType(withSalesTypeSettings({ ...type, sectionId }, month, { rates: { ...rates }, hasTarget, target: hasTarget ? target : null }));
+   const { rates, hasTarget, target, productRate, scaleStepBelow, scaleStepAbove, ...type } = typeDraft;
+   saveSaleType(withSalesTypeSettings({ ...type, sectionId }, month, { rates: { ...rates }, hasTarget, target: hasTarget ? target : null, productRate: hasTarget ? productRate : null, scaleStepBelow, scaleStepAbove }));
    typeDraft = newTypeDraft(); error = ''; showToast({ message: 'Tipo, comissões e meta específica salvos.' });
   } catch(e) { error = e.message; }
  }
@@ -142,17 +142,23 @@
 <button class="btn btn-ghost" disabled={!appState.ready || !!editing || !!config} onclick={() => { managingTypes = !managingTypes; typeDraft = newTypeDraft(); error = ''; }}><Tags size={16} /> Tipos de venda</button>
 </div>
 {#if managingTypes}
- <Modal open={managingTypes} onClose={() => { managingTypes = false; typeDraft = newTypeDraft(); error = ''; }} title="Tipos de venda" eyebrow="Organização" maxWidth="700px">
+ <Modal open={managingTypes} onClose={() => { managingTypes = false; typeDraft = newTypeDraft(); error = ''; }} title="Tipos de venda" eyebrow="Organização" maxWidth="850px">
   <p>Personalize os tipos para seu comércio. Ao excluir um tipo, ele deixa de aparecer em novas vendas; o histórico e as comissões são preservados.</p>
   {#if error}<p role="alert" class="field-error">{error}</p>{/if}
  <form class="movement-form" onsubmit={submitType}>
    <label class="field"><span>Nome do tipo</span><input class="field-input" required maxlength="80" placeholder="Ex.: Roupas, Alimentos, Consultoria" bind:value={typeDraft.name} /></label>
    <p class="field-hint">Configuração para {month.split('-').reverse().join('/')}. As faixas usam a meta mensal do controle. Alterações preservam os meses anteriores.</p>
-   <fieldset class="type-rate-card"><legend>Comissionamento do produto</legend><div class="type-rate-grid">
-    {#each Object.entries(TIERS) as [tier, label]}<label class="field"><span>{label} (%)</span><input class="field-input" aria-label={`${label} (%)`} type="number" min="0" max="100" step="0.01" required bind:value={typeDraft.rates[tier]} /></label>{/each}
-   </div></fieldset>
+   <fieldset class="type-rate-card"><legend>Comissão geral das vendas</legend>
+   <div class="type-rate-grid">
+    {#each Object.entries(TIERS) as [tier, label]}
+     {#if tier !== 'below'}<label class="field"><span>Escalonável {tier === 'target' ? 'antes' : 'após'} · a cada (%)</span><input class="field-input" aria-label={`Escalonável ${tier === 'target' ? 'antes' : 'após'} · a cada (%)`} type="number" min="0.01" max="100000" step="0.01" placeholder="Não usar" bind:value={typeDraft[tier === 'target' ? 'scaleStepBelow' : 'scaleStepAbove']} /></label>{/if}
+     <label class="field"><span>{label} (%)</span><input class="field-input" aria-label={`${label} (%)`} type="number" min="0" max="100" step="0.01" required bind:value={typeDraft.rates[tier]} /></label>
+    {/each}
+   </div>
+   <p class="field-hint">Passos independentes, opcionais. Antes: passo 1 dá 80% da meta = 0,80%; 81% = 0,81%. Em 100% salta para Meta batida. Após: passo 1 dá 101% = 1,16%, até o máximo da Supermeta. Cada passo completo soma 0,01 ponto percentual. Vazio mantém o percentual fixo da fase.</p>
+   </fieldset>
    <label class="field"><span>Possui meta específica?</span><select class="field-input" bind:value={typeDraft.hasTarget}><option value={false}>Não</option><option value={true}>Sim</option></select></label>
-   {#if typeDraft.hasTarget}<label class="field"><span>Meta específica mensal (R$)</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0.01" required use:moneyInput={{ value: typeDraft.target, setValue: (value) => typeDraft.target = value }} /></label>{/if}
+   {#if typeDraft.hasTarget}<label class="field"><span>Comissão específica do produto (%)</span><input class="field-input" type="number" min="0" max="100" step="0.01" required placeholder="Ex.: 10" bind:value={typeDraft.productRate} /></label><p class="field-hint">Ao atingir a meta do produto, o complemento é este percentual menos a comissão geral. Ex.: 10% − 0,80% = 9,20% adicionais.</p><label class="field"><span>Meta específica mensal (R$)</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0.01" required use:moneyInput={{ value: typeDraft.target, setValue: (value) => typeDraft.target = value }} /></label>{/if}
    <div class="modal-footer"><button class="btn btn-primary">{typeDraft.id ? 'Salvar tipo' : 'Incluir tipo'}</button>
    {#if typeDraft.id}<button type="button" class="btn btn-ghost" onclick={() => typeDraft = newTypeDraft()}>Cancelar edição</button>{/if}</div>
   </form>
@@ -214,26 +220,57 @@
  {#each [['Total vendido', summary.total], ['Taxas', summary.fees], ['Vendas líquidas', summary.net]] as [label, value]}<div class="stat-card"><p class="stat-label">{label}</p><strong class="font-display stat-value privacy-value">{value === null ? 'A configurar' : fmtMoney(value)}</strong></div>{/each}
 </div>
 {#if plan}
- {#if dailyKPI && dailyKPI.isCurrentMonth}
-  <div class="kpi-row">
+ <section class="card sales-goal" aria-label="Atingimento da meta mensal">
+  <div class="sales-goal-head">
+   <div><p class="stat-label">Meta do mês</p><p class="sales-goal-value privacy-value">{fmtMoney(plan.target)}</p></div>
+   <div class="sales-goal-percent"><strong style:color={goalColor}>{percentLabel}%</strong><span class="field-hint">{goalPercent >= 100 ? 'Meta atingida' : 'da meta atingida'}</span></div>
+  </div>
+  <div class="goal-progress-track" role="progressbar" aria-label="Atingimento da meta" aria-valuemin="0" aria-valuemax="100" aria-valuenow={goalFill} aria-valuetext={`${percentLabel}% da meta atingida`}>
+   <div class="goal-progress-fill" style:width={`${goalFill}%`} style:background={goalColor}></div>
+  </div>
+  <p class="stat-sub">Total vendido: <span class="privacy-value">{fmtMoney(summary.goalBase)}</span>{#if goalPercent < 100} · Faltam <span class="privacy-value">{fmtMoney(Math.max(0, plan.target - summary.goalBase))}</span>{/if}</p>
+  {#if summary.tier === 'target' || summary.tier === 'super'}
+   <div class="super-goal">
+    <div class="sales-goal-head">
+     <div><p class="stat-label">Supermeta</p><p class="sales-goal-value privacy-value">{fmtMoney(plan.superTarget)}</p></div>
+     <div class="sales-goal-percent"><strong>{superPercentLabel}%</strong><span class="field-hint">{summary.tier === 'super' ? 'Supermeta atingida' : 'da supermeta atingida'}</span></div>
+    </div>
+    <div class="goal-progress-track" role="progressbar" aria-label="Atingimento da supermeta" aria-valuemin="0" aria-valuemax="100" aria-valuenow={superFill} aria-valuetext={`${superPercentLabel}% da supermeta atingida`}>
+     <div class="goal-progress-fill" style:width={`${superFill}%`} style:background={`hsl(${superFill * 1.2} 65% 38%)`}></div>
+    </div>
+    <p class="stat-sub">Total vendido: <span class="privacy-value">{fmtMoney(summary.goalBase)}</span>{#if summary.tier !== 'super'} · Faltam <span class="privacy-value">{fmtMoney(Math.max(0, plan.superTarget - summary.goalBase))}</span>{/if}</p>
+   </div>
+  {/if}
+ </section>
+ {#if typeKPIs.length}
+  <section class="card type-goals" aria-label="Metas por tipo"><h2>Metas por tipo</h2>
+   {#each typeKPIs as kpi (kpi.typeId)}
+    <div class="type-goal-item"><div class="sales-goal-head"><strong>{kpi.typeName}</strong><span>{new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(kpi.sold / kpi.target * 100)}%</span></div>
+    <div class="kpi-progress-track" role="progressbar" aria-label={`Meta ${kpi.typeName}`} aria-valuemin="0" aria-valuemax="100" aria-valuenow={kpi.pct}><div class="kpi-progress-fill" style:width={`${kpi.pct}%`} style:background={kpi.done ? 'hsl(140 55% 38%)' : 'hsl(30 70% 42%)'}></div></div>
+    <div class="sales-goal-head kpi-sub"><span class="privacy-value">{fmtMoney(kpi.sold)}</span><span>de {fmtMoney(kpi.target)}</span></div>
+    </div>
+   {/each}
+  </section>
+ {/if}
+ <div class="product-commission-kpis">
+ {#each typeKPIs.filter(kpi => kpi.done && summary.typeCommissions[kpi.typeId]?.productRate !== null && summary.typeCommissions[kpi.typeId]?.generalRate !== null) as kpi (kpi.typeId)}
+  {@const result = summary.typeCommissions[kpi.typeId]}
+  <section class="card kpi-card kpi-type" aria-label={`Comissão de ${kpi.typeName}`}><p class="stat-label">Comissão · {kpi.typeName}</p><strong class="font-display kpi-value privacy-value">{fmtMoney(result.productCommission)}</strong><p class="kpi-sub">Meta do produto atingida · {new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(result.productRate)}% − {new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(result.generalRate)}% = {new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(result.extraRate)}% de complemento</p></section>
+ {/each}
+ </div>
+
+ <div class="kpi-row">
+  {#if dailyKPI && dailyKPI.isCurrentMonth}
    <section class="card kpi-card kpi-daily" aria-label="Ritmo diário necessário">
     <p class="stat-label">Valor diário necessário</p>
     <strong class="font-display kpi-value privacy-value">{new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0}).format(dailyKPI.dailyNeeded)}</strong>
     <p class="kpi-sub">{dailyKPI.onTrack ? '✓ No ritmo para atingir a meta' : `Faltam ${new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(dailyKPI.remaining)} em ${dailyKPI.daysLeft} dia${dailyKPI.daysLeft !== 1 ? 's' : ''}`}</p>
    </section>
-   {#each typeKPIs as kpi (kpi.typeId)}
-    <section class="card kpi-card kpi-type" aria-label={`Meta de ${kpi.typeName}`}>
-     <p class="stat-label">{kpi.typeName}</p>
-     <strong class="font-display kpi-value privacy-value">{new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(kpi.sold)}</strong>
-     <div class="kpi-progress-track" role="progressbar" aria-label={`Meta ${kpi.typeName}`} aria-valuemin="0" aria-valuemax="100" aria-valuenow={kpi.pct}>
-      <div class="kpi-progress-fill" style:width={`${kpi.pct}%`} style:background={kpi.done ? 'hsl(140 55% 38%)' : 'hsl(30 70% 42%)'}></div>
-     </div>
-     <p class="kpi-sub">{kpi.done ? `✓ Meta atingida (${new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(kpi.target)})` : `Meta: ${new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(kpi.target)} · Falta ${new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(kpi.remaining)}`}</p>
-    </section>
-   {/each}
+  {/if}
    <section class="card kpi-card kpi-commission" aria-label="Comissão do mês">
-    <p class="stat-label">Comissão mês</p>
-    <strong class="font-display kpi-value privacy-value">{summary.commission === null ? 'A configurar' : fmtMoney(summary.commission)}</strong>
+    <p class="stat-label">Comissão das vendas</p>
+    <strong class="font-display kpi-value privacy-value">{summary.generalCommission === null ? 'A configurar' : fmtMoney(summary.generalCommission)}</strong>
+    {#if summary.productCommission > 0}<p class="kpi-sub">Vendas + produtos: {fmtMoney(summary.commission)}</p>{/if}
     {#if summary.commission === null}<p class="kpi-sub">Configure os percentuais de comissão</p>{/if}
    </section>
   </div>
@@ -257,29 +294,6 @@
     </section>
    </div>
   {/if}
- {/if}
- <section class="card sales-goal" aria-label="Atingimento da meta mensal">
-  <div class="sales-goal-head">
-   <div><p class="stat-label">Meta do mês</p><p class="sales-goal-value privacy-value">{fmtMoney(plan.target)}</p></div>
-   <div class="sales-goal-percent"><strong style:color={goalColor}>{percentLabel}%</strong><span class="field-hint">{goalPercent >= 100 ? 'Meta atingida' : 'da meta atingida'}</span></div>
-  </div>
-  <div class="goal-progress-track" role="progressbar" aria-label="Atingimento da meta" aria-valuemin="0" aria-valuemax="100" aria-valuenow={goalFill} aria-valuetext={`${percentLabel}% da meta atingida`}>
-   <div class="goal-progress-fill" style:width={`${goalFill}%`} style:background={goalColor}></div>
-  </div>
-  <p class="stat-sub">Total vendido: <span class="privacy-value">{fmtMoney(summary.goalBase)}</span>{#if goalPercent < 100} · Faltam <span class="privacy-value">{fmtMoney(Math.max(0, plan.target - summary.goalBase))}</span>{/if}</p>
-  {#if summary.tier === 'target' || summary.tier === 'super'}
-   <div class="super-goal">
-    <div class="sales-goal-head">
-     <div><p class="stat-label">Supermeta</p><p class="sales-goal-value privacy-value">{fmtMoney(plan.superTarget)}</p></div>
-     <div class="sales-goal-percent"><strong>{superPercentLabel}%</strong><span class="field-hint">{summary.tier === 'super' ? 'Supermeta atingida' : 'da supermeta atingida'}</span></div>
-    </div>
-    <div class="goal-progress-track" role="progressbar" aria-label="Atingimento da supermeta" aria-valuemin="0" aria-valuemax="100" aria-valuenow={superFill} aria-valuetext={`${superPercentLabel}% da supermeta atingida`}>
-     <div class="goal-progress-fill" style:width={`${superFill}%`} style:background={`hsl(${superFill * 1.2} 65% 38%)`}></div>
-    </div>
-    <p class="stat-sub">Total vendido: <span class="privacy-value">{fmtMoney(summary.goalBase)}</span>{#if summary.tier !== 'super'} · Faltam <span class="privacy-value">{fmtMoney(Math.max(0, plan.superTarget - summary.goalBase))}</span>{/if}</p>
-   </div>
-  {/if}
- </section>
 {/if}
 {#snippet salesPagination(position)}
  <nav class="sales-pagination" aria-label={`Paginação das vendas — ${position}`}>
@@ -300,9 +314,9 @@
  <p id="sales-table-status" class="field-hint sales-table-status" role="status" aria-live="polite">Resultados: {tablePage.total} de {summary.items.length} venda{summary.items.length === 1 ? '' : 's'} no mês{#if tablePage.total}{` · exibindo ${tablePage.start + 1}–${tablePage.end}`}{/if}</p>
  <div class="sales-table-results" bind:this={ledgerElement}>
  {#if tablePage.total}{@render salesPagination('superior')}{/if}
- <div class="table-wrap"><table class="list"><thead><tr><th scope="col">Pedido</th><th scope="col">Data venda</th><th scope="col">Tipo</th><th scope="col" class="num">Valor total</th><th scope="col" class="num">Taxas</th><th scope="col" class="num">Líquido</th><th scope="col" class="num">Comissão (%)</th><th scope="col" class="num">Comissão mês</th><th scope="col" class="th-actions">Ações</th></tr></thead><tbody>
+ <div class="table-wrap"><table class="list"><thead><tr><th scope="col">Pedido</th><th scope="col">Data venda</th><th scope="col">Tipo</th><th scope="col" class="num">Valor total</th><th scope="col" class="num">Taxas</th><th scope="col" class="num">Líquido</th><th scope="col" class="num">Comissão total (%)</th><th scope="col" class="num">Comissão total</th><th scope="col" class="th-actions">Ações</th></tr></thead><tbody>
  {#each tablePage.items as sale (sale.id)}
- <tr><td data-label="Pedido">{sale.orderNumber || '—'}</td><td data-label="Data venda">{fmtDate(sale.date)}</td><td data-label="Tipo">{typeName(sale.type)}</td><td data-label="Valor total" class="num privacy-value">{fmtMoney(sale.total)}</td><td data-label="Taxas" class="num privacy-value">{fmtMoney(sale.fees)}</td><td data-label="Líquido" class="num privacy-value">{fmtMoney(sale.total-sale.fees)}</td><td data-label="Comissão (%)" class="num">{sale.rate === null ? '—' : `${sale.rate}%`}</td><td data-label="Comissão mês" class="num privacy-value">{sale.commission === null ? '—' : fmtMoney(sale.commission)}</td><td class="actions-cell"><div class="actions-row"><button class="btn btn-ghost tbl-icon-btn" disabled={managingTypes} aria-label="Editar venda" onclick={() => { editing = { id: sale.id, date: sale.date, total: sale.total, fees: sale.fees, type: sale.type, orderNumber: sale.orderNumber ?? '' }; error = ''; }}><Pencil size={14} /></button><button class="btn btn-danger tbl-icon-btn" aria-label="Excluir venda" onclick={() => deleting = sale.id}><Trash2 size={14} /></button></div></td></tr>
+ <tr><td data-label="Pedido">{sale.orderNumber || '—'}</td><td data-label="Data venda">{fmtDate(sale.date)}</td><td data-label="Tipo">{typeName(sale.type)}</td><td data-label="Valor total" class="num privacy-value">{fmtMoney(sale.total)}</td><td data-label="Taxas" class="num privacy-value">{fmtMoney(sale.fees)}</td><td data-label="Líquido" class="num privacy-value">{fmtMoney(sale.total-sale.fees)}</td><td data-label="Comissão total (%)" class="num">{sale.rate === null ? '—' : `${sale.rate}%`}</td><td data-label="Comissão total" class="num privacy-value">{sale.commission === null ? '—' : fmtMoney(sale.commission)}</td><td class="actions-cell"><div class="actions-row"><button class="btn btn-ghost tbl-icon-btn" disabled={managingTypes} aria-label="Editar venda" onclick={() => { editing = { id: sale.id, date: sale.date, total: sale.total, fees: sale.fees, type: sale.type, orderNumber: sale.orderNumber ?? '' }; error = ''; }}><Pencil size={14} /></button><button class="btn btn-danger tbl-icon-btn" aria-label="Excluir venda" onclick={() => deleting = sale.id}><Trash2 size={14} /></button></div></td></tr>
  {:else}<tr><td colspan="9" class="empty">{summary.items.length ? 'Nenhuma venda encontrada. Tente outro tipo ou busca.' : 'Nenhuma venda neste mês. Cadastre sua primeira venda.'}</td></tr>{/each}
  </tbody></table></div>
  {#if tablePage.total}{@render salesPagination('inferior')}{/if}
@@ -345,10 +359,16 @@
 
  .types-list-head { display:flex; align-items:center; gap:10px; margin:24px 0 12px; }
  .types-list-head h3 { margin:0; font-size:14px; font-weight:700; }
+ .type-rate-card .type-rate-grid { margin-top:12px; }
+ .type-goals { padding:20px; margin:20px 0; }
+ .type-goals h2 { font-size:16px; margin:0 0 18px; }
+ .type-goal-item + .type-goal-item { margin-top:20px; }
+ .type-goal-item .sales-goal-head { margin-bottom:8px; }
+ .product-commission-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); gap:14px; }
  .type-rate-card { border:1px solid var(--border); border-radius:var(--radius-md); padding:14px; margin:0; min-width:0; }
  .type-rate-card legend { font-size:13px; font-weight:600; padding:0 6px; }
- .type-rate-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
- @media(max-width:480px) { .type-rate-grid { grid-template-columns:1fr; } }
+ .type-rate-grid { display:grid; align-items:end; grid-template-columns:repeat(5,minmax(0,1fr)); gap:12px; }
+ @media(max-width:680px) { .type-rate-grid { grid-template-columns:1fr; } }
  .types-table { min-width:0; table-layout:fixed; }
  .types-table th { background:var(--surface-3); }
  .types-table .types-actions-heading { width:200px; text-align:center; }
@@ -386,7 +406,7 @@
  .sales-list { padding:20px; margin-top:20px; min-width:0; }
  .sales-explanation { margin-top:16px; line-height:1.6; }
 
- .kpi-row { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin:20px 0; }
+ .kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr)); gap:14px; margin:20px 0; }
  .kpi-card { padding:18px 20px; }
  .kpi-value { display:block; font-size:22px; margin:6px 0 10px; overflow-wrap:anywhere; }
  .kpi-sub { font-size:12px; color:var(--text-2); margin:6px 0 0; line-height:1.5; }
