@@ -233,8 +233,8 @@
       <tr class="type-row" class:editing-type={typeDraft.id === type.id}>
        <td data-label="Tipo de venda" class="type-name">{type.name}</td>
        <td class="actions-cell"><div class="actions-row">
-        <button class="btn btn-ghost sm" aria-label={`Editar tipo ${type.name}`} onclick={() => editType(type)}><Pencil size={14} /> Editar</button>
-        <button class="btn btn-danger sm" aria-label={`Excluir tipo ${type.name}`} onclick={() => deletingType = type}><Trash2 size={14} /> Excluir</button>
+        <button class="btn btn-ghost tbl-icon-btn" aria-label={`Editar tipo ${type.name}`} title="Editar" onclick={() => editType(type)}><Pencil size={16} /></button>
+        <button class="btn btn-danger tbl-icon-btn" aria-label={`Excluir tipo ${type.name}`} title="Excluir" onclick={() => deletingType = type}><Trash2 size={16} /></button>
        </div></td>
       </tr>
      {:else}<tr><td colspan="2" class="empty">Nenhum tipo cadastrado. Toque em Novo tipo de venda para começar.</td></tr>{/each}
@@ -458,25 +458,25 @@
  @media(max-width:680px) { .type-rate-grid { grid-template-columns:1fr; } }
  .types-table { min-width:0; table-layout:fixed; }
  .types-table th { background:var(--surface-3); }
- .types-table .types-actions-heading { width:200px; text-align:center; }
+ .types-table .types-actions-heading { width:120px; text-align:center; }
  .types-table .type-name { font-weight:600; overflow-wrap:anywhere; }
- .types-table .actions-row { justify-content:center; flex-wrap:nowrap; gap:8px; }
+ .types-table .actions-row { justify-content:center; flex-wrap:nowrap; gap:6px; }
  .types-table .editing-type { background:var(--surface-3); }
+ .types-table .tbl-icon-btn { min-height:36px; width:36px; padding:0; }
  @media(max-width:760px) {
   .types-table { display:table; width:100%; }
   .types-table thead { display:table-header-group; }
   .types-table tbody { display:table-row-group; }
   .types-table tr { display:table-row; margin:0; padding:0; border:0; border-radius:0; background:transparent; }
   .types-table th { padding:10px 6px; }
-  .types-table .types-actions-heading { width:128px; }
+  .types-table .types-actions-heading { width:96px; }
   .types-table td { display:table-cell; padding:10px 6px; border-bottom:1px solid var(--border-soft); vertical-align:middle; }
   .types-table tr:last-child td { border-bottom:0; }
   .types-table td::before { display:none; }
   .types-table .type-name { text-align:left; }
   .types-table .actions-cell { display:table-cell; padding:10px 6px; }
   .types-table .actions-row { gap:4px; }
-  .types-table .actions-row .btn { min-height:40px; padding:8px; font-size:11px; flex:0 0 auto; }
-  .types-table .actions-row :global(svg) { display:none; }
+  .types-table .tbl-icon-btn { min-height:40px; width:40px; }
  }
 
  .super-goal { margin-top:20px; padding-top:20px; border-top:1px solid var(--border-soft); }
