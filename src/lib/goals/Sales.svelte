@@ -13,7 +13,7 @@
  import { Plus, Pencil, Trash2, ArrowLeft, CircleHelp } from 'lucide-svelte';
  import { appState, saveSale, removeSale, saveSalesPlan, saveSaleType } from '$lib/fin/store.svelte.js';
  import { forSection } from './sales.js';
- import { todayISO, fmtMoney, fmtDate } from '$lib/format.js';
+ import { todayISO, fmtMoney, fmtDate, monthLabel } from '$lib/format.js';
  import { saleTypesCatalog, TIERS, emptyPlan, monthSummary, dailyPaceKPI } from './sales.js';
  import { filterSalesRows, salesTablePage } from './sales-table.js';
 
@@ -69,7 +69,27 @@
  onDestroy(() => tour?.close());
  function typeName(id) { return types.find(t => t.id === id)?.name || id; }
  function openConfig() {
-  config = structuredClone($state.snapshot(rawPlan || emptyPlan(month, [])));
+  if (rawPlan) {
+   // Mês já tem plano: editar normalmente
+   config = structuredClone($state.snapshot(rawPlan));
+   configIsTemplate = false;
+   configTemplateMonth = '';
+  } else {
+   // Sem plano para este mês: herdar do plano mais recente cadastrado
+   const templatePlan = [...scopedSales.salesPlans]
+    .filter((p) => p.id !== planId)
+    .sort((a, b) => b.id.split(':').at(-1).localeCompare(a.id.split(':').at(-1)))[0];
+   if (templatePlan) {
+    config = structuredClone($state.snapshot(templatePlan));
+    config.id = planId;
+    configIsTemplate = true;
+    configTemplateMonth = templatePlan.id.split(':').at(-1);
+   } else {
+    config = emptyPlan(month, []);
+    configIsTemplate = false;
+    configTemplateMonth = '';
+   }
+  }
   config.commissionBase ??= 'net';
   config.typeTargets ??= {};
   error = '';
@@ -92,6 +112,8 @@
  let editing = $state(null);
  let config = $state(null);
  let error = $state('');
+ let configIsTemplate = $state(false);
+ let configTemplateMonth = $state('');
 
  let deleting = $state(null);
  const canCreateSale = $derived(!!month && appState.ready && !tourOpen && !managingTypes && !reportsOpen && !!activeTypes.length && !editing && !config && !deleting && !deletingType);
@@ -174,7 +196,7 @@
  }
  function submitPlan(e) {
   e.preventDefault();
-  try { saveSalesPlan({ ...config, sectionId, id: planId }); config = null; error = ''; showToast({ message: 'Metas mensais salvas.' }); } catch(e) { error = e.message; }
+  try { saveSalesPlan({ ...config, sectionId, id: planId }); config = null; configIsTemplate = false; configTemplateMonth = ''; error = ''; showToast({ message: 'Metas mensais salvas.' }); } catch(e) { error = e.message; }
  }
 </script>
 <div class="page-head sales-page-head">
@@ -247,7 +269,12 @@
 
 
 {#if config}
- <Modal open={!!config} onClose={() => { config = null; error = ''; }} title="Metas mensais" subtitle={month} maxWidth="760px">
+ <Modal open={!!config} onClose={() => { config = null; configIsTemplate = false; configTemplateMonth = ''; error = ''; }} title="Metas mensais" subtitle={month} maxWidth="760px">
+ {#if configIsTemplate}
+  <p class="template-notice" role="status">
+   ⟳ Pré-preenchido com as configurações de <strong>{monthLabel(configTemplateMonth)}</strong>. Revise e ajuste os valores antes de salvar.
+  </p>
+ {/if}
  {#if error}<p role="alert" class="field-error">{error}</p>{/if}
  <form class="movement-form" onsubmit={submitPlan}>
   <p>Defina a meta e a supermeta deste mês. Cadastre os percentuais de comissão e a meta específica de cada produto em Tipos de venda. Valores em reais (R$).</p>
@@ -259,7 +286,7 @@
   </label>
   <p>A base escolhida vale para o cálculo da comissão. A meta e a supermeta acompanham o total vendido, antes das taxas.</p>
   <div class="form-grid" data-tourism="plan-values"><label class="field"><span>Meta (R$)</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0.01" required use:moneyInput={{ value: config.target, setValue: (value) => config.target = value }} /></label><label class="field"><span>Supermeta (R$)</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0.02" required use:moneyInput={{ value: config.superTarget, setValue: (value) => config.superTarget = value }} /></label></div>
-  <div class="modal-footer"><button class="btn btn-primary">Salvar configuração</button><button type="button" class="btn btn-ghost" onclick={() => { config = null; error = ''; }}>Cancelar</button></div>
+  <div class="modal-footer"><button class="btn btn-primary">Salvar configuração</button><button type="button" class="btn btn-ghost" onclick={() => { config = null; configIsTemplate = false; configTemplateMonth = ''; error = ''; }}>Cancelar</button></div>
  </form>
  </Modal>
 {/if}
@@ -528,4 +555,15 @@
  .sales-list .actions-cell { text-align:center; }
  .sales-list .actions-row { justify-content:center; flex-wrap:nowrap; gap:6px; }
  .tbl-icon-btn { min-height:32px; width:32px; padding:0; }
+
+ .template-notice {
+  background: color-mix(in srgb, var(--accent, hsl(215 65% 55%)) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent, hsl(215 65% 55%)) 40%, transparent);
+  border-radius: 6px;
+  color: var(--ink);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+ }
 </style>
