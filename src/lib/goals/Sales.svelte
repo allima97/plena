@@ -25,6 +25,7 @@
  const scopedSales = $derived(forSection(sectionId, { sales: appState.sales, salesPlans: appState.salesPlans, salesTypes: appState.salesTypes }));
 
  let managingTypes = $state(false);
+ let typeFormOpen = $state(false);
  let reportsOpen = $state(false);
  const newTypeDraft = () => ({ name: '', rates: { below: null, target: null, super: null }, hasTarget: false, target: null, productRate: null, scaleStepBelow: null, scaleStepAbove: null });
  let typeDraft = $state(newTypeDraft());
@@ -38,10 +39,11 @@
  async function prepareTourStep(step) {
   if (step.panel !== tourPanel) {
    config = null; editing = null; reportsOpen = false; managingTypes = false;
-   typeDraft = newTypeDraft(); error = ''; tourPanel = step.panel;
+   typeFormOpen = false; typeDraft = newTypeDraft(); error = ''; tourPanel = step.panel;
    if (step.panel === 'plan') openConfig();
    if (step.panel === 'types' || step.panel === 'type') {
     managingTypes = true;
+    typeFormOpen = true;
     if (step.panel === 'type') {
      const type = activeTypes.find(t => salesTypeSettings(t, month, rawPlan).hasTarget) || activeTypes[0];
      if (type) editType(type);
@@ -58,7 +60,7 @@
   tour = startTourismTour({ theme: 'plena', prepare: prepareTourStep,
    onClose: async () => {
     config = null; editing = null; reportsOpen = false; managingTypes = false;
-    typeDraft = newTypeDraft(); error = ''; tourPanel = ''; tourOpen = false; tour = null;
+    typeFormOpen = false; typeDraft = newTypeDraft(); error = ''; tourPanel = ''; tourOpen = false; tour = null;
     await tick();
    },
    returnFocus: () => document.querySelector('[data-tourism="help"]')
@@ -75,6 +77,7 @@
  function editType(type) {
   const settings = salesTypeSettings(type, month, rawPlan);
   typeDraft = { ...type, rates: { ...settings.rates }, hasTarget: settings.hasTarget, target: settings.target, productRate: settings.productRate ?? templateSuggestedProductRate(type), scaleStepBelow: settings.scaleStepBelow ?? null, scaleStepAbove: settings.scaleStepAbove ?? null };
+  typeFormOpen = true;
   error = '';
  }
  function submitType(e) {
@@ -82,7 +85,7 @@
   try {
    const { rates, hasTarget, target, productRate, scaleStepBelow, scaleStepAbove, ...type } = typeDraft;
    saveSaleType(withSalesTypeSettings({ ...type, sectionId }, month, { rates: { ...rates }, hasTarget, target: hasTarget ? target : null, productRate: hasTarget ? productRate : null, scaleStepBelow, scaleStepAbove }));
-   typeDraft = newTypeDraft(); error = ''; showToast({ message: 'Tipo, comissões e meta específica salvos.' });
+   typeFormOpen = false; typeDraft = newTypeDraft(); error = ''; showToast({ message: 'Tipo, comissões e meta específica salvos.' });
   } catch(e) { error = e.message; }
  }
  let month = $state(todayISO().slice(0,7));
@@ -191,15 +194,18 @@
  <label class="field" data-tourism="month"><span>Mês de referência</span><input class="field-input" type="month" bind:value={month} onchange={e => tableFilters = { scope: `${sectionId}:${e.currentTarget.value}`, type: '', query: '', page: 0 }} required disabled={!!editing || !!config} /></label>
  <div class="sales-settings-actions">
  <button class="btn btn-ghost" data-tourism="plan-button" disabled={!month || !appState.ready || managingTypes} onclick={() => { openConfig(); }}>Metas mensais</button>
-<button class="btn btn-ghost" data-tourism="types-button" disabled={!appState.ready || !!editing || !!config} onclick={() => { managingTypes = !managingTypes; typeDraft = newTypeDraft(); error = ''; }}>Tipos de venda</button>
+<button class="btn btn-ghost" data-tourism="types-button" disabled={!appState.ready || !!editing || !!config} onclick={() => { managingTypes = !managingTypes; typeFormOpen = false; typeDraft = newTypeDraft(); error = ''; }}>Tipos de venda</button>
  <button id="sales-reports-button" class="btn btn-ghost sales-report-button" disabled={!appState.ready || !!editing || !!config || managingTypes} onclick={() => reportsOpen = true}>Relatórios</button>
  </div>
 </div>
 {#if reportsOpen}<SalesReports sales={scopedSales.sales} plans={scopedSales.salesPlans} initialYear={month.slice(0, 4)} sectionName={appState.salesSections.find(section => section.id === sectionId)?.name || 'Vendas'} onClose={() => reportsOpen = false} />{/if}
 {#if managingTypes}
- <Modal open={managingTypes} onClose={() => { managingTypes = false; typeDraft = newTypeDraft(); error = ''; }} title="Tipos de venda" eyebrow="Organização" maxWidth="850px">
+ <Modal open={managingTypes} onClose={() => { managingTypes = false; typeFormOpen = false; typeDraft = newTypeDraft(); error = ''; }} title="Tipos de venda" eyebrow="Organização" maxWidth="850px">
   <p>Personalize os tipos para seu comércio. Ao excluir um tipo, ele deixa de aparecer em novas vendas; o histórico e as comissões são preservados.</p>
   {#if error}<p role="alert" class="field-error">{error}</p>{/if}
+  {#if !typeFormOpen}
+   <button class="btn btn-primary types-new-btn" onclick={() => { typeDraft = newTypeDraft(); typeFormOpen = true; error = ''; }}><Plus size={16} /> Novo tipo de venda</button>
+  {:else}
  <form class="movement-form" onsubmit={submitType}>
    <label class="field" data-tourism="type-name"><span>Nome do tipo</span><input class="field-input" required maxlength="80" placeholder="Ex.: Roupas, Alimentos, Consultoria" bind:value={typeDraft.name} /></label>
    <p class="field-hint">Configuração para {month.split('-').reverse().join('/')}. As faixas usam a meta mensal do controle. Alterações preservam os meses anteriores.</p>
@@ -215,8 +221,9 @@
    <label class="field" data-tourism="type-specific"><span>Possui meta específica?</span><select class="field-input" bind:value={typeDraft.hasTarget}><option value={false}>Não</option><option value={true}>Sim</option></select></label>
    {#if typeDraft.hasTarget}<label class="field"><span>Comissão específica do produto (%)</span><input class="field-input" type="number" min="0" max="100" step="0.01" required placeholder="Ex.: 10" bind:value={typeDraft.productRate} /></label><p class="field-hint">Ao atingir a meta do produto, o complemento é este percentual menos a comissão geral. Ex.: 10% − 0,80% = 9,20% adicionais.</p><label class="field"><span>Meta específica mensal (R$)</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0.01" required use:moneyInput={{ value: typeDraft.target, setValue: (value) => typeDraft.target = value }} /></label>{/if}
    <div class="modal-footer"><button class="btn btn-primary">{typeDraft.id ? 'Salvar tipo' : 'Incluir tipo'}</button>
-   {#if typeDraft.id}<button type="button" class="btn btn-ghost" onclick={() => typeDraft = newTypeDraft()}>Cancelar edição</button>{/if}</div>
+   <button type="button" class="btn btn-ghost" onclick={() => { typeFormOpen = false; typeDraft = newTypeDraft(); error = ''; }}>Cancelar</button></div>
   </form>
+  {/if}
   <div class="types-list-head" data-tourism="type-list"><h3>Tipos cadastrados</h3><span class="badge badge-gray">{activeTypes.length}</span></div>
   <div class="table-wrap types-table-wrap">
    <table class="list types-table" aria-label="Tipos de venda cadastrados">
@@ -230,7 +237,7 @@
         <button class="btn btn-danger sm" aria-label={`Excluir tipo ${type.name}`} onclick={() => deletingType = type}><Trash2 size={14} /> Excluir</button>
        </div></td>
       </tr>
-     {:else}<tr><td colspan="2" class="empty">Nenhum tipo cadastrado. Inclua um tipo acima para começar.</td></tr>{/each}
+     {:else}<tr><td colspan="2" class="empty">Nenhum tipo cadastrado. Toque em Novo tipo de venda para começar.</td></tr>{/each}
     </tbody>
    </table>
   </div>
@@ -391,7 +398,7 @@
  <button class="btn btn-primary" disabled={!canCreateSale} onclick={openNewSale}><Plus size={16} /> Nova venda</button>
 </div>
 <ConfirmDialog open={!!deleting} title="Excluir venda?" message="A venda será excluída e a comissão do mês será recalculada." confirmLabel="Excluir venda" onCancel={() => deleting = null} onConfirm={() => { removeSale(deleting); deleting = null; showToast({ message: 'Venda excluída.' }); }} />
-<ConfirmDialog open={!!deletingType} title="Excluir tipo de venda?" message={`O tipo “${deletingType?.name || ''}” deixará de aparecer em novas vendas. O histórico e as comissões serão preservados.`} confirmLabel="Excluir tipo" onCancel={() => deletingType = null} onConfirm={() => { saveSaleType({ ...deletingType, deleted: true }); deletingType = null; typeDraft = newTypeDraft(); showToast({ message: 'Tipo excluído. Histórico preservado.' }); }} />
+<ConfirmDialog open={!!deletingType} title="Excluir tipo de venda?" message={`O tipo “${deletingType?.name || ''}” deixará de aparecer em novas vendas. O histórico e as comissões serão preservados.`} confirmLabel="Excluir tipo" onCancel={() => deletingType = null} onConfirm={() => { saveSaleType({ ...deletingType, deleted: true }); deletingType = null; typeFormOpen = false; typeDraft = newTypeDraft(); showToast({ message: 'Tipo excluído. Histórico preservado.' }); }} />
 <style>
  .sales-title-row { width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
  .sales-help-button { border:1px solid var(--border); gap:7px; min-height:40px; white-space:nowrap; }
@@ -438,6 +445,7 @@
  @media(min-width:1024px) { .sales-floating-actions { left:288px; right:40px; bottom:calc(24px + env(safe-area-inset-bottom, 0px)); } }
 
  .types-list-head { display:flex; align-items:center; gap:10px; margin:24px 0 12px; }
+ .types-new-btn { width:100%; justify-content:center; gap:8px; margin:16px 0 4px; }
  .types-list-head h3 { margin:0; font-size:14px; font-weight:700; }
  .type-rate-card .type-rate-grid { margin-top:12px; }
  .type-goals { padding:20px; margin:20px 0; }
