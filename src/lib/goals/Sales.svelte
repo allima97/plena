@@ -68,10 +68,18 @@
  }
  onDestroy(() => tour?.close());
  function typeName(id) { return types.find(t => t.id === id)?.name || id; }
+ // Clona um plano e garante que typeTargets seja objeto (D1 pode retornar JSON string)
+ function clonePlan(sourcePlan) {
+  const c = JSON.parse(JSON.stringify($state.snapshot(sourcePlan)));
+  if (typeof c.typeTargets === 'string') { try { c.typeTargets = JSON.parse(c.typeTargets); } catch { c.typeTargets = {}; } }
+  c.typeTargets ??= {};
+  return c;
+ }
+
  function openConfig() {
   if (rawPlan) {
    // Mês já tem plano: editar normalmente
-   config = structuredClone($state.snapshot(rawPlan));
+   config = clonePlan(rawPlan);
    configIsTemplate = false;
    configTemplateMonth = '';
   } else {
@@ -80,7 +88,7 @@
     .filter((p) => p.id !== planId)
     .sort((a, b) => b.id.split(':').at(-1).localeCompare(a.id.split(':').at(-1)))[0];
    if (templatePlan) {
-    config = structuredClone($state.snapshot(templatePlan));
+    config = clonePlan(templatePlan);
     config.id = planId;
     configIsTemplate = true;
     configTemplateMonth = templatePlan.id.split(':').at(-1);
@@ -91,8 +99,17 @@
    }
   }
   config.commissionBase ??= 'net';
-  config.typeTargets ??= {};
   error = '';
+ }
+
+ // Aplica as metas do mês mais recente para o mês atual ao lançar uma venda
+ function applyCopyPlan() {
+  const c = clonePlan(confirmCopyPlan);
+  c.id = planId;
+  c.commissionBase ??= 'net';
+  saveSalesPlan({ ...c, sectionId, id: planId });
+  showToast({ message: `Metas de ${monthLabel(confirmCopyPlan.id.split(':').at(-1))} aplicadas a ${monthLabel(month)}.` });
+  confirmCopyPlan = null;
  }
  function editType(type) {
   const settings = salesTypeSettings(type, month, rawPlan);
@@ -114,6 +131,7 @@
  let error = $state('');
  let configIsTemplate = $state(false);
  let configTemplateMonth = $state('');
+ let confirmCopyPlan = $state(null); // plano template para cópia ao lançar venda
 
  let deleting = $state(null);
  const canCreateSale = $derived(!!month && appState.ready && !tourOpen && !managingTypes && !reportsOpen && !!activeTypes.length && !editing && !config && !deleting && !deletingType);
@@ -121,6 +139,13 @@
   if (!canCreateSale) return;
   editing = { date: month === todayISO().slice(0,7) ? todayISO() : `${month}-01`, total: 0, fees: 0, type: activeTypes[0].id, orderNumber: '' };
   error = '';
+  confirmCopyPlan = null;
+  if (!rawPlan) {
+   const tpl = [...scopedSales.salesPlans]
+    .filter((p) => p.id !== planId)
+    .sort((a, b) => b.id.split(':').at(-1).localeCompare(a.id.split(':').at(-1)))[0];
+   if (tpl) confirmCopyPlan = tpl;
+  }
  }
  $effect(() => {
   navigation.saleAction = { onClick: openNewSale, disabled: !canCreateSale };
@@ -192,7 +217,7 @@
  );
  function submitSale(e) {
   e.preventDefault();
-  try { saveSale({ ...editing, sectionId }); editing = null; error = ''; showToast({ message: 'Venda salva.' }); } catch(e) { error = e.message; }
+  try { saveSale({ ...editing, sectionId }); editing = null; confirmCopyPlan = null; error = ''; showToast({ message: 'Venda salva.' }); } catch(e) { error = e.message; }
  }
  function submitPlan(e) {
   e.preventDefault();
@@ -291,8 +316,17 @@
  </Modal>
 {/if}
 {#if editing}
- <Modal open={!!editing} onClose={() => { editing = null; error = ''; }} title={editing.id ? 'Editar venda' : 'Nova venda'} eyebrow="Controle de vendas">
+ <Modal open={!!editing} onClose={() => { editing = null; confirmCopyPlan = null; error = ''; }} title={editing.id ? 'Editar venda' : 'Nova venda'} eyebrow="Controle de vendas">
  {#if error}<p role="alert" class="field-error">{error}</p>{/if}
+ {#if confirmCopyPlan && !editing.id}
+  <div class="copy-plan-notice">
+   <p>⟳ Sem metas para <strong>{monthLabel(month)}</strong>. Aplicar as metas de <strong>{monthLabel(confirmCopyPlan.id.split(':').at(-1))}</strong>?</p>
+   <div class="notice-btns">
+    <button class="btn btn-primary sm" type="button" onclick={applyCopyPlan}>Sim, aplicar</button>
+    <button class="btn btn-ghost sm" type="button" onclick={() => confirmCopyPlan = null}>Não</button>
+   </div>
+  </div>
+ {/if}
  <form class="movement-form" onsubmit={submitSale}>
  <div class="form-grid" data-tourism="sale-details">
   <label class="field"><span>Data da venda</span><input class="field-input" type="date" required bind:value={editing.date} /></label>
@@ -300,7 +334,7 @@
   <label class="field" data-tourism="sale-values"><span>Valor total (R$)</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0.01" required use:moneyInput={{ value: editing.total, setValue: (value) => editing.total = value }} /></label>
   <label class="field"><span>Valor das taxas (R$)</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0" max={editing.total} required use:moneyInput={{ value: editing.fees, setValue: (value) => editing.fees = value }} /></label>
   <label class="field"><span>Pedido <span class="field-hint" style="display:inline">(opcional)</span></span><input class="field-input" type="text" maxlength="80" placeholder="Ex.: 1234" bind:value={editing.orderNumber} /></label>
-  </div><div class="modal-footer"><button class="btn btn-primary">Salvar venda</button><button type="button" class="btn btn-ghost" onclick={() => { editing = null; error = ''; }}>Cancelar</button></div>
+  </div><div class="modal-footer"><button class="btn btn-primary">Salvar venda</button><button type="button" class="btn btn-ghost" onclick={() => { editing = null; confirmCopyPlan = null; error = ''; }}>Cancelar</button></div>
  </form>
  </Modal>
 {/if}
@@ -566,4 +600,21 @@
   margin-bottom: 14px;
   padding: 10px 14px;
  }
+ .copy-plan-notice {
+  background: color-mix(in srgb, var(--accent, hsl(215 65% 55%)) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent, hsl(215 65% 55%)) 35%, transparent);
+  border-radius: 6px;
+  color: var(--ink);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+ }
+ .copy-plan-notice p { margin: 0; }
+ .notice-btns { display: flex; gap: 8px; flex-shrink: 0; }
 </style>
