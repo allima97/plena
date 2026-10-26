@@ -11,6 +11,7 @@
 		return {
 			type: 'outro',
 			name: '',
+			description: '',
 			currency: 'BRL',
 			referenceRate: '',
 			targetDate: '',
@@ -30,6 +31,7 @@
 			? {
 					type: editing.type,
 					name: editing.name,
+					description: editing.description || '',
 					currency: editing.currency || 'BRL',
 					referenceRate: editing.referenceRate ?? '',
 					targetDate: editing.targetDate || '',
@@ -56,6 +58,7 @@
 		const payload = {
 			type: form.type,
 			name: form.name.trim(),
+			description: (form.description || '').trim(),
 			currency,
 			referenceRate: currency !== moedaPadrao && form.referenceRate ? Number(form.referenceRate) || null : null,
 			targetDate: form.targetDate || '',
@@ -91,7 +94,8 @@
 			</div>
 		</div>
 
-		<label class="field"><span>Nome do objetivo</span><input class="field-input" required bind:value={form.name} /></label>
+		<label class="field"><span>Título</span><input class="field-input" required bind:value={form.name} placeholder="Ex.: Viagem Europa" /></label>
+		<label class="field"><span>Descritivo (opcional)</span><textarea class="field-input" rows="2" bind:value={form.description} placeholder="Ex.: Hotéis, Passeios, Trens, Voos Internos"></textarea></label>
 
 		<div class="form-grid">
 			<label class="field">

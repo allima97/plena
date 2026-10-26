@@ -14,7 +14,8 @@
 		restoreAmortization
 	} from '$lib/fin/store.svelte.js';
 	import { showToast } from '$lib/toast.svelte.js';
-	import { page } from '$app/state';
+	import { tick } from 'svelte';
+	import { getNavigationContext } from '$lib/navigation-context.js';
 	import { computeMetrics, progressColor, encargosAbatimentoSummary, installmentYearsOf, estimateMonthlyRate, simulateAmortizationScenario, simulateMultipleAmortizations } from './metrics.js';
 	import { GOAL_TYPES } from './constants.js';
 	import { fmtMoney, fmtDate } from '$lib/format.js';
@@ -26,13 +27,28 @@
 	import AmortizationFormModal from './AmortizationFormModal.svelte';
 	import RowActionsModal from '$lib/components/RowActionsModal.svelte';
 	import Modal from '$lib/components/Modal.svelte';
-	import { Plus, Archive, ArchiveRestore, Pencil, Trash2, ChevronDown, ChevronUp, Wallet, Eye, X, Minus, Pause, Play } from 'lucide-svelte';
+	import { Plus, Archive, ArchiveRestore, Pencil, Trash2, ChevronDown, ChevronUp, Wallet, X, Minus, Pause, Play, ArrowLeft, ChevronRight } from 'lucide-svelte';
 
 	const MONTH_ABBR = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+	const navigation = getNavigationContext();
 
-	// Se a página abriu a partir da busca global (?goal=<id>), começa com esse objetivo
-	// selecionado -- o efeito abaixo cai pro primeiro objetivo se o id não existir/for inválido.
-	let selectedGoalId = $state(page.url.searchParams.get('goal'));
+	let { selectedGoalId = $bindable(null) } = $props();
+	let detailHeading = $state(null);
+
+	async function openGoal(id) {
+		selectedGoalId = id;
+		await tick();
+		window.scrollTo(0, 0);
+		detailHeading?.focus({ preventScroll: true });
+	}
+
+	async function backToGoals() {
+		const previousId = selectedGoalId;
+		selectedGoalId = null;
+		await tick();
+		window.scrollTo(0, 0);
+		document.getElementById(`goal-card-${previousId}`)?.focus({ preventScroll: true });
+	}
 	let showArchived = $state(false);
 	let expandedResource = $state({});
 	let movesPage = $state({}); // resourceId -> pagina atual
@@ -57,7 +73,7 @@
 	let installmentYear = $state(null); // ano escolhido em "Prestacoes do financiamento"
 	let encargosPeriod = $state('currentYear'); // 'currentYear' | 'last12' | 'all' | 'year' | 'installment'
 	let encargosYear = $state(null); // ano escolhido no seletor "Em <ano>" de Encargos e Abatimentos
-	let compositionInstallmentId = $state(null); // prestacao escolhida (icone de olho / seletor / Anterior-Proxima)
+	let compositionInstallmentId = $state(null); // prestação escolhida (seletor / Anterior-Próxima)
 
 	let simAporte = $state(''); // Fase 5: simulador de amortizacao extra -- valor hipotetico digitado pelo usuario
 	let simAportesMultiplos = $state([]); // P5.4: lista de aportes futuros planejados { id, mes, valor }
@@ -82,8 +98,9 @@
 	const archivedGoals = $derived(appState.goals.filter((g) => g.archived));
 
 	$effect(() => {
-		if (selectedGoalId && appState.goals.some((g) => g.id === selectedGoalId)) return;
-		selectedGoalId = activeGoals[0]?.id || appState.goals[0]?.id || null;
+		if (appState.ready && selectedGoalId && !appState.goals.some((g) => g.id === selectedGoalId)) {
+			selectedGoalId = null;
+		}
 	});
 
 	const selectedGoal = $derived(appState.goals.find((g) => g.id === selectedGoalId) || null);
@@ -210,10 +227,6 @@
 		return `${n} ${n === 1 ? 'prestação' : 'prestações'} · ${fmtDate(first.date)} – ${fmtDate(last.date)}`;
 	});
 
-	function viewComposition(installmentId) {
-		compositionInstallmentId = installmentId;
-		encargosPeriod = 'installment';
-	}
 	function navComposition(dir) {
 		if (!metrics) return;
 		const idx = compositionRefIndex + (dir === 'prev' ? -1 : 1);
@@ -245,6 +258,16 @@
 	let installmentModal = $state({ open: false, goalId: null, editing: null });
 	let amortModal = $state({ open: false, goalId: null, editing: null });
 	let deleting = $state(null); // { kind, id, label, warn }
+	function openNewGoal() {
+		goalModal = { open: true, editing: null };
+	}
+	$effect(() => {
+		navigation.goalAction = {
+			onClick: openNewGoal,
+			disabled: !appState.ready || goalModal.open || resourceModal.open || moveModal.open || installmentModal.open || amortModal.open || installmentDetail.open || rowActions.open || !!deleting
+		};
+		return () => { navigation.goalAction = null; };
+	});
 
 	function confirmDelete() {
 		if (!deleting) return;
@@ -290,19 +313,20 @@
 	}
 </script>
 
+{#if !selectedGoal}
 <div class="page-head">
 	<div>
 		<h1 class="font-display page-title">Objetivos</h1>
-		<p class="page-sub">A mesma ideia do Rumo Financeiro (nextgoals), agora no design do Plena.</p>
+		<p class="page-sub">Acompanhe seus objetivos e abra um deles para gerenciar recursos e lançamentos.</p>
 	</div>
-	<button class="btn btn-primary" onclick={() => (goalModal = { open: true, editing: null })}><Plus size={16} /> Novo objetivo</button>
+	<button class="btn btn-primary" disabled={!appState.ready} onclick={openNewGoal}><Plus size={16} /> Novo objetivo</button>
 </div>
 
 <div class="goals-layout">
 	<div class="goals-list" style="--goal-cols:{Math.max(Math.min(activeGoals.length, 6), 1)}">
 		{#each activeGoals as g (g.id)}
 			{@const m = computeMetrics(g, { resources: appState.resources, resourceMoves: appState.resourceMoves, goalCategories: appState.goalCategories, installments: appState.installments, amortizations: appState.amortizations })}
-			<button class="goal-list-item" class:active={g.id === selectedGoalId} class:paused={g.paused} onclick={() => (selectedGoalId = g.id)}>
+			<button id="goal-card-{g.id}" class="goal-list-item" class:paused={g.paused} onclick={() => openGoal(g.id)}>
 				<div class="goal-list-top">
 					<span class="goal-list-name">{g.name}</span>
 					{#if g.paused}
@@ -313,6 +337,7 @@
 						</span>
 					{/if}
 				</div>
+				{#if g.description}<p class="goal-description goal-card-description">{g.description}</p>{/if}
 				<p class="goal-list-type">{GOAL_TYPES[g.type]?.label || 'Outro objetivo'}</p>
 				<div class="goal-progress-track" style="margin-top:8px">
 					<div class="goal-progress-fill" style="width:{m.percent * 100}%;background:{progressColor(m.percent)}"></div>
@@ -321,6 +346,7 @@
 				{#if m.status !== 'concluido' && m.targetDate && m.projectedDate}
 					<p class="goal-list-pace">Previsão: {m.projectedDate.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}</p>
 				{/if}
+				<span class="goal-open-link">Abrir objetivo <ChevronRight size={16} /></span>
 			</button>
 		{:else}
 			<p class="empty">Nenhum objetivo ainda.</p>
@@ -335,8 +361,10 @@
 			{#if showArchived}
 				<div class="goals-list archived" style="--goal-cols:{Math.max(Math.min(archivedGoals.length, 6), 1)}">
 					{#each archivedGoals as g (g.id)}
-						<button class="goal-list-item archived" class:active={g.id === selectedGoalId} onclick={() => (selectedGoalId = g.id)}>
+						<button id="goal-card-{g.id}" class="goal-list-item archived" onclick={() => openGoal(g.id)}>
 							<span class="goal-list-name">{g.name}</span>
+							{#if g.description}<p class="goal-description goal-card-description">{g.description}</p>{/if}
+							<span class="goal-open-link">Abrir objetivo <ChevronRight size={16} /></span>
 						</button>
 					{/each}
 				</div>
@@ -344,6 +372,11 @@
 		</div>
 	{/if}
 
+</div>
+{:else}
+	<div class="goal-back-row">
+		<button class="btn btn-ghost" onclick={backToGoals}><ArrowLeft size={16} /> Todos os objetivos</button>
+	</div>
 	<section class="goal-detail">
 		{#if selectedGoal && metrics}
 			<div class="card">
@@ -353,7 +386,8 @@
 							<p class="stat-label" style="margin:0">{GOAL_TYPES[selectedGoal.type]?.label || 'Outro objetivo'}</p>
 							{#if selectedGoal.paused}<span class="badge badge-gray"><Pause size={11} style="vertical-align:-1px;margin-right:3px" />Pausado</span>{/if}
 						</div>
-						<h2 class="font-display" style="margin:4px 0 0;font-size:22px">{selectedGoal.name}</h2>
+						<h1 bind:this={detailHeading} tabindex="-1" class="font-display goal-detail-title" style="margin:4px 0 0;font-size:22px">{selectedGoal.name}</h1>
+						{#if selectedGoal.description}<p class="goal-description goal-detail-description">{selectedGoal.description}</p>{/if}
 						{#if selectedGoal.notes}<p class="movement-meta" style="margin-top:6px">{selectedGoal.notes}</p>{/if}
 						{#if selectedGoal.paused}<p class="movement-meta" style="margin-top:6px">Objetivo pausado: não entra no score financeiro, nos avisos nem nos totais da Dashboard, do Simulador ou do Patrimônio.</p>{/if}
 					</div>
@@ -362,7 +396,7 @@
 						<button class="btn btn-ghost sm" aria-label={selectedGoal.paused ? 'Retomar' : 'Pausar'} title={selectedGoal.paused ? 'Retomar' : 'Pausar'} onclick={() => updateGoal(selectedGoal.id, { paused: !selectedGoal.paused })}>
 							{#if selectedGoal.paused}<Play size={14} /> <span class="btn-label">Retomar</span>{:else}<Pause size={14} /> <span class="btn-label">Pausar</span>{/if}
 						</button>
-						<button class="btn btn-ghost sm" aria-label={selectedGoal.archived ? 'Reativar' : 'Arquivar'} title={selectedGoal.archived ? 'Reativar' : 'Arquivar'} onclick={() => updateGoal(selectedGoal.id, { archived: !selectedGoal.archived })}>
+						<button class="btn btn-ghost btn-archive sm" aria-label={selectedGoal.archived ? 'Reativar' : 'Arquivar'} title={selectedGoal.archived ? 'Reativar' : 'Arquivar'} onclick={() => updateGoal(selectedGoal.id, { archived: !selectedGoal.archived })}>
 							{#if selectedGoal.archived}<ArchiveRestore size={14} /> <span class="btn-label">Reativar</span>{:else}<Archive size={14} /> <span class="btn-label">Arquivar</span>{/if}
 						</button>
 						<button class="btn btn-danger sm" aria-label="Excluir" title="Excluir" onclick={() => (deleting = { kind: 'goal', id: selectedGoal.id, label: `"${selectedGoal.name}"`, warn: 'Todos os recursos, movimentações e prestações desse objetivo serão apagados.' })}>
@@ -442,7 +476,7 @@
 						{#if expandedResource[r.id]}
 							<div class="resource-body">
 								<div class="actions-row" style="margin-bottom:10px">
-									<button class="btn btn-ghost sm" onclick={() => (moveModal = { open: true, resourceId: r.id, goalId: selectedGoal.id, editing: null })}><Plus size={13} /> Lançamento</button>
+									<button class="btn btn-ghost btn-add sm" onclick={() => (moveModal = { open: true, resourceId: r.id, goalId: selectedGoal.id, editing: null })}><Plus size={13} /> Lançamento</button>
 									<button class="btn btn-ghost sm" onclick={() => (resourceModal = { open: true, goalId: selectedGoal.id, editing: r })}>Editar recurso</button>
 									<button class="btn btn-danger sm" onclick={() => (deleting = { kind: 'resource', id: r.id, label: `"${r.name}"`, warn: 'O histórico de movimentações desse recurso será apagado.' })}>Excluir recurso</button>
 								</div>
@@ -870,9 +904,9 @@
 			<p class="empty">Crie um objetivo para começar.</p>
 		{/if}
 	</section>
-</div>
+{/if}
 
-<GoalFormModal open={goalModal.open} editing={goalModal.editing} onClose={() => (goalModal = { ...goalModal, open: false })} onSaved={(g) => (selectedGoalId = g.id)} />
+<GoalFormModal open={goalModal.open} editing={goalModal.editing} onClose={() => (goalModal = { ...goalModal, open: false })} onSaved={(g) => openGoal(g.id)} />
 <ResourceFormModal open={resourceModal.open} goalId={resourceModal.goalId} editing={resourceModal.editing} onClose={() => (resourceModal = { ...resourceModal, open: false })} />
 <MoveFormModal open={moveModal.open} resourceId={moveModal.resourceId} goalId={moveModal.goalId} editing={moveModal.editing} onClose={() => (moveModal = { ...moveModal, open: false })} />
 <InstallmentFormModal open={installmentModal.open} goalId={installmentModal.goalId} editing={installmentModal.editing} onClose={() => (installmentModal = { ...installmentModal, open: false })} />
@@ -912,17 +946,6 @@
 	{#snippet footer()}
 		{#if installmentDetail.installment}
 			{@const it = installmentDetail.installment}
-			<button
-				type="button"
-				class="btn sm"
-				class:btn-primary={compositionRef && it.id === compositionRef.id}
-				onclick={() => {
-					installmentDetail = { ...installmentDetail, open: false };
-					viewComposition(it.id);
-				}}
-			>
-				<Eye size={14} /> Ver composição
-			</button>
 			<button
 				type="button"
 				class="btn btn-primary sm"
@@ -1019,4 +1042,10 @@
 			margin-left: auto;
 		}
 	}
+ .goal-description { margin:4px 0 0; color:var(--ink-muted); line-height:1.5; white-space:pre-wrap; overflow-wrap:anywhere; }
+ .goal-card-description { font-size:12px; }
+ .goal-detail-description { font-size:13px; }
+ .goal-back-row { margin-bottom:20px; }
+ .goal-detail-title:focus { outline:none; }
+ .goal-open-link { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:12px; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-btn, 20px); color:var(--ink-soft); font-size:12px; font-weight:600; }
 </style>

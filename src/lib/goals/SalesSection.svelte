@@ -121,15 +121,16 @@
    {#each activeSections as section (section.id)}
     {@const summary = sectionSummary(section.id)}
     {@const plan = sectionPlan(section.id)}
-    {@const pct = plan?.target > 0 ? Math.min(100, summary.net / plan.target * 100) : 0}
-    {@const color = `hsl(${pct * 1.2} 65% 38%)`}
+    {@const pct = plan?.target > 0 ? Math.max(0, summary.goalBase / plan.target * 100) : 0}
+    {@const fill = Math.min(100, pct)}
+    {@const color = `hsl(${fill * 1.2} 65% 38%)`}
     <div class="section-card card">
      <div class="section-card-header">
       <div class="section-info">
        <h2 class="section-name">{section.name}</h2>
        {#if plan}
-        <span class="section-badge" style:background={`hsl(${pct*1.2} 65% 92%)`} style:color={color}>
-         {new Intl.NumberFormat('pt-BR',{maximumFractionDigits:0}).format(pct)}% da meta
+        <span class="section-badge" style:background={`hsl(${fill*1.2} 65% 92%)`} style:color={color}>
+         {new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1,roundingMode:'floor'}).format(pct)}% da meta
         </span>
        {:else}
         <span class="section-badge badge-gray">Sem meta</span>
@@ -147,8 +148,8 @@
      </div>
 
      {#if plan}
-      <div class="section-progress-track" role="progressbar" aria-label="Meta {section.name}" aria-valuemin="0" aria-valuemax="100" aria-valuenow={pct}>
-       <div class="section-progress-fill" style:width={`${pct}%`} style:background={color}></div>
+      <div class="section-progress-track" role="progressbar" aria-label="Meta {section.name}" aria-valuemin="0" aria-valuemax="100" aria-valuenow={fill}>
+       <div class="section-progress-fill" style:width={`${fill}%`} style:background={color}></div>
       </div>
      {/if}
 

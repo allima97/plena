@@ -9,6 +9,7 @@
 	--ink-faint: #a0abb0;
 	--mint: #bfead3;
 	--card: #ffffff;
+	--archive-soft: #f0f1f3;
 	--surface-2: #f7f9f8;
 	--surface-3: #f3f6f4;
 	--border: #e4ebe7;
@@ -82,6 +83,7 @@
 	--ink-muted: #8b98a0;
 	--ink-faint: #5e6b72;
 	--card: #1a2127;
+	--archive-soft: #252c32;
 	--surface-2: #212a31;
 	--surface-3: #262f37;
 	--border: #2c363e;
@@ -223,6 +225,23 @@ a {
 }
 .btn-ghost:hover {
 	background: var(--surface-3);
+}
+.btn.btn-add {
+	background: var(--kpi-green-soft);
+	border-color: var(--kpi-green);
+	color: var(--kpi-green);
+}
+.btn.btn-add:hover {
+	background: var(--kpi-green-soft);
+	filter: brightness(1.04);
+}
+.btn.btn-archive {
+	background: var(--archive-soft);
+	border-color: var(--ink-soft);
+	color: var(--ink-soft);
+}
+.btn.btn-archive:hover {
+	background: var(--border-soft);
 }
 .btn-danger {
 	color: var(--expense);
@@ -1244,6 +1263,36 @@ table.list .num {
 	border-radius: var(--radius-lg);
 	box-shadow: var(--shadow-card);
 	padding: 14px 18px;
+}
+@media (max-width: 1023px) {
+	.topbar {
+		position: sticky;
+		top: 0;
+		z-index: 40;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		gap: 4px 10px;
+		width: calc(100% + 32px);
+		margin: -16px -16px 28px;
+		padding-top: calc(14px + env(safe-area-inset-top, 0px));
+		padding-left: max(14px, env(safe-area-inset-left, 0px));
+		padding-right: max(14px, env(safe-area-inset-right, 0px));
+		border-width: 0 0 1px;
+		border-radius: 0;
+	}
+	.topbar .topbar-left { gap: 8px; min-width: 0; }
+	.topbar .topbar-right { gap: 6px; }
+	.topbar .topbar-search { display: none; }
+	.topbar .topbar-right .icon-btn { width: 36px; height: 36px; }
+	.topbar .avatar-chip { width: 36px; height: 36px; }
+	.topbar-brand-name { font-size: 23px; font-weight: 700; line-height: 1.2; }
+	.topbar-tagline { grid-column: 1 / -1; margin: 2px 0 0; font-size: 11px; line-height: 1.4; color: var(--ink-faint); }
+}
+@media (min-width: 640px) and (max-width: 1023px) {
+	.topbar {
+		width: calc(100% + 48px);
+		margin-inline: -24px;
+	}
 }
 /* Dentro do card branco do topbar, os ícones precisam de um preenchimento visível
    (fundo branco + contorno claro somem contra o próprio card branco). */

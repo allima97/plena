@@ -1,13 +1,16 @@
 <script>
 	import { moneyInput } from '$lib/money-input.js';
  import { templateSuggestedProductRate } from './sales-templates.js';
- import { tick } from 'svelte';
+ import { tick, onDestroy } from 'svelte';
+ import { isTourismSection, startTourismTour } from './tourism-tour.js';
+ import './tourism-tour.css';
  import { getNavigationContext } from '$lib/navigation-context.js';
  import { salesTypeSettings, withSalesTypeSettings, salesPlanWithTypeSettings } from './sales-type-settings.js';
  import Modal from '$lib/components/Modal.svelte';
+ import SalesReports from './SalesReports.svelte';
  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
  import { showToast } from '$lib/toast.svelte.js';
- import { Plus, Settings2, Tags, Pencil, Trash2, ArrowLeft } from 'lucide-svelte';
+ import { Plus, Pencil, Trash2, ArrowLeft, CircleHelp } from 'lucide-svelte';
  import { appState, saveSale, removeSale, saveSalesPlan, saveSaleType } from '$lib/fin/store.svelte.js';
  import { forSection } from './sales.js';
  import { todayISO, fmtMoney, fmtDate } from '$lib/format.js';
@@ -22,11 +25,46 @@
  const scopedSales = $derived(forSection(sectionId, { sales: appState.sales, salesPlans: appState.salesPlans, salesTypes: appState.salesTypes }));
 
  let managingTypes = $state(false);
+ let reportsOpen = $state(false);
  const newTypeDraft = () => ({ name: '', rates: { below: null, target: null, super: null }, hasTarget: false, target: null, productRate: null, scaleStepBelow: null, scaleStepAbove: null });
  let typeDraft = $state(newTypeDraft());
  let deletingType = $state(null);
  const types = $derived(saleTypesCatalog(scopedSales.salesTypes, scopedSales.sales, scopedSales.salesPlans));
  const activeTypes = $derived(types.filter(t => !t.deleted));
+ const tourismSection = $derived(isTourismSection(appState.salesSections.find(s => s.id === sectionId), scopedSales.salesTypes));
+ let tourOpen = $state(false);
+ let tour = null;
+ let tourPanel = '';
+ async function prepareTourStep(step) {
+  if (step.panel !== tourPanel) {
+   config = null; editing = null; reportsOpen = false; managingTypes = false;
+   typeDraft = newTypeDraft(); error = ''; tourPanel = step.panel;
+   if (step.panel === 'plan') openConfig();
+   if (step.panel === 'types' || step.panel === 'type') {
+    managingTypes = true;
+    if (step.panel === 'type') {
+     const type = activeTypes.find(t => salesTypeSettings(t, month, rawPlan).hasTarget) || activeTypes[0];
+     if (type) editType(type);
+    }
+   }
+   if (step.panel === 'sale') editing = { date: month === todayISO().slice(0,7) ? todayISO() : `${month}-01`, total: 0, fees: 0, type: activeTypes[0]?.id || '', orderNumber: '' };
+   if (step.panel === 'reports') reportsOpen = true;
+  }
+  await tick();
+ }
+ function startHelpTour() {
+  if (!tourismSection || tourOpen || !appState.ready || editing || config || managingTypes || reportsOpen) return;
+  tourOpen = true;
+  tour = startTourismTour({ theme: 'plena', prepare: prepareTourStep,
+   onClose: async () => {
+    config = null; editing = null; reportsOpen = false; managingTypes = false;
+    typeDraft = newTypeDraft(); error = ''; tourPanel = ''; tourOpen = false; tour = null;
+    await tick();
+   },
+   returnFocus: () => document.querySelector('[data-tourism="help"]')
+  });
+ }
+ onDestroy(() => tour?.close());
  function typeName(id) { return types.find(t => t.id === id)?.name || id; }
  function openConfig() {
   config = structuredClone($state.snapshot(rawPlan || emptyPlan(month, [])));
@@ -53,7 +91,7 @@
  let error = $state('');
 
  let deleting = $state(null);
- const canCreateSale = $derived(!!month && appState.ready && !managingTypes && !!activeTypes.length && !editing && !config && !deleting && !deletingType);
+ const canCreateSale = $derived(!!month && appState.ready && !tourOpen && !managingTypes && !reportsOpen && !!activeTypes.length && !editing && !config && !deleting && !deletingType);
  function openNewSale() {
   if (!canCreateSale) return;
   editing = { date: month === todayISO().slice(0,7) ? todayISO() : `${month}-01`, total: 0, fees: 0, type: activeTypes[0].id, orderNumber: '' };
@@ -140,42 +178,46 @@
  {#if onBack}
   <button class="btn btn-ghost back-btn" onclick={onBack}><ArrowLeft size={16} /> Todas as seções</button>
  {/if}
+ <div data-tourism="header" class="sales-title-row">
  <div>
   <p class="page-eyebrow">Vendas</p>
   <h1 class="font-display page-title">{sectionId === 'default' ? 'Vendas' : (appState.salesSections.find(s => s.id === sectionId)?.name ?? 'Seção')}</h1>
   <p class="page-sub">Acompanhe suas vendas, metas e comissão mensal.</p>
  </div>
+ {#if tourismSection}<button class="btn btn-ghost sales-help-button" data-tourism="help" disabled={!appState.ready || !!editing || !!config || managingTypes || reportsOpen || tourOpen} onclick={startHelpTour}><CircleHelp size={17} /> Tour de ajuda</button>{/if}
+ </div>
 </div>
-<div class="sales-primary-actions">
- <label class="field"><span>Mês </span><input class="field-input" type="month" bind:value={month} onchange={e => tableFilters = { scope: `${sectionId}:${e.currentTarget.value}`, type: '', query: '', page: 0 }} required disabled={!!editing || !!config} /></label>
+<div class="sales-toolbar">
+ <label class="field" data-tourism="month"><span>Mês de referência</span><input class="field-input" type="month" bind:value={month} onchange={e => tableFilters = { scope: `${sectionId}:${e.currentTarget.value}`, type: '', query: '', page: 0 }} required disabled={!!editing || !!config} /></label>
+ <div class="sales-settings-actions">
+ <button class="btn btn-ghost" data-tourism="plan-button" disabled={!month || !appState.ready || managingTypes} onclick={() => { openConfig(); }}>Metas mensais</button>
+<button class="btn btn-ghost" data-tourism="types-button" disabled={!appState.ready || !!editing || !!config} onclick={() => { managingTypes = !managingTypes; typeDraft = newTypeDraft(); error = ''; }}>Tipos de venda</button>
+ <button id="sales-reports-button" class="btn btn-ghost sales-report-button" disabled={!appState.ready || !!editing || !!config || managingTypes} onclick={() => reportsOpen = true}>Relatórios</button>
+ </div>
 </div>
-
-<div class="sales-settings-actions">
- <button class="btn btn-ghost" disabled={!month || !appState.ready || managingTypes} onclick={() => { openConfig(); }}><Settings2 size={16} /> Metas mensais</button>
-<button class="btn btn-ghost" disabled={!appState.ready || !!editing || !!config} onclick={() => { managingTypes = !managingTypes; typeDraft = newTypeDraft(); error = ''; }}><Tags size={16} /> Tipos de venda</button>
-</div>
+{#if reportsOpen}<SalesReports sales={scopedSales.sales} plans={scopedSales.salesPlans} initialYear={month.slice(0, 4)} sectionName={appState.salesSections.find(section => section.id === sectionId)?.name || 'Vendas'} onClose={() => reportsOpen = false} />{/if}
 {#if managingTypes}
  <Modal open={managingTypes} onClose={() => { managingTypes = false; typeDraft = newTypeDraft(); error = ''; }} title="Tipos de venda" eyebrow="Organização" maxWidth="850px">
   <p>Personalize os tipos para seu comércio. Ao excluir um tipo, ele deixa de aparecer em novas vendas; o histórico e as comissões são preservados.</p>
   {#if error}<p role="alert" class="field-error">{error}</p>{/if}
  <form class="movement-form" onsubmit={submitType}>
-   <label class="field"><span>Nome do tipo</span><input class="field-input" required maxlength="80" placeholder="Ex.: Roupas, Alimentos, Consultoria" bind:value={typeDraft.name} /></label>
+   <label class="field" data-tourism="type-name"><span>Nome do tipo</span><input class="field-input" required maxlength="80" placeholder="Ex.: Roupas, Alimentos, Consultoria" bind:value={typeDraft.name} /></label>
    <p class="field-hint">Configuração para {month.split('-').reverse().join('/')}. As faixas usam a meta mensal do controle. Alterações preservam os meses anteriores.</p>
-   <fieldset class="type-rate-card"><legend>Comissão geral das vendas</legend>
+   <fieldset class="type-rate-card" data-tourism="type-rates"><legend>Comissão geral das vendas</legend>
    <div class="type-rate-grid">
     {#each Object.entries(TIERS) as [tier, label]}
-     {#if tier !== 'below'}<label class="field"><span>Escalonável {tier === 'target' ? 'antes' : 'após'} · a cada (%)</span><input class="field-input" aria-label={`Escalonável ${tier === 'target' ? 'antes' : 'após'} · a cada (%)`} type="number" min="0.01" max="100000" step="0.01" placeholder="Não usar" bind:value={typeDraft[tier === 'target' ? 'scaleStepBelow' : 'scaleStepAbove']} /></label>{/if}
+     {#if tier !== 'below'}<label class="field" data-tourism={tier === 'target' ? 'type-scaling' : undefined}><span>Escalonável {tier === 'target' ? 'antes' : 'após'} · a cada (%)</span><input class="field-input" aria-label={`Escalonável ${tier === 'target' ? 'antes' : 'após'} · a cada (%)`} type="number" min="0.01" max="100000" step="0.01" placeholder="Não usar" bind:value={typeDraft[tier === 'target' ? 'scaleStepBelow' : 'scaleStepAbove']} /></label>{/if}
      <label class="field"><span>{label} (%)</span><input class="field-input" aria-label={`${label} (%)`} type="number" min="0" max="100" step="0.01" required bind:value={typeDraft.rates[tier]} /></label>
     {/each}
    </div>
    <p class="field-hint">Passos independentes, opcionais. Antes: passo 1 dá 80% da meta = 0,80%; 81% = 0,81%. Em 100% salta para Meta batida. Após: passo 1 dá 101% = 1,16%, até o máximo da Supermeta. Cada passo completo soma 0,01 ponto percentual. Vazio mantém o percentual fixo da fase.</p>
    </fieldset>
-   <label class="field"><span>Possui meta específica?</span><select class="field-input" bind:value={typeDraft.hasTarget}><option value={false}>Não</option><option value={true}>Sim</option></select></label>
+   <label class="field" data-tourism="type-specific"><span>Possui meta específica?</span><select class="field-input" bind:value={typeDraft.hasTarget}><option value={false}>Não</option><option value={true}>Sim</option></select></label>
    {#if typeDraft.hasTarget}<label class="field"><span>Comissão específica do produto (%)</span><input class="field-input" type="number" min="0" max="100" step="0.01" required placeholder="Ex.: 10" bind:value={typeDraft.productRate} /></label><p class="field-hint">Ao atingir a meta do produto, o complemento é este percentual menos a comissão geral. Ex.: 10% − 0,80% = 9,20% adicionais.</p><label class="field"><span>Meta específica mensal (R$)</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0.01" required use:moneyInput={{ value: typeDraft.target, setValue: (value) => typeDraft.target = value }} /></label>{/if}
    <div class="modal-footer"><button class="btn btn-primary">{typeDraft.id ? 'Salvar tipo' : 'Incluir tipo'}</button>
    {#if typeDraft.id}<button type="button" class="btn btn-ghost" onclick={() => typeDraft = newTypeDraft()}>Cancelar edição</button>{/if}</div>
   </form>
-  <div class="types-list-head"><h3>Tipos cadastrados</h3><span class="badge badge-gray">{activeTypes.length}</span></div>
+  <div class="types-list-head" data-tourism="type-list"><h3>Tipos cadastrados</h3><span class="badge badge-gray">{activeTypes.length}</span></div>
   <div class="table-wrap types-table-wrap">
    <table class="list types-table" aria-label="Tipos de venda cadastrados">
     <thead><tr><th scope="col">Tipo de venda</th><th scope="col" class="types-actions-heading">Ações</th></tr></thead>
@@ -202,14 +244,14 @@
  {#if error}<p role="alert" class="field-error">{error}</p>{/if}
  <form class="movement-form" onsubmit={submitPlan}>
   <p>Defina a meta e a supermeta deste mês. Cadastre os percentuais de comissão e a meta específica de cada produto em Tipos de venda. Valores em reais (R$).</p>
-  <label class="field"><span>Receber comissão sobre
+  <label class="field" data-tourism="commission-base"><span>Receber comissão sobre
    </span><select class="field-input" bind:value={config.commissionBase} required>
     <option value="net">Valor líquido (sem taxas)</option>
     <option value="gross">Valor total (com taxas)</option>
    </select>
   </label>
   <p>A base escolhida vale para o cálculo da comissão. A meta e a supermeta acompanham o total vendido, antes das taxas.</p>
-  <div class="form-grid"><label class="field"><span>Meta (R$)</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0.01" required use:moneyInput={{ value: config.target, setValue: (value) => config.target = value }} /></label><label class="field"><span>Supermeta (R$)</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0.02" required use:moneyInput={{ value: config.superTarget, setValue: (value) => config.superTarget = value }} /></label></div>
+  <div class="form-grid" data-tourism="plan-values"><label class="field"><span>Meta (R$)</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0.01" required use:moneyInput={{ value: config.target, setValue: (value) => config.target = value }} /></label><label class="field"><span>Supermeta (R$)</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0.02" required use:moneyInput={{ value: config.superTarget, setValue: (value) => config.superTarget = value }} /></label></div>
   <div class="modal-footer"><button class="btn btn-primary">Salvar configuração</button><button type="button" class="btn btn-ghost" onclick={() => { config = null; error = ''; }}>Cancelar</button></div>
  </form>
  </Modal>
@@ -218,10 +260,10 @@
  <Modal open={!!editing} onClose={() => { editing = null; error = ''; }} title={editing.id ? 'Editar venda' : 'Nova venda'} eyebrow="Controle de vendas">
  {#if error}<p role="alert" class="field-error">{error}</p>{/if}
  <form class="movement-form" onsubmit={submitSale}>
- <div class="form-grid">
+ <div class="form-grid" data-tourism="sale-details">
   <label class="field"><span>Data da venda</span><input class="field-input" type="date" required bind:value={editing.date} /></label>
   <label class="field"><span>Tipo</span><select class="field-input" bind:value={editing.type}>{#each types.filter(t => !t.deleted || t.id === editing.type) as type}<option value={type.id}>{type.name}{type.deleted ? " (excluído)" : ""}</option>{/each}</select></label>
-  <label class="field"><span>Valor total (R$)</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0.01" required use:moneyInput={{ value: editing.total, setValue: (value) => editing.total = value }} /></label>
+  <label class="field" data-tourism="sale-values"><span>Valor total (R$)</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0.01" required use:moneyInput={{ value: editing.total, setValue: (value) => editing.total = value }} /></label>
   <label class="field"><span>Valor das taxas (R$)</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0" max={editing.total} required use:moneyInput={{ value: editing.fees, setValue: (value) => editing.fees = value }} /></label>
   <label class="field"><span>Pedido <span class="field-hint" style="display:inline">(opcional)</span></span><input class="field-input" type="text" maxlength="80" placeholder="Ex.: 1234" bind:value={editing.orderNumber} /></label>
   </div><div class="modal-footer"><button class="btn btn-primary">Salvar venda</button><button type="button" class="btn btn-ghost" onclick={() => { editing = null; error = ''; }}>Cancelar</button></div>
@@ -230,10 +272,10 @@
 {/if}
 {#if !plan}<p class="card editor">Configure as metas e os percentuais deste mês para calcular a comissão.</p>{/if}
 <div class="totals">
- {#each [['Total vendido', summary.total], ['Taxas', summary.fees], ['Vendas líquidas', summary.net]] as [label, value]}<div class="stat-card"><p class="stat-label">{label}</p><strong class="font-display stat-value privacy-value">{value === null ? 'A configurar' : fmtMoney(value)}</strong></div>{/each}
+ {#each [['Total vendido', summary.total], ['Taxas', summary.fees], ['Vendas líquidas', summary.net]] as [label, value]}<div class="stat-card" data-tourism={label === 'Total vendido' ? 'gross' : label === 'Taxas' ? 'fees' : 'net'}><p class="stat-label">{label}</p><strong class="font-display stat-value privacy-value">{value === null ? 'A configurar' : fmtMoney(value)}</strong></div>{/each}
 </div>
 {#if plan}
- <section class="card sales-goal" aria-label="Atingimento da meta mensal">
+ <section class="card sales-goal" data-tourism="monthly-goal" aria-label="Atingimento da meta mensal">
   <div class="sales-goal-head">
    <div><p class="stat-label">Meta do mês</p><p class="sales-goal-value privacy-value">{fmtMoney(plan.target)}</p></div>
    <div class="sales-goal-percent"><strong style:color={goalColor}>{percentLabel}%</strong><span class="field-hint">{goalPercent >= 100 ? 'Meta atingida' : 'da meta atingida'}</span></div>
@@ -243,7 +285,7 @@
   </div>
   <p class="stat-sub">Total vendido: <span class="privacy-value">{fmtMoney(summary.goalBase)}</span>{#if goalPercent < 100} · Faltam <span class="privacy-value">{fmtMoney(Math.max(0, plan.target - summary.goalBase))}</span>{/if}</p>
   {#if summary.tier === 'target' || summary.tier === 'super'}
-   <div class="super-goal">
+   <div class="super-goal" data-tourism="super-goal">
     <div class="sales-goal-head">
      <div><p class="stat-label">Supermeta</p><p class="sales-goal-value privacy-value">{fmtMoney(plan.superTarget)}</p></div>
      <div class="sales-goal-percent"><strong>{superPercentLabel}%</strong><span class="field-hint">{summary.tier === 'super' ? 'Supermeta atingida' : 'da supermeta atingida'}</span></div>
@@ -256,7 +298,7 @@
   {/if}
  </section>
  {#if typeKPIs.length}
-  <section class="card type-goals" aria-label="Metas por tipo"><h2>Metas por tipo</h2>
+  <section class="card type-goals" data-tourism="product-goal" aria-label="Metas por tipo"><h2>Metas por tipo</h2>
    {#each typeKPIs as kpi (kpi.typeId)}
     <div class="type-goal-item"><div class="sales-goal-head"><strong>{kpi.typeName}</strong><span>{new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(kpi.sold / kpi.target * 100)}%</span></div>
     <div class="kpi-progress-track" role="progressbar" aria-label={`Meta ${kpi.typeName}`} aria-valuemin="0" aria-valuemax="100" aria-valuenow={kpi.pct}><div class="kpi-progress-fill" style:width={`${kpi.pct}%`} style:background={`hsl(${kpi.pct * 1.2} 65% 38%)`}></div></div>
@@ -268,27 +310,27 @@
 
  <div class="kpi-row" style:--kpi-columns={Number(!!dailyKPI?.isCurrentMonth) + 1 + commissionKPIs.length + Number(summary.productCommission > 0)}>
   {#if dailyKPI && dailyKPI.isCurrentMonth}
-   <section class="card kpi-card kpi-daily" aria-label="Ritmo diário necessário">
+   <section class="card kpi-card kpi-daily" data-tourism="daily" aria-label="Ritmo diário necessário">
     <p class="stat-label">Valor diário necessário</p>
     <strong class="font-display kpi-value privacy-value">{new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0}).format(dailyKPI.dailyNeeded)}</strong>
     <p class="kpi-sub">{dailyKPI.onTrack ? '✓ No ritmo para atingir a meta' : `Faltam ${new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(dailyKPI.remaining)} em ${dailyKPI.daysLeft} dia${dailyKPI.daysLeft !== 1 ? 's' : ''}`}</p>
    </section>
   {/if}
-   <section class="card kpi-card kpi-commission" aria-label="Comissão do mês">
+   <section class="card kpi-card kpi-commission" data-tourism="commission" aria-label="Comissão do mês">
     <p class="stat-label">Comissão das vendas</p>
     <strong class="font-display kpi-value privacy-value">{summary.generalCommission === null ? 'A configurar' : fmtMoney(summary.generalCommission)}</strong>
     {#if summary.commission === null}<p class="kpi-sub">Configure os percentuais de comissão</p>{/if}
    </section>
    {#each commissionKPIs as kpi (kpi.typeId)}
     {@const result = summary.typeCommissions[kpi.typeId]}
-    <section class="card kpi-card kpi-type" aria-label={`Comissão de ${kpi.typeName}`}>
+    <section class="card kpi-card kpi-type" data-tourism="product-commission" aria-label={`Comissão de ${kpi.typeName}`}>
      <p class="stat-label">Comissão · {kpi.typeName}</p>
      <strong class="font-display kpi-value privacy-value">{!kpi.done ? fmtMoney(0) : result.productCommission === null ? 'A configurar' : fmtMoney(result.productCommission)}</strong>
      <p class="kpi-sub">{#if !kpi.done}Meta do produto não atingida{:else if result.generalRate === null}Configure os percentuais de comissão{:else}Meta do produto atingida · {new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(result.productRate)}% − {new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(result.generalRate)}% = {new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(result.extraRate)}% de complemento{/if}</p>
     </section>
    {/each}
    {#if summary.productCommission > 0}
-    <section class="card kpi-card kpi-total" aria-label="Comissão total de vendas e produtos">
+    <section class="card kpi-card kpi-total" data-tourism="commission-total" aria-label="Comissão total de vendas e produtos">
      <p class="stat-label">Vendas + produtos</p>
      <strong class="font-display kpi-value privacy-value">{fmtMoney(summary.commission)}</strong>
      <p class="kpi-sub">Comissão total do mês</p>
@@ -297,7 +339,7 @@
   </div>
   {#if typeDistribution.length > 0}
    <div class="types-row">
-    <section class="card kpi-card kpi-types-dist" aria-label="Distribuição por tipo de venda">
+    <section class="card kpi-card kpi-types-dist" data-tourism="distribution" aria-label="Distribuição por tipo de venda">
      <p class="stat-label">Tipos de vendas</p>
      <div class="types-dist-list">
       {#each typeDistribution as t, i (t.typeId)}
@@ -318,7 +360,7 @@
 {/if}
 {#snippet salesPagination(position)}
  <nav class="sales-pagination" aria-label={`Paginação das vendas — ${position}`}>
-  <span class="list-nav-range">Vendas {tablePage.start + 1}–{tablePage.end} de {tablePage.total}</span>
+  <span class="list-nav-range">exibindo {tablePage.start + 1}–{tablePage.end}</span>
   <div class="sales-page-controls">
    <button type="button" class="list-nav-btn" data-page-direction="previous" aria-label="Página anterior" disabled={tablePage.page === 0} onclick={() => changeTablePage(-1)}>Anterior</button>
    <span class="sales-page-label">Página <strong>{tablePage.page + 1}</strong> de <strong>{tablePage.totalPages}</strong></span>
@@ -326,18 +368,20 @@
   </div>
  </nav>
 {/snippet}
-<section class="card sales-list" aria-label="Vendas do mês">
- <div class="sales-table-filters">
+<section class="card sales-list" data-tourism="ledger" aria-label="Vendas do mês">
+ <div class="sales-table-filters" data-tourism="filters">
   <label class="field"><span>Filtrar por tipo</span><select class="field-input" aria-label="Filtrar por tipo" value={selectedType} onchange={e => updateTableFilters({ type: e.currentTarget.value })}><option value="">Todos os tipos</option>{#each filterTypes as type (type.id)}<option value={type.id}>{type.name}{type.deleted ? ' (excluído)' : ''}</option>{/each}</select></label>
   <label class="field"><span>Buscar nas vendas</span><input class="field-input" type="search" aria-label="Buscar nas vendas" aria-describedby="sales-table-status" placeholder="Pedido, tipo, data ou valor" autocomplete="off" value={currentFilters.query} oninput={e => updateTableFilters({ query: e.currentTarget.value })} /></label>
   <button type="button" class="btn btn-ghost" disabled={!selectedType && !currentFilters.query} onclick={() => updateTableFilters({ type: '', query: '' })}>Limpar filtros</button>
  </div>
- <p id="sales-table-status" class="field-hint sales-table-status" role="status" aria-live="polite">Resultados: {tablePage.total} de {summary.items.length} venda{summary.items.length === 1 ? '' : 's'} no mês{#if tablePage.total}{` · exibindo ${tablePage.start + 1}–${tablePage.end}`}{/if}</p>
  <div class="sales-table-results" bind:this={ledgerElement}>
+ <div class="sales-results-summary" data-tourism="results">
+ <p id="sales-table-status" class="field-hint sales-table-status" role="status" aria-live="polite">Resultados: {tablePage.total} venda{tablePage.total === 1 ? '' : 's'} no mês</p>
  {#if tablePage.total}{@render salesPagination('superior')}{/if}
+ </div>
  <div class="table-wrap"><table class="list"><thead><tr><th scope="col">Pedido</th><th scope="col">Data venda</th><th scope="col">Tipo</th><th scope="col" class="num">Valor total</th><th scope="col" class="num">Taxas</th><th scope="col" class="num">Líquido</th><th scope="col" class="num">Comissão total (%)</th><th scope="col" class="num">Comissão total</th><th scope="col" class="th-actions">Ações</th></tr></thead><tbody>
  {#each tablePage.items as sale (sale.id)}
- <tr><td data-label="Pedido">{sale.orderNumber || '—'}</td><td data-label="Data venda">{fmtDate(sale.date)}</td><td data-label="Tipo">{typeName(sale.type)}</td><td data-label="Valor total" class="num privacy-value">{fmtMoney(sale.total)}</td><td data-label="Taxas" class="num privacy-value">{fmtMoney(sale.fees)}</td><td data-label="Líquido" class="num privacy-value">{fmtMoney(sale.total-sale.fees)}</td><td data-label="Comissão total (%)" class="num">{sale.rate === null ? '—' : `${sale.rate}%`}</td><td data-label="Comissão total" class="num privacy-value">{sale.commission === null ? '—' : fmtMoney(sale.commission)}</td><td class="actions-cell"><div class="actions-row"><button class="btn btn-ghost tbl-icon-btn" disabled={managingTypes} aria-label="Editar venda" onclick={() => { editing = { id: sale.id, date: sale.date, total: sale.total, fees: sale.fees, type: sale.type, orderNumber: sale.orderNumber ?? '' }; error = ''; }}><Pencil size={14} /></button><button class="btn btn-danger tbl-icon-btn" aria-label="Excluir venda" onclick={() => deleting = sale.id}><Trash2 size={14} /></button></div></td></tr>
+ <tr data-tourism="sale-row"><td data-label="Pedido">{sale.orderNumber || '—'}</td><td data-label="Data venda">{fmtDate(sale.date)}</td><td data-label="Tipo">{typeName(sale.type)}</td><td data-label="Valor total" class="num privacy-value">{fmtMoney(sale.total)}</td><td data-label="Taxas" class="num privacy-value">{fmtMoney(sale.fees)}</td><td data-label="Líquido" class="num privacy-value">{fmtMoney(sale.total-sale.fees)}</td><td data-label="Comissão total (%)" class="num">{sale.rate === null ? '—' : `${sale.rate}%`}</td><td data-label="Comissão total" class="num privacy-value">{sale.commission === null ? '—' : fmtMoney(sale.commission)}</td><td class="actions-cell"><div class="actions-row"><button class="btn btn-ghost tbl-icon-btn" disabled={managingTypes} aria-label="Editar venda" onclick={() => { editing = { id: sale.id, date: sale.date, total: sale.total, fees: sale.fees, type: sale.type, orderNumber: sale.orderNumber ?? '' }; error = ''; }}><Pencil size={14} /></button><button class="btn btn-danger tbl-icon-btn" aria-label="Excluir venda" onclick={() => deleting = sale.id}><Trash2 size={14} /></button></div></td></tr>
  {:else}<tr><td colspan="9" class="empty">{summary.items.length ? 'Nenhuma venda encontrada. Tente outro tipo ou busca.' : 'Nenhuma venda neste mês. Cadastre sua primeira venda.'}</td></tr>{/each}
  </tbody></table></div>
  {#if tablePage.total}{@render salesPagination('inferior')}{/if}
@@ -349,14 +393,18 @@
 <ConfirmDialog open={!!deleting} title="Excluir venda?" message="A venda será excluída e a comissão do mês será recalculada." confirmLabel="Excluir venda" onCancel={() => deleting = null} onConfirm={() => { removeSale(deleting); deleting = null; showToast({ message: 'Venda excluída.' }); }} />
 <ConfirmDialog open={!!deletingType} title="Excluir tipo de venda?" message={`O tipo “${deletingType?.name || ''}” deixará de aparecer em novas vendas. O histórico e as comissões serão preservados.`} confirmLabel="Excluir tipo" onCancel={() => deletingType = null} onConfirm={() => { saveSaleType({ ...deletingType, deleted: true }); deletingType = null; typeDraft = newTypeDraft(); showToast({ message: 'Tipo excluído. Histórico preservado.' }); }} />
 <style>
+ .sales-title-row { width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+ .sales-help-button { border:1px solid var(--border); gap:7px; min-height:40px; white-space:nowrap; }
  .sales-table-filters { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr) auto; gap:12px; align-items:end; margin-bottom:12px; }
  .sales-table-filters .field { min-width:0; }
  .sales-table-filters .field-input { width:100%; min-width:0; }
  .sales-table-filters .btn { min-height:44px; }
- .sales-table-status { margin:0 0 12px; }
+ .sales-results-summary, .sales-pagination { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; margin:14px 0; text-align:center; }
+ .sales-table-status { margin:0; text-align:center; line-height:1.55; }
+ .sales-results-summary .sales-pagination { background:transparent; border:0; border-radius:0; padding:0; margin:12px 0 0; }
  .sales-table-results { scroll-margin-top:20px; }
- .sales-pagination { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:14px 0; }
- .sales-page-controls { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px; }
+ .sales-pagination { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; }
+ .sales-page-controls { width:100%; max-width:440px; margin-inline:auto; display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px; }
  .sales-page-label { font-size:12px; color:var(--ink-soft); text-align:center; white-space:nowrap; }
  .sales-pagination .list-nav-btn { min-height:40px; }
  @media(max-width:760px) {
@@ -369,21 +417,25 @@
  }
  .sales-page-head { display:flex; flex-direction:column; gap:8px; margin-bottom:4px; align-items:flex-start; }
  .back-btn { align-self:flex-start; padding:6px 10px; gap:6px; font-size:13px; }
- .sales-primary-actions, .sales-settings-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; max-width:520px; margin:16px 0; align-items:end; }
- .sales-primary-actions { grid-template-columns:minmax(0,1fr); max-width:254px; }
- .sales-primary-actions .field { min-width:0; }
- .sales-primary-actions .field-input { width:100%; min-width:0; height:44px; min-height:44px; box-sizing:border-box; }
+ .sales-toolbar { display:flex; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:10px; margin:16px 0 20px; }
+ .sales-toolbar .field { min-width:170px; gap:4px; }
+ .sales-toolbar .field > span { font-size:.68rem; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-faint); font-weight:600; }
+ .sales-toolbar .field-input { width:100%; min-width:0; height:auto; min-height:38px; padding:8px 9px; border:1px solid var(--border); border-radius:7px; background:var(--card); font-size:.85rem; font-weight:400; box-sizing:border-box; }
+ .sales-settings-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); align-items:end; gap:10px; }
+ .sales-settings-actions .btn { min-width:0; height:38px; min-height:38px; padding:0 15px; border:1px solid var(--border); border-radius:8px; background:transparent; color:var(--ink-soft); font-size:.85rem; font-weight:600; box-shadow:none; }
+ .sales-settings-actions .btn:hover { color:var(--ink); border-color:var(--ink-faint); }
+ @media(max-width:760px) {
+  .sales-toolbar { align-items:stretch; }
+  .sales-toolbar .field { width:100%; }
+  .sales-toolbar .field-input { height:46px; font-size:16px; padding:11px 12px; }
+  .sales-settings-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); width:100%; }
+  .sales-report-button { grid-column:1/-1; width:100%; }
+  .sales-settings-actions .btn { height:42px; min-height:42px; padding:0 16px; }
+ }
  .sales-floating-actions { position:fixed; z-index:40; left:16px; right:16px; bottom:calc(90px + env(safe-area-inset-bottom, 0px)); display:flex; justify-content:center; pointer-events:none; }
  .sales-floating-actions .btn { width:auto; min-height:36px; padding:0 12px; gap:6px; font-size:12px; font-weight:600; border-radius:8px; box-shadow:var(--shadow-card); pointer-events:auto; }
  @media(min-width:640px) { .sales-floating-actions { left:24px; right:24px; } }
  @media(min-width:1024px) { .sales-floating-actions { left:288px; right:40px; bottom:calc(24px + env(safe-area-inset-bottom, 0px)); } }
- .sales-settings-actions .btn { min-width:0; min-height:44px; padding:8px; gap:6px; }
- @media(max-width:480px) {
-  .sales-primary-actions, .sales-settings-actions { gap:8px; }
-  .sales-primary-actions .field-input { padding-inline:10px; font-size:12px; }
-  .sales-settings-actions .btn { font-size:11px; }
-  .sales-settings-actions :global(svg) { flex-shrink:0; }
- }
 
  .types-list-head { display:flex; align-items:center; gap:10px; margin:24px 0 12px; }
  .types-list-head h3 { margin:0; font-size:14px; font-weight:700; }

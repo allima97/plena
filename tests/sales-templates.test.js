@@ -12,10 +12,10 @@ const database=column=>{
 };
 
 test('tourism catalog is a standalone immutable suggestion, not an account snapshot',()=>{
- assert.equal(TOURISM_TEMPLATE.types.length,13);
+ assert.equal(TOURISM_TEMPLATE.types.length,14);
  assert.throws(()=>TOURISM_TEMPLATE.types[0].rates.below=99);
  const built=buildSalesTemplate(request());
- assert.equal(built.types.length,13);
+ assert.equal(built.types.length,14);
  for(const entry of built.types){
   validateSaleType(entry);assert.ok(entry.id.startsWith('fresh:tourism:'));assert.equal(entry.sectionId,'fresh');
   assert.deepEqual(Object.keys(entry.monthlySettings),['2026-10']);
@@ -33,6 +33,19 @@ test('tourism catalog is a standalone immutable suggestion, not an account snaps
  assert.equal(TOURISM_TEMPLATE.types[0].rates.below,.8);
 });
 
+test('car rental uses the screenshot commission rules with no specific target',()=>{
+ const built=buildSalesTemplate(request('rental',{types:['car-rental']}));
+ assert.equal(built.types.length,1);
+ const rental=built.types[0];
+ assert.equal(rental.name,'Aluguel de Carro');
+ assert.equal(rental.template.key,'car-rental');
+ const settings=rental.monthlySettings['2026-10'];
+ assert.deepEqual(settings.rates,{below:.8,target:1.15,super:1.35});
+ assert.equal(settings.scaleStepBelow,1);assert.equal(settings.scaleStepAbove,1);
+ assert.equal(settings.hasTarget,false);assert.equal(settings.target,null);assert.equal(settings.productRate,null);
+ assert.equal(templateSuggestedProductRate(rental),null);
+});
+
 test('template import is explicit, validates selections and accepts no owner, private targets or arbitrary rules',()=>{
  assert.equal(buildSalesTemplate(request('own',{types:['insurance','services']})).types.length,2);
  for(const patch of [{templateId:''},{templateId:'unknown'},{version:2},{types:[]},{types:['insurance','insurance']},{types:['unknown']},{types:'insurance'},{name:''},{sectionId:'other/account'},{month:'2026-13'},{month:['2026-10']},{owner:'somebody@example.test'},{target:3400},{rates:{below:99}}])assert.throws(()=>buildSalesTemplate({...request(),...patch}),JSON.stringify(patch));
@@ -42,16 +55,16 @@ for(const column of ['owner_email','user_id']){
  test(`atomic import isolates accounts and retains later edits on retry (${column})`,async()=>{
   const {db,sql}=database(column);
   try{
-   const first=await importSalesTemplate(db,'alice',column,request());assert.equal(first.types.length,13);
+   const first=await importSalesTemplate(db,'alice',column,request());assert.equal(first.types.length,14);
    const original=sql.prepare(`SELECT * FROM documents WHERE ${column}='alice' ORDER BY collection,id`).all();
-   const second=await importSalesTemplate(db,'bob',column,request());assert.equal(second.types.length,13);
+   const second=await importSalesTemplate(db,'bob',column,request());assert.equal(second.types.length,14);
    const changed={...first.types[0],name:'Meu produto'};
    sql.prepare(`UPDATE documents SET data=? WHERE ${column}='alice' AND collection='salesTypes' AND id=?`).run(JSON.stringify(changed),changed.id);
    const retry=await importSalesTemplate(db,'alice',column,request());assert.equal(retry.types.find(t=>t.id===changed.id).name,'Meu produto');
-   assert.equal(sql.prepare(`SELECT count(*) n FROM documents WHERE ${column}='alice'`).get().n,14);
+   assert.equal(sql.prepare(`SELECT count(*) n FROM documents WHERE ${column}='alice'`).get().n,15);
    assert.deepEqual(sql.prepare(`SELECT * FROM documents WHERE ${column}='bob' ORDER BY collection,id`).all().map(row=>({...row,[column]:'alice',updated_at:0})),original.map(row=>({...row,updated_at:0})));
    await assert.rejects(importSalesTemplate(db,'alice',column,request('duplicate')),error=>error.status===409);
-   assert.equal(sql.prepare(`SELECT count(*) n FROM documents WHERE ${column}='alice'`).get().n,14);
+   assert.equal(sql.prepare(`SELECT count(*) n FROM documents WHERE ${column}='alice'`).get().n,15);
    const target=first.types.find(t=>t.template.key==='insurance');
    sql.prepare(`DELETE FROM documents WHERE ${column}='alice' AND id=?`).run(target.id);
    sql.prepare(`INSERT INTO sync_tombstones VALUES(?,?,?,?)`).run('alice','salesTypes',target.id,Date.now());

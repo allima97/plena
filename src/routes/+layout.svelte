@@ -1,5 +1,5 @@
 <script>
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { clearPrivateLocalData } from '$lib/fin/persist.js';
 	import { showToast } from '$lib/toast.svelte.js';
 	import { page } from '$app/state';
@@ -35,9 +35,10 @@
 	import OnboardingModal from '$lib/components/OnboardingModal.svelte';
 	import ToastHost from '$lib/components/ToastHost.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import UserProfileModal from '$lib/components/UserProfileModal.svelte';
 
 	let { children } = $props();
-	const navigation = $state({ salesActive: false, saleAction: null });
+	const navigation = $state({ salesActive: false, saleAction: null, goalAction: null });
 	setNavigationContext(navigation);
 
 	let searchOpen = $state(false);
@@ -46,6 +47,8 @@
 	let showOnboarding = $state(false);
 	let onboardingChecked = false;
 	let confirmSairOpen = $state(false);
+	let profileOpen = $state(false);
+	let avatarButton = $state(null);
 	let appBootStarted = false;
 
 	$effect(() => {
@@ -122,9 +125,10 @@
 	const alertCount = $derived(upcomingDue(appState.transactions, appState.alertThresholds).total);
 	const isLoginPage = $derived(page.url.pathname === '/login');
 	const isSalesSection = $derived(page.url.pathname === '/objetivos' && navigation.salesActive);
+	const isGoalsSection = $derived(page.url.pathname === '/objetivos' && !navigation.salesActive);
 
 	$effect(() => {
-		if (isSalesSection) showNewGlobal = false;
+		if (isSalesSection || isGoalsSection) showNewGlobal = false;
 	});
 
 	const initials = $derived.by(() => {
@@ -134,12 +138,18 @@
 		return (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase();
 	});
 
-	async function handleAvatarClick() {
+	async function handleSignOutClick() {
 		if (appState.settings.confirmExitApp) {
 			confirmSairOpen = true;
 			return;
 		}
 		await signOut();
+	}
+
+	async function closeProfile() {
+		profileOpen = false;
+		await tick();
+		avatarButton?.focus();
 	}
 
 	async function confirmSair() {
@@ -262,7 +272,7 @@
 					{t('sync_carregando')}
 				{/if}
 			</div>
-			<button class="nav-item logout-btn" onclick={handleAvatarClick}>
+			<button class="nav-item logout-btn" onclick={handleSignOutClick}>
 				<LogOut size={18} strokeWidth={1.8} />
 				<span>{t('nav_sair')}</span>
 			</button>
@@ -276,10 +286,11 @@
 			<header class="topbar">
 				<div class="topbar-left">
 					<img src="/icons/icon-192.png" alt="Plena" class="brand-mark topbar-logo mobile-only" />
+					<span class="font-display topbar-brand-name mobile-only">Plena</span>
 					<p class="section-label">{activeLabel}</p>
 				</div>
 				<div class="topbar-right">
-					<button class="icon-btn" aria-label={t('topbar_buscar')} onclick={() => { searchOpen = true; notifOpen = false; }}><Search size={17} /></button>
+					<button class="icon-btn topbar-search" aria-label={t('topbar_buscar')} onclick={() => { searchOpen = true; notifOpen = false; }}><Search size={17} /></button>
 					<button class="icon-btn" aria-label={hideValues ? t('topbar_exibirValores') : t('topbar_ocultarValores')} title={hideValues ? t('topbar_exibirValores') : t('topbar_ocultarValores')} onclick={toggleHideValues}>
 						{#if hideValues}<EyeOff size={17} />{:else}<Eye size={17} />{/if}
 					</button>
@@ -295,13 +306,17 @@
 					</a>
 					<button
 						class="avatar-chip"
-						onclick={handleAvatarClick}
-						title={appState.user ? `${appState.user.email} · ${t('nav_cliqueSair')}` : t('nav_loginNaoConfigurado')}
+						bind:this={avatarButton}
+						onclick={() => (profileOpen = true)}
+						aria-label={t('profile_title')}
+						aria-haspopup="dialog"
+						title={t('profile_title')}
 						style="border:none;cursor:{appState.user ? 'pointer' : 'default'}"
 					>
 						{initials}
 					</button>
 				</div>
+				<p class="topbar-tagline mobile-only">{t('brand_perspective')}</p>
 			</header>
 
 			{#if appState.ready}
@@ -314,10 +329,11 @@
 </div>
 
 <GlobalSearch open={searchOpen} onClose={() => (searchOpen = false)} />
-{#if !isSalesSection}
+{#if !isSalesSection && !isGoalsSection}
 <QuickAddModal open={showNewGlobal} onClose={() => (showNewGlobal = false)} />
 {/if}
 <OnboardingModal open={showOnboarding} onClose={() => (showOnboarding = false)} />
+<UserProfileModal open={profileOpen} name={appState.user?.name} email={appState.user?.email} onClose={closeProfile} />
 <ConfirmDialog
 	open={confirmSairOpen}
 	title={t('sair_confirmarTitulo')}
@@ -346,6 +362,10 @@
 				<Plus size={22} />
 			</button>
 		{/if}
+	{:else if isGoalsSection}
+		<button class="bottom-nav-fab" disabled={!navigation.goalAction || navigation.goalAction.disabled} onclick={() => navigation.goalAction?.onClick()} aria-label={t('nav_novoObjetivo')}>
+			<Plus size={22} />
+		</button>
 	{:else}
 		<button class="bottom-nav-fab" onclick={() => (showNewGlobal = true)} aria-label={t('nav_novoLancamento')}>
 			<Plus size={22} />

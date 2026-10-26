@@ -1,6 +1,6 @@
 # Modelo Turismo opcional
 
-Ao criar um controle de vendas, **Modelo** começa em **Em branco — criar meus próprios tipos**. Escolher **Turismo** apresenta 13 sugestões, com nomes, percentuais por faixa e passos de escalonamento. O usuário pode desmarcar tipos antes de confirmar, cancelar ou criar o controle em branco. Após importar, os tipos continuam editáveis nos formulários existentes.
+Ao criar um controle de vendas, **Modelo** começa em **Em branco — criar meus próprios tipos**. Escolher **Turismo** apresenta 14 sugestões, com nomes, percentuais por faixa e passos de escalonamento. O usuário pode desmarcar tipos antes de confirmar, cancelar ou criar o controle em branco. Após importar, os tipos continuam editáveis nos formulários existentes.
 
 O catálogo é estático e versionado. A criação não consulta nenhuma outra conta, não migra cadastros antigos e não copia vendas, objetivos, valores de metas, identificadores ou histórico de configurações. Somente as regras genéricas dos tipos selecionados são aplicadas ao mês atual do novo controle. Os valores das metas devem ser definidos pelo próprio usuário. Seguro viagem oferece 10% como sugestão ao ativar a meta específica; ela começa desativada e sem valor.
 
@@ -9,3 +9,5 @@ A API `POST /api/sales-templates/import` exige a identidade autenticada, verific
 Com sincronização ativa, o novo controle e seus tipos seguem o mesmo canal autenticado entre Plena e NextGoals. Sem vínculo, permanecem somente na conta do sistema em que foram criados. Não há criação automática na entrada do usuário.
 
 Validação: testes unitários de catálogo, validação, isolamento entre contas, reenvio, exclusão e rollback; integração das duas APIs com autenticação real, banco SQLite isolado, seleção de tipos, sincronização em ambas as direções e rejeição de origens/identidades inválidas. A conferência visual usa dados fictícios e formulários reais dos dois projetos.
+
+Aluguel de Carro: 0,8% antes da meta, 1,15% na meta e 1,35% na supermeta; escalonamento antes e após de 1% (cada passo completo acrescenta 0,01 ponto percentual), sem meta específica. A inclusão é aditiva no catálogo v1 e não altera controles já criados.

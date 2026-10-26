@@ -14,6 +14,7 @@ function freeze(value) {
 export const TOURISM_TEMPLATE = freeze({
   id: 'tourism', version: 1, name: 'Turismo',
   types: [
+    type('car-rental', 'Aluguel de Carro'),
     type('charter', 'Fretamento'),
     type('hotel-high', 'Hotel (+ de 10%)'),
     type('hotel-low', 'Hotel (- de 10%)', reduced, false),
