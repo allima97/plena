@@ -22,4 +22,9 @@ npm run build
 echo "Fazendo deploy para Cloudflare..."
 npx wrangler deploy
 
+npx wrangler r2 bucket create plena-backups 2>/dev/null || true
+
+echo "Fazendo deploy do backup automático (cron R2)..."
+cd plena-backup-cron && npx wrangler deploy && cd ..
+
 echo "=== plena deploy OK ==="

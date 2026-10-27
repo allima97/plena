@@ -1,13 +1,12 @@
+import { pbkdf2 } from 'node:crypto';
 import { readJson } from './security.js';
 const SESSION_COOKIE = '__Host-plena_session';
 const CHALLENGE_COOKIE = '__Host-plena_challenge';
 const SESSION_TTL = 30 * 24 * 60 * 60 * 1000;
 const CHALLENGE_TTL = 5 * 60 * 1000;
-// 260k iterações ≈ 22 ms de CPU em PBKDF2-SHA256 no V8.
-// Hashes 600k existentes continuam funcionando: verifyPassword usa o valor
-// gravado no hash, não esta constante (≈ 52 ms, dentro do limits.cpu_ms=30s).
-// Novos hashes (registro e reset) ficam em ≈ 22 ms → dentro do limite padrão.
-const PASSWORD_ITERATIONS = 260_000;
+// O runtime do Workers (WebCrypto e node:crypto) rejeita PBKDF2 acima de 100k iterações.
+// Hashes gravados com mais iterações não podem ser verificados: exigem redefinição de senha.
+const PASSWORD_ITERATIONS = 100_000;
 // The account-wide included email quota is shared with Salão na Mão. Reserve
 // 500 of its 3,000 monthly messages for that app.
 const MONTHLY_EMAIL_LIMIT = 2_500;
@@ -56,10 +55,15 @@ function normalizeEmail(value) {
 	return value.trim().toLowerCase();
 }
 
-async function derivePassword(password, salt, iterations = PASSWORD_ITERATIONS) {
-	const material = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
-	const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations, hash: 'SHA-256' }, material, 256);
-	return base64url(new Uint8Array(bits));
+// WebCrypto no Workers rejeita PBKDF2 com mais de 100k iterações (→ 500).
+// node:crypto (nodejs_compat) não tem esse limite e gera o mesmo resultado.
+function derivePassword(password, salt, iterations = PASSWORD_ITERATIONS) {
+	return new Promise((resolve, reject) => {
+		pbkdf2(password, salt, iterations, 32, 'sha256', (error, bits) => {
+			if (error) reject(error);
+			else resolve(base64url(new Uint8Array(bits)));
+		});
+	});
 }
 
 async function hashPassword(password) {
@@ -77,9 +81,12 @@ function decodeBase64url(value) {
 async function verifyPassword(password, stored) {
 	const [algorithm, iterationValue, saltValue, expected] = stored.split('$');
 	const iterations = Number(iterationValue);
-	if (algorithm !== 'pbkdf2-sha256' || !Number.isSafeInteger(iterations) || iterations < 100_000 || iterations > 1_000_000) return false;
-	const actual = await derivePassword(password, decodeBase64url(saltValue), iterations);
-	return equal(actual, expected);
+	if (algorithm !== 'pbkdf2-sha256' || !Number.isSafeInteger(iterations) || iterations < 100_000 || iterations > 100_000) return false;
+	try {
+		return equal(await derivePassword(password, decodeBase64url(saltValue), iterations), expected);
+	} catch {
+		return false;
+	}
 }
 
 function cookieOptions(maxAge) {

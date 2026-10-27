@@ -3,6 +3,7 @@ const toCents = value => Number.isFinite(Number(value)) ? Math.round(Number(valu
 const monthIndex = month => Number(month.slice(0, 4)) * 12 + Number(month.slice(5)) - 1;
 const monthId = index => `${String(Math.floor(index / 12)).padStart(4, '0')}-${String(index % 12 + 1).padStart(2, '0')}`;
 const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+export const MONTH_NAMES = monthNames;
 export const REPORT_PERIODS = [
   ['year', 'Ano inteiro'], ['h1', '1º semestre · Jan–Jun'], ['h2', '2º semestre · Jul–Dez'],
   ['q1', '1º trimestre · Jan–Mar'], ['q2', '2º trimestre · Abr–Jun'],
@@ -11,7 +12,7 @@ export const REPORT_PERIODS = [
 
 // Inputs must already be scoped to the selected sales control. Goals use gross sales,
 // just like the monthly dashboard; fees never change attainment.
-export function buildSalesReport(sales = [], plans = [], { year = 'all', period = 'year', currentMonth } = {}) {
+export function buildSalesReport(sales = [], plans = [], { year = 'all', period = 'year', month = '', currentMonth } = {}) {
   if (!validMonth(currentMonth)) {
     const now = new Date();
     currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -40,7 +41,7 @@ export function buildSalesReport(sales = [], plans = [], { year = 'all', period 
   const years = [...new Set([currentMonth.slice(0, 4), ...(/^\d{4}$/.test(String(year)) ? [String(year)] : []), ...allMonths.map(month => month.slice(0, 4))])].sort().reverse();
   const bounds = { h1: [1, 6], h2: [7, 12], q1: [1, 3], q2: [4, 6], q3: [7, 9], q4: [10, 12] };
   const [first, last] = year !== 'all' && bounds[period] ? bounds[period] : [1, 12];
-  const months = allMonths.filter(month => (year === 'all' || month.startsWith(`${year}-`)) && Number(month.slice(5)) >= first && Number(month.slice(5)) <= last).reverse().map(month => {
+  const rows = allMonths.filter(month => (year === 'all' || month.startsWith(`${year}-`)) && Number(month.slice(5)) >= first && Number(month.slice(5)) <= last).reverse().map(month => {
     const row = records.get(month) || { sold: 0, count: 0, target: null };
     const future = month > currentMonth;
     const percent = row.target ? row.sold / row.target * 100 : null;
@@ -48,6 +49,9 @@ export function buildSalesReport(sales = [], plans = [], { year = 'all', period 
     const label = { future: 'Aguardando', met: 'Meta batida', below: 'Meta não batida', 'no-goal': 'Sem meta definida', empty: 'Sem registros' }[status];
     return { month, label: `${monthNames[Number(month.slice(5)) - 1]}/${month.slice(0, 4)}`, sold: row.sold / 100, target: row.target === null ? null : row.target / 100, percent, status, statusLabel: label, count: row.count, current: month === currentMonth, future };
   });
+  // Months without sales and without a goal stay out of the report; a month
+  // picked explicitly by the user is always shown, even when empty.
+  const months = validMonth(month) ? rows.filter(row => row.month === month) : rows.filter(row => row.status !== 'empty');
   const eligible = months.filter(month => !month.future && month.target !== null);
   const goalCents = eligible.reduce((sum, month) => sum + toCents(month.target), 0);
   const goalSalesCents = eligible.reduce((sum, month) => sum + toCents(month.sold), 0);

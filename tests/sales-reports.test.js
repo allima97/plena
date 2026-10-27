@@ -21,13 +21,12 @@ test('historical goals use gross sales, cent totals and each month own target; p
  assert.ok(Math.abs(report.percent - 910.3 / 1100.3 * 100) < 1e-10, 'period attainment is weighted by monetary targets, never the average of monthly percentages');
 });
 
-test('quarter and semester filters stay within the selected year and include missing past months', () => {
+test('quarter and semester filters stay within the selected year and include months with any record', () => {
  const months = ['2025-12','2026-01','2026-03','2026-04','2026-06','2026-07','2026-09','2026-10'];
  const sales = months.map(month => sale(month, 100));
  const plans = months.map(month => plan(month, 100));
  const q3 = buildSalesReport(sales, plans, options({ period:'q3' }));
- assert.deepEqual(q3.months.map(row => row.month), ['2026-09','2026-08','2026-07']);
- assert.equal(q3.months[1].status, 'empty');
+ assert.deepEqual(q3.months.map(row => row.month), ['2026-09','2026-07'],'August has neither sales nor goal, so it stays out');
  assert.equal(q3.sold, 200); assert.equal(q3.percent, 100);
  assert.equal(buildSalesReport(sales, plans, options({period:'h1'})).sold, 400);
  assert.equal(buildSalesReport(sales, plans, options({period:'h2'})).sold, 300);
@@ -47,9 +46,23 @@ test('zero sales against an existing goal is 0%, while no records never fabricat
  const report=buildSalesReport([], [plan('2026-08',100)],options());
  assert.equal(report.months.find(row=>row.month==='2026-08').status,'below');
  assert.equal(report.months.find(row=>row.month==='2026-08').percent,0);
- assert.equal(report.months.find(row=>row.month==='2026-09').percent,null);
+ assert.equal(report.months.some(row=>row.month==='2026-09'),false,'September has neither sales nor goal, so it stays out');
  assert.equal(report.achieved,0); assert.equal(report.evaluated,1);
  assert.deepEqual(buildSalesReport([],[],options()).months,[]);
+});
+
+test('a month picked explicitly is shown even when empty, and the summary follows the selection', () => {
+ const sales=[sale('2026-01',100),sale('2026-03',300)];
+ const plans=[plan('2026-01',100),plan('2026-03',100)];
+ const full=buildSalesReport(sales,plans,options());
+ assert.deepEqual(full.months.map(row=>row.month),['2026-03','2026-01'],'empty February stays out');
+ const picked=buildSalesReport(sales,plans,options({month:'2026-03'}));
+ assert.deepEqual(picked.months.map(row=>row.month),['2026-03']);
+ assert.equal(picked.sold,300); assert.equal(picked.percent,300); assert.equal(picked.evaluated,1);
+ const empty=buildSalesReport(sales,plans,options({month:'2026-02'}));
+ assert.deepEqual(empty.months.map(row=>row.month),['2026-02'],'explicit pick shows the month even without records');
+ assert.equal(empty.months[0].status,'empty');
+ assert.equal(empty.sold,0); assert.equal(empty.percent,null); assert.equal(empty.evaluated,0);
 });
 
 test('legacy plan ids, deleted records and corrections preserve accurate historical statuses', () => {

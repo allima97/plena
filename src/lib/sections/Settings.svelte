@@ -17,6 +17,7 @@
 	import SyncSettings from '$lib/components/SyncSettings.svelte';
 	import PrivacySettings from '$lib/components/PrivacySettings.svelte';
 	import { Save, Download, Upload, Trash2, ShieldAlert } from 'lucide-svelte';
+	import { downloadBlob } from '$lib/fin/export.js';
 
 	const SECOES = [
 		{ id: 'geral', label: () => t('settings_tab_geral') },
@@ -106,6 +107,58 @@
 		} finally {
 			restaurando = false;
 			importPending = null;
+		}
+	}
+
+	// ---- Criar backup (servidor + navigator.share para mobile) ------------------
+
+	let criandoBackup = $state(false);
+	let ultimoBackup = $state(/** @type {string|null} */ (null));
+	$effect(() => {
+		try { ultimoBackup = localStorage.getItem('plena_last_backup'); } catch {}
+	});
+
+	async function criarBackup() {
+		criandoBackup = true;
+		try {
+			const today = new Date().toISOString().slice(0, 10);
+			const filename = `plena-backup-${today}.json`;
+			let content;
+
+			// Tenta exportar do servidor (D1 — dados canônicos)
+			try {
+				const res = await fetch('/api/privacy/export');
+				if (!res.ok) throw new Error('server');
+				content = await res.text();
+			} catch {
+				// Offline ou erro: usa snapshot local
+				exportBackup();
+				try { localStorage.setItem('plena_last_backup', new Date().toISOString()); } catch {}
+				ultimoBackup = new Date().toISOString();
+				showToast({ message: 'Backup local criado!' });
+				return;
+			}
+
+			const file = new File([content], filename, { type: 'application/json' });
+
+			// navigator.share: no celular abre o menu de compartilhamento nativo
+			// (Google Drive, iCloud, WhatsApp, E-mail, etc.)
+			if (navigator.canShare?.({ files: [file] })) {
+				try {
+					await navigator.share({ files: [file], title: 'Backup Plena' });
+				} catch (e) {
+					if (e?.name === 'AbortError') return; // usuário cancelou
+					downloadBlob(content, filename, 'application/json');
+				}
+			} else {
+				downloadBlob(content, filename, 'application/json');
+			}
+
+			try { localStorage.setItem('plena_last_backup', new Date().toISOString()); } catch {}
+			ultimoBackup = new Date().toISOString();
+			showToast({ message: 'Backup criado com sucesso!' });
+		} finally {
+			criandoBackup = false;
 		}
 	}
 
@@ -251,13 +304,33 @@
 {:else if secaoAtiva === 'backup'}
 	<div class="card" style="max-width:560px">
 		<p class="stat-label" style="margin:0 0 4px">{t('settings_backup_titulo')}</p>
-		<p class="movement-meta" style="margin:0 0 18px">{t('settings_backup_sub')}</p>
+		<p class="movement-meta" style="margin:0 0 16px">{t('settings_backup_sub')}</p>
 
-		<div class="modal-footer" style="justify-content:flex-start;gap:12px">
-			<button type="button" class="btn" onclick={exportBackup}><Download size={16} /> {t('settings_backup_criar')}</button>
-			<button type="button" class="btn" onclick={() => fileInput?.click()}><Upload size={16} /> {t('settings_backup_restaurar')}</button>
+		{#if ultimoBackup}
+			{@const diasAtras = Math.floor((Date.now() - new Date(ultimoBackup).getTime()) / 86_400_000)}
+			<div class="backup-status" class:backup-aviso={diasAtras > 7}>
+				<span>{#if diasAtras === 0}✓ Backup feito hoje{:else}Último backup: há {diasAtras} {diasAtras === 1 ? 'dia' : 'dias'}{/if}</span>
+				{#if diasAtras > 7}<span class="backup-aviso-texto">Recomendamos backup semanal</span>{/if}
+			</div>
+		{:else}
+			<div class="backup-status backup-aviso">
+				<span>Nenhum backup local encontrado</span>
+			</div>
+		{/if}
+
+		<div class="modal-footer" style="justify-content:flex-start;gap:12px;margin-top:16px">
+			<button type="button" class="btn btn-primary" onclick={criarBackup} disabled={criandoBackup}>
+				<Download size={16} /> {criandoBackup ? 'Aguarde…' : t('settings_backup_criar')}
+			</button>
+			<button type="button" class="btn" onclick={() => fileInput?.click()}>
+				<Upload size={16} /> {t('settings_backup_restaurar')}
+			</button>
 			<input bind:this={fileInput} type="file" accept="application/json,.json" style="display:none" onchange={onBackupFile} />
 		</div>
+
+		<p class="field-hint" style="margin-top:14px">
+			📱 No celular, o arquivo pode ser salvo direto no <strong>Google Drive</strong> ou <strong>iCloud</strong> pelo menu de compartilhamento que aparece automaticamente.
+		</p>
 	</div>
 {:else if secaoAtiva === 'apagar'}
 	<div class="card" style="max-width:560px; border-color:var(--expense-soft)">
@@ -348,5 +421,25 @@
 		gap: 16px;
 		padding: 14px 0;
 		border-bottom: 1px solid var(--border-soft);
+	}
+	.backup-status {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 10px 14px;
+		border-radius: 10px;
+		background: color-mix(in srgb, var(--income, #23a768) 12%, transparent);
+		color: var(--income, #23a768);
+		font-size: 13px;
+		font-weight: 500;
+	}
+	.backup-status.backup-aviso {
+		background: color-mix(in srgb, var(--expense, #e06b5f) 10%, transparent);
+		color: var(--expense, #e06b5f);
+	}
+	.backup-aviso-texto {
+		margin-left: auto;
+		font-size: 11px;
+		opacity: 0.85;
 	}
 </style>

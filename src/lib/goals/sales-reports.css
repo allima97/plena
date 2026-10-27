@@ -1,6 +1,6 @@
 .sales-report{min-width:0}
 .sales-report-intro{margin:0 0 18px;color:var(--ink-soft);font-size:13px;line-height:1.55}
-.sales-report-filters{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:12px;margin-bottom:16px}
+.sales-report-filters{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr) minmax(0,1fr);gap:12px;margin-bottom:16px}
 .sales-report-filters label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink-soft);min-width:0}
 .sales-report-filters select{width:100%;min-width:0}
 .sales-report-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}

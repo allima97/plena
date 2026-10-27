@@ -1,6 +1,8 @@
 import { validateCommissionSettings } from './sales-commissions.js';
-// Product settings are versioned by reference month. Legacy monthly plans remain
-// the fallback, so editing a product never rewrites previous months.
+// Product settings are versioned by reference month, but a single configuration
+// is a business rule: it serves every month without its own explicit entry, both
+// previous and future ones, so the user never re-enters the general commission.
+// Explicit monthly entries always win, which keeps intentional per-month changes.
 const TIERS = ['below', 'target', 'super'];
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 export function validateTypeSettings(type) {
@@ -20,20 +22,33 @@ export function validateTypeSettings(type) {
 export function salesTypeSettings(type, month, plan) {
   const entries = type?.monthlySettings || {};
   if (Object.hasOwn(entries, month)) return { ...entries[month], configured: true };
+  // Per-type monthlySettings always take priority over plan-level legacy rates.
+  // Without an exact entry, the nearest configured month wins: prefer the most
+  // recent previous one, otherwise fall back to the earliest future one, so a
+  // single configuration covers previous and future months alike.
+  const keys = Object.keys(entries).filter(key => MONTH.test(key)).sort();
+  const nearest = keys.filter(key => key <= month).at(-1) ?? keys[0];
+  if (nearest) return { ...entries[nearest], configured: true };
+  // Legacy fallback: plan-level rates for types that have never had per-type settings saved.
   const id = type?.id;
   if (id && plan && (Object.hasOwn(plan.rates || {}, id) || Object.hasOwn(plan.typeTargets || {}, id))) {
     const target = Number(plan.typeTargets?.[id]);
     return { rates: { ...plan.rates?.[id] }, hasTarget: Number.isFinite(target) && target > 0, target: target > 0 ? target : null, configured: true };
   }
-  const previous = Object.keys(entries).filter(key => MONTH.test(key) && key <= month).sort().at(-1);
-  if (previous) return { ...entries[previous], configured: true };
   return { rates: { below: null, target: null, super: null }, hasTarget: false, target: null, configured: false };
 }
-export function withSalesTypeSettings(type, month, settings) {
+export function withSalesTypeSettings(type, month, settings, scope = 'month') {
   const extra = {};
   if (settings.productRate !== undefined) extra.productRate = settings.hasTarget ? settings.productRate : null;
   for (const key of ['scaleStepBelow', 'scaleStepAbove']) if (settings[key] !== undefined) extra[key] = settings[key] === '' ? null : settings[key];
-  const next = { ...type, monthlySettings: { ...type.monthlySettings, [month]: { rates: { ...settings.rates }, hasTarget: settings.hasTarget, target: settings.hasTarget ? settings.target : null, ...extra } } };
+  const entry = { rates: { ...settings.rates }, hasTarget: settings.hasTarget, target: settings.hasTarget ? settings.target : null, ...extra };
+  // scope 'all' rewrites every saved month, 'onward' only this month and the
+  // saved months after it; months without their own entry always resolve to
+  // the nearest saved one, so both also cover months never edited directly.
+  const keys = Object.keys(type.monthlySettings || {}).filter(key => MONTH.test(key));
+  const months = scope === 'all' ? keys : scope === 'onward' ? keys.filter(key => key >= month) : [];
+  if (!months.includes(month)) months.push(month);
+  const next = { ...type, monthlySettings: { ...type.monthlySettings, ...Object.fromEntries(months.map(key => [key, { ...entry, rates: { ...entry.rates } }])) } };
   validateTypeSettings(next);
   return next;
 }

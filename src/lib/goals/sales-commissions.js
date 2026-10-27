@@ -30,7 +30,9 @@ export function summarizeSalesMonth(sales, month, plan) {
   const rows = sales.filter(sale => sale.date.slice(0, 7) === month);
   const total = rows.reduce((sum, sale) => sum + cents(sale.total), 0);
   const fees = rows.reduce((sum, sale) => sum + cents(sale.fees), 0);
-  const tier = !plan ? null : total >= cents(plan.superTarget) ? 'super' : total >= cents(plan.target) ? 'target' : 'below';
+  // A plan without a positive target is an in-memory placeholder used to show
+  // commissions in months without saved goals: everything stays at the base tier.
+  const tier = !plan ? null : !(cents(plan.target) > 0) ? 'below' : total >= cents(plan.superTarget) ? 'super' : total >= cents(plan.target) ? 'target' : 'below';
   const progress = plan?.target > 0 ? total / cents(plan.target) * 100 : 0;
   const byTypeCents = new Map();
   for (const sale of rows) byTypeCents.set(sale.type, (byTypeCents.get(sale.type) || 0) + cents(sale.total));

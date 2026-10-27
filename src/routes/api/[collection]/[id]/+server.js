@@ -4,7 +4,7 @@ import { validateSale, validatePlan, validateSaleType } from '$lib/goals/sales.j
 import { json } from '@sveltejs/kit';
 import { env } from 'cloudflare:workers';
 import { claimLegacyData, dataOwner } from '$lib/server/data-owner.js';
-import { syncRecordStatements, runSyncStatements } from '$lib/server/sync-records.js';
+import { syncRecordStatements, runSyncStatements, readSyncRecords } from '$lib/server/sync-records.js';
 import { isSyncable, triggerSyncToNextgoals } from '$lib/server/sync.js';
 
 export const prerender = false;
@@ -127,6 +127,15 @@ export async function DELETE({ locals, params, platform }) {
 	if (!validDocumentId(params.id)) return json({ error: 'Identificador inválido' }, { status: 400 });
 
 	await claimLegacyData(db, owner, env);
+	if (params.collection === 'salesPlans') {
+		// Uma meta mensal só pode ser excluída enquanto o mês não tem vendas.
+		const records = (await readSyncRecords(db, owner, 'owner_email', ['sales', 'salesPlans'])).filter((record) => !record.deleted);
+		const plan = records.find((record) => record.collection === 'salesPlans' && record.id === params.id);
+		const month = plan?.data?.month || params.id.split(':').at(-1);
+		const sectionId = plan?.data?.sectionId || 'default';
+		const hasSales = records.some((record) => record.collection === 'sales' && (record.data.sectionId || 'default') === sectionId && typeof record.data.date === 'string' && record.data.date.slice(0, 7) === month);
+		if (hasSales) return json({ error: 'O mês tem vendas. Exclua as vendas antes de excluir a meta.' }, { status: 409 });
+	}
 	const deletedAt = Date.now();
 	if (isSyncable(params.collection)) {
 		await runSyncStatements(db, syncRecordStatements(db, owner, 'owner_email', { collection: params.collection, id: params.id, deleted: true, updatedAt: deletedAt }));

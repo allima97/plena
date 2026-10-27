@@ -2,14 +2,15 @@
  import { onMount } from 'svelte';
  import Modal from '$lib/components/Modal.svelte';
  import { fmtMoney, todayISO } from '$lib/format.js';
- import { buildSalesReport, REPORT_PERIODS } from './sales-reports.js';
+ import { buildSalesReport, REPORT_PERIODS, MONTH_NAMES } from './sales-reports.js';
  import './sales-reports.css';
  let { sales = [], plans = [], initialYear, sectionName, onClose } = $props();
  let selectedYear = $state('');
  let period = $state('year');
+ let reportMonth = $state('');
  let content = $state(null);
  const year = $derived(selectedYear || initialYear);
- const report = $derived(buildSalesReport(sales, plans, { year, period, currentMonth: todayISO().slice(0, 7) }));
+ const report = $derived(buildSalesReport(sales, plans, { year, period, month: reportMonth ? `${year}-${reportMonth}` : '', currentMonth: todayISO().slice(0, 7) }));
  const percent = value => value === null ? '—' : `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1, roundingMode: 'floor' }).format(value)}%`;
  const fill = value => Math.min(100, Math.max(0, value ?? 0));
  const color = value => `hsl(${fill(value) * 1.2} 65% 38%)`;
@@ -31,15 +32,16 @@
  <div class="sales-report" bind:this={content}>
   <p class="sales-report-intro">Compare seus resultados mês a mês e acompanhe a evolução das suas metas.</p>
   <div class="sales-report-filters" data-tourism="report-filters">
-   <label>Ano<select class="field-input" aria-label="Ano do relatório" value={year} onchange={event => { selectedYear = event.currentTarget.value; period = 'year'; }}><option value="all">Todo o histórico</option>{#each report.years as option}<option value={option}>{option}</option>{/each}</select></label>
-   <label>Período<select class="field-input" aria-label="Período do relatório" bind:value={period} disabled={year === 'all'}>{#each REPORT_PERIODS as [value, label]}<option {value}>{label}</option>{/each}</select></label>
+   <label>Ano<select class="field-input" aria-label="Ano do relatório" value={year} onchange={event => { selectedYear = event.currentTarget.value; period = 'year'; reportMonth = ''; }}><option value="all">Todo o histórico</option>{#each report.years as option}<option value={option}>{option}</option>{/each}</select></label>
+   <label>Período<select class="field-input" aria-label="Período do relatório" bind:value={period} disabled={year === 'all' || reportMonth !== ''}>{#each REPORT_PERIODS as [value, label]}<option {value}>{label}</option>{/each}</select></label>
+   <label>Mês<select class="field-input" aria-label="Mês do relatório" bind:value={reportMonth} disabled={year === 'all'}><option value="">Todos os meses</option>{#each MONTH_NAMES as name, index}<option value={String(index + 1).padStart(2, '0')}>{name}</option>{/each}</select></label>
   </div>
   <div class="sales-report-summary" data-tourism="report-summary" role="status" aria-live="polite">
    <div class="sales-report-stat"><span>Total vendido no período</span><strong class="privacy-value">{fmtMoney(report.sold)}</strong></div>
    <div class="sales-report-stat"><span>Atingimento das metas</span><strong>{percent(report.percent)}</strong></div>
    <div class="sales-report-stat"><span>Meses com meta batida</span><strong>{report.achieved} de {report.evaluated}</strong></div>
   </div>
-  <p class="sales-report-note">O percentual do período considera a soma das metas cadastradas e as vendas desses meses. Meses futuros não entram no resumo.</p>
+  <p class="sales-report-note">O percentual do período considera a soma das metas cadastradas e as vendas desses meses. Meses futuros não entram no resumo e meses sem vendas e sem meta não aparecem na lista.</p>
   <div class="sales-report-list">
    {#each report.months as row (row.month)}
     <article class="sales-report-month" data-tourism="report-month" aria-label={`Desempenho de ${row.label}`}>

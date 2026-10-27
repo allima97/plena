@@ -1166,6 +1166,10 @@ export function saveSalesPlan(data) {
  salesPlans = [...salesPlans.filter((p) => p.id !== data.id), data];
  write('salesPlans', data.id, data);
 }
+export function removeSalesPlan(id) {
+ salesPlans = salesPlans.filter((p) => p.id !== id);
+ erase('salesPlans', id);
+}
 
 export function saveSaleType(data) {
  const type = { ...data, id: data.id || uid(), name: data.name.trim(), deleted: !!data.deleted };

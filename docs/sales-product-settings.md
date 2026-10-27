@@ -37,6 +37,10 @@ Com passo 2 antes: 80% → 0,80%, 81% → 0,80%, 82% → 0,81%. Com passo 2 apó
 
 Os tipos recebem `monthlySettings[YYYY-MM]` com `rates`, `hasTarget`, `target` e, quando configurados, `productRate`, `scaleStepBelow` e `scaleStepAbove`. O documento completo é salvo e sincronizado. **Metas mensais** continua configurando apenas meta, supermeta e base da comissão.
 
-A configuração explícita do produto para o mês tem prioridade. Sem ela, planos mensais antigos continuam valendo; meses sem configuração podem herdar os últimos valores anteriores do produto. Editar o mês atual não reescreve meses anteriores. Não há migração de registros financeiros.
+A configuração explícita do produto para o mês tem prioridade. Sem ela, vale a configuração mais próxima do produto — preferindo a mais recente anterior e, na falta dela, a mais antiga posterior — de modo que **a comissão geral cadastrada uma vez vale para todos os meses, anteriores e posteriores**, sem recadastro. Tipos que nunca usaram a tela de tipo herdam os percentuais do plano mensal mais próximo. Não há migração de registros financeiros.
+
+Meses sem metas cadastradas também calculam comissões: um plano em memória sem meta resolve a configuração mais próxima de cada tipo e mantém as vendas na faixa **Meta não batida**, de modo que vendas de meses anteriores à criação do controle exibem percentual e valor em vez de **A configurar**.
+
+Ao editar um tipo, **Aplicar alteração em** define o alcance da gravação: **Alterar todos os meses** regrava cada mês já configurado, **Alterar só este mês** grava apenas o mês em edição e **Alterar deste mês em diante** regrava o mês atual e os meses posteriores já configurados, preservando o histórico anterior. Meses nunca editados continuam seguindo a configuração mais próxima em qualquer dos escopos.
 
 Os testes cobrem os exemplos, limites exatos, passos fracionários/independentes, teto, mudança de faixa, arredondamento em centavos, legado, isolamento entre meses/controles e APIs. A integração em bancos isolados verifica sincronização nos dois sentidos e rejeição de comissões/passos inválidos.

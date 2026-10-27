@@ -11,7 +11,7 @@
  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
  import { showToast } from '$lib/toast.svelte.js';
  import { Plus, Pencil, Trash2, ArrowLeft, CircleHelp } from 'lucide-svelte';
- import { appState, saveSale, removeSale, saveSalesPlan, saveSaleType } from '$lib/fin/store.svelte.js';
+ import { appState, saveSale, removeSale, saveSalesPlan, removeSalesPlan, saveSaleType } from '$lib/fin/store.svelte.js';
  import { forSection } from './sales.js';
  import { todayISO, fmtMoney, fmtDate, monthLabel } from '$lib/format.js';
  import { saleTypesCatalog, TIERS, emptyPlan, monthSummary, dailyPaceKPI } from './sales.js';
@@ -27,7 +27,7 @@
  let managingTypes = $state(false);
  let typeFormOpen = $state(false);
  let reportsOpen = $state(false);
- const newTypeDraft = () => ({ name: '', rates: { below: null, target: null, super: null }, hasTarget: false, target: null, productRate: null, scaleStepBelow: null, scaleStepAbove: null });
+ const newTypeDraft = () => ({ name: '', rates: { below: null, target: null, super: null }, hasTarget: false, target: null, productRate: null, scaleStepBelow: null, scaleStepAbove: null, applyScope: 'all' });
  let typeDraft = $state(newTypeDraft());
  let deletingType = $state(null);
  const types = $derived(saleTypesCatalog(scopedSales.salesTypes, scopedSales.sales, scopedSales.salesPlans));
@@ -76,6 +76,16 @@
   return c;
  }
 
+ // Plano mais próximo do mês de referência: prefere o anterior mais recente e,
+ // na falta dele, o posterior mais antigo — usado para herdar metas e comissões.
+ function nearestPlan() {
+  const key = (p) => p.month || p.id.split(':').at(-1);
+  const others = scopedSales.salesPlans.filter((p) => p.id !== planId);
+  return others.filter((p) => key(p) < month).sort((a, b) => key(b).localeCompare(key(a)))[0]
+   ?? others.filter((p) => key(p) > month).sort((a, b) => key(a).localeCompare(key(b)))[0]
+   ?? null;
+ }
+
  function openConfig() {
   if (rawPlan) {
    // Mês já tem plano: editar normalmente
@@ -83,10 +93,8 @@
    configIsTemplate = false;
    configTemplateMonth = '';
   } else {
-   // Sem plano para este mês: herdar do plano mais recente cadastrado
-   const templatePlan = [...scopedSales.salesPlans]
-    .filter((p) => p.id !== planId)
-    .sort((a, b) => b.id.split(':').at(-1).localeCompare(a.id.split(':').at(-1)))[0];
+   // Sem plano para este mês: herdar do plano mais próximo cadastrado
+   const templatePlan = nearestPlan();
    if (templatePlan) {
     config = clonePlan(templatePlan);
     config.id = planId;
@@ -112,16 +120,19 @@
   confirmCopyPlan = null;
  }
  function editType(type) {
-  const settings = salesTypeSettings(type, month, rawPlan);
-  typeDraft = { ...type, rates: { ...settings.rates }, hasTarget: settings.hasTarget, target: settings.target, productRate: settings.productRate ?? templateSuggestedProductRate(type), scaleStepBelow: settings.scaleStepBelow ?? null, scaleStepAbove: settings.scaleStepAbove ?? null };
+  // Para tipos legados (sem monthlySettings), usa o plano mais próximo como
+  // fallback, pré-preenchendo os percentuais mesmo sem plano neste mês.
+  const effectivePlan = rawPlan ?? ((!type?.monthlySettings || Object.keys(type.monthlySettings).length === 0) ? nearestPlan() : null);
+  const settings = salesTypeSettings(type, month, effectivePlan);
+  typeDraft = { ...type, rates: { ...settings.rates }, hasTarget: settings.hasTarget, target: settings.target, productRate: settings.productRate ?? templateSuggestedProductRate(type), scaleStepBelow: settings.scaleStepBelow ?? null, scaleStepAbove: settings.scaleStepAbove ?? null, applyScope: 'all' };
   typeFormOpen = true;
   error = '';
  }
  function submitType(e) {
   e.preventDefault();
   try {
-   const { rates, hasTarget, target, productRate, scaleStepBelow, scaleStepAbove, ...type } = typeDraft;
-   saveSaleType(withSalesTypeSettings({ ...type, sectionId }, month, { rates: { ...rates }, hasTarget, target: hasTarget ? target : null, productRate: hasTarget ? productRate : null, scaleStepBelow, scaleStepAbove }));
+   const { rates, hasTarget, target, productRate, scaleStepBelow, scaleStepAbove, applyScope, ...type } = typeDraft;
+   saveSaleType(withSalesTypeSettings({ ...type, sectionId }, month, { rates: { ...rates }, hasTarget, target: hasTarget ? target : null, productRate: hasTarget ? productRate : null, scaleStepBelow, scaleStepAbove }, ['all', 'month', 'onward'].includes(applyScope) ? applyScope : 'month'));
    typeFormOpen = false; typeDraft = newTypeDraft(); error = ''; showToast({ message: 'Tipo, comissões e meta específica salvos.' });
   } catch(e) { error = e.message; }
  }
@@ -134,6 +145,7 @@
  let confirmCopyPlan = $state(null); // plano template para cópia ao lançar venda
 
  let deleting = $state(null);
+ let deletingPlan = $state(false);
  const canCreateSale = $derived(!!month && appState.ready && !tourOpen && !managingTypes && !reportsOpen && !!activeTypes.length && !editing && !config && !deleting && !deletingType);
  function openNewSale() {
   if (!canCreateSale) return;
@@ -141,9 +153,7 @@
   error = '';
   confirmCopyPlan = null;
   if (!rawPlan) {
-   const tpl = [...scopedSales.salesPlans]
-    .filter((p) => p.id !== planId)
-    .sort((a, b) => b.id.split(':').at(-1).localeCompare(a.id.split(':').at(-1)))[0];
+   const tpl = nearestPlan();
    if (tpl) confirmCopyPlan = tpl;
   }
  }
@@ -158,7 +168,11 @@
   scopedSales.salesPlans.find(p => p.id === month) // fallback: plano migrado
  );
  const plan = $derived(salesPlanWithTypeSettings(rawPlan, scopedSales.salesTypes));
- const summary = $derived(monthSummary(scopedSales.sales, month, plan));
+ // Meses sem meta salva ainda calculam comissões: um plano em memória sem meta
+ // resolve a configuração mais próxima de cada tipo e mantém as vendas na faixa base.
+ const commissionPlan = $derived(plan ?? salesPlanWithTypeSettings(emptyPlan(month, []), scopedSales.salesTypes));
+ const summary = $derived(monthSummary(scopedSales.sales, month, commissionPlan));
+ const monthHasSales = $derived(scopedSales.sales.some(s => !s.deleted && s.date.slice(0, 7) === month));
  const tableScope = $derived(`${sectionId}:${month}`);
  let tableFilters = $state({ scope: '', type: '', query: '', page: 0 });
  const currentFilters = $derived(tableFilters.scope === tableScope ? tableFilters : { scope: tableScope, type: '', query: '', page: 0 });
@@ -248,14 +262,14 @@
 {#if reportsOpen}<SalesReports sales={scopedSales.sales} plans={scopedSales.salesPlans} initialYear={month.slice(0, 4)} sectionName={appState.salesSections.find(section => section.id === sectionId)?.name || 'Vendas'} onClose={() => reportsOpen = false} />{/if}
 {#if managingTypes}
  <Modal open={managingTypes} onClose={() => { managingTypes = false; typeFormOpen = false; typeDraft = newTypeDraft(); error = ''; }} title="Tipos de venda" eyebrow="Organização" maxWidth="850px">
-  <p>Personalize os tipos para seu comércio. Ao excluir um tipo, ele deixa de aparecer em novas vendas; o histórico e as comissões são preservados.</p>
+  <p>Cadastre o comissionamento de cada produto uma única vez: ele vale para todos os meses. Inclua, se desejar, a meta específica. Ao excluir um tipo, ele deixa de aparecer em novas vendas; o histórico e as comissões são preservados.</p>
   {#if error}<p role="alert" class="field-error">{error}</p>{/if}
   {#if !typeFormOpen}
    <button class="btn btn-primary types-new-btn" onclick={() => { typeDraft = newTypeDraft(); typeFormOpen = true; error = ''; }}><Plus size={16} /> Novo tipo de venda</button>
   {:else}
  <form class="movement-form" onsubmit={submitType}>
    <label class="field" data-tourism="type-name"><span>Nome do tipo</span><input class="field-input" required maxlength="80" placeholder="Ex.: Roupas, Alimentos, Consultoria" bind:value={typeDraft.name} /></label>
-   <p class="field-hint">Configuração para {month.split('-').reverse().join('/')}. As faixas usam a meta mensal do controle. Alterações preservam os meses anteriores.</p>
+   <p class="field-hint">Meses sem configuração própria usam a mais próxima, anterior ou posterior — não é preciso cadastrar de novo a cada mês. As faixas usam a meta mensal do controle. Ao salvar, escolha em "Aplicar alteração em" se a mudança vale para todos os meses, só este mês ou deste mês em diante.</p>
    <fieldset class="type-rate-card" data-tourism="type-rates"><legend>Comissão geral das vendas</legend>
    <div class="type-rate-grid">
     {#each Object.entries(TIERS) as [tier, label]}
@@ -266,6 +280,7 @@
    <p class="field-hint">Passos independentes, opcionais. Antes: passo 1 dá 80% da meta = 0,80%; 81% = 0,81%. Em 100% salta para Meta batida. Após: passo 1 dá 101% = 1,16%, até o máximo da Supermeta. Cada passo completo soma 0,01 ponto percentual. Vazio mantém o percentual fixo da fase.</p>
    </fieldset>
    <label class="field" data-tourism="type-specific"><span>Possui meta específica?</span><select class="field-input" bind:value={typeDraft.hasTarget}><option value={false}>Não</option><option value={true}>Sim</option></select></label>
+   <label class="field" data-tourism="type-scope"><span>Aplicar alteração em</span><select class="field-input" aria-label="Aplicar alteração em" bind:value={typeDraft.applyScope}><option value="all">Alterar todos os meses</option><option value="month">Alterar só este mês ({month.split('-').reverse().join('/')})</option><option value="onward">Alterar deste mês em diante</option></select></label>
    {#if typeDraft.hasTarget}<label class="field"><span>Comissão específica do produto (%)</span><input class="field-input" type="number" min="0" max="100" step="0.01" required placeholder="Ex.: 10" bind:value={typeDraft.productRate} /></label><p class="field-hint">Ao atingir a meta do produto, o complemento é este percentual menos a comissão geral. Ex.: 10% − 0,80% = 9,20% adicionais.</p><label class="field"><span>Meta específica mensal (R$)</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0.01" required use:moneyInput={{ value: typeDraft.target, setValue: (value) => typeDraft.target = value }} /></label>{/if}
    <div class="modal-footer"><button class="btn btn-primary">{typeDraft.id ? 'Salvar tipo' : 'Incluir tipo'}</button>
    <button type="button" class="btn btn-ghost" onclick={() => { typeFormOpen = false; typeDraft = newTypeDraft(); error = ''; }}>Cancelar</button></div>
@@ -311,6 +326,12 @@
   </label>
   <p>A base escolhida vale para o cálculo da comissão. A meta e a supermeta acompanham o total vendido, antes das taxas.</p>
   <div class="form-grid" data-tourism="plan-values"><label class="field"><span>Meta (R$)</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0.01" required use:moneyInput={{ value: config.target, setValue: (value) => config.target = value }} /></label><label class="field"><span>Supermeta (R$)</span><input class="field-input" type="text" inputmode="decimal" placeholder="0,00" min="0.02" required use:moneyInput={{ value: config.superTarget, setValue: (value) => config.superTarget = value }} /></label></div>
+  {#if rawPlan && !monthHasSales}
+   <div class="sales-plan-delete">
+    <p class="field-hint">Este mês não tem vendas. Você pode excluir a meta para tirá-lo do relatório.</p>
+    <button type="button" class="btn btn-danger" onclick={() => deletingPlan = true}>Excluir meta deste mês</button>
+   </div>
+  {/if}
   <div class="modal-footer"><button class="btn btn-primary">Salvar configuração</button><button type="button" class="btn btn-ghost" onclick={() => { config = null; configIsTemplate = false; configTemplateMonth = ''; error = ''; }}>Cancelar</button></div>
  </form>
  </Modal>
@@ -460,6 +481,7 @@
 </div>
 <ConfirmDialog open={!!deleting} title="Excluir venda?" message="A venda será excluída e a comissão do mês será recalculada." confirmLabel="Excluir venda" onCancel={() => deleting = null} onConfirm={() => { removeSale(deleting); deleting = null; showToast({ message: 'Venda excluída.' }); }} />
 <ConfirmDialog open={!!deletingType} title="Excluir tipo de venda?" message={`O tipo “${deletingType?.name || ''}” deixará de aparecer em novas vendas. O histórico e as comissões serão preservados.`} confirmLabel="Excluir tipo" onCancel={() => deletingType = null} onConfirm={() => { saveSaleType({ ...deletingType, deleted: true }); deletingType = null; typeFormOpen = false; typeDraft = newTypeDraft(); showToast({ message: 'Tipo excluído. Histórico preservado.' }); }} />
+<ConfirmDialog open={deletingPlan} title="Excluir meta do mês?" message={`A meta de ${month.split('-').reverse().join('/')} será excluída e este mês deixará de aparecer no relatório. Os comissionamentos dos tipos continuam valendo. Essa ação não pode ser desfeita.`} confirmLabel="Excluir meta" onCancel={() => deletingPlan = false} onConfirm={() => { if (rawPlan && !monthHasSales) { removeSalesPlan(rawPlan.id); showToast({ message: 'Meta do mês excluída.' }); } deletingPlan = false; config = null; configIsTemplate = false; configTemplateMonth = ''; }} />
 <style>
  .sales-title-row { width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
  .sales-help-button { border:1px solid var(--border); gap:7px; min-height:40px; white-space:nowrap; }
@@ -590,6 +612,8 @@
  .sales-list .actions-row { justify-content:center; flex-wrap:nowrap; gap:6px; }
  .tbl-icon-btn { min-height:32px; width:32px; padding:0; }
 
+ .sales-plan-delete { margin-top:14px; }
+ .sales-plan-delete .btn { width:100%; justify-content:center; }
  .template-notice {
   background: color-mix(in srgb, var(--accent, hsl(215 65% 55%)) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--accent, hsl(215 65% 55%)) 40%, transparent);
