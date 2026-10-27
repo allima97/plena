@@ -4,9 +4,12 @@
 	"main": ".svelte-kit/cloudflare/_worker.js",
 	"compatibility_date": "2026-09-07",
 	"compatibility_flags": ["nodejs_compat"],
-	// Unbound: sem limite de CPU por request. Necessário para PBKDF2-SHA256
-	// com 600k iterações (≈ 50 ms de CPU), acima do limite padrão de 30 ms.
+	// usage_model "unbound" para planos Bundled/Unbound legados (sem limite de CPU).
+	// Para o plano Workers Standard, usar "limits.cpu_ms" abaixo.
 	"usage_model": "unbound",
+	// Permite até 30 s de CPU por request. Necessário para PBKDF2-SHA256:
+	// verifyPassword (600k hash legado) ≈ 52 ms; hashPassword (260k) ≈ 22 ms.
+	"limits": { "cpu_ms": 30000 },
 	"observability": {
 		"enabled": true
 	},

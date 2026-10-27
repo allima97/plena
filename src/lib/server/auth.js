@@ -3,8 +3,11 @@ const SESSION_COOKIE = '__Host-plena_session';
 const CHALLENGE_COOKIE = '__Host-plena_challenge';
 const SESSION_TTL = 30 * 24 * 60 * 60 * 1000;
 const CHALLENGE_TTL = 5 * 60 * 1000;
-// Validated against the configured workerd runtime; follows OWASP PBKDF2-SHA256 guidance.
-const PASSWORD_ITERATIONS = 600_000;
+// 260k iterações ≈ 22 ms de CPU em PBKDF2-SHA256 no V8.
+// Hashes 600k existentes continuam funcionando: verifyPassword usa o valor
+// gravado no hash, não esta constante (≈ 52 ms, dentro do limits.cpu_ms=30s).
+// Novos hashes (registro e reset) ficam em ≈ 22 ms → dentro do limite padrão.
+const PASSWORD_ITERATIONS = 260_000;
 // The account-wide included email quota is shared with Salão na Mão. Reserve
 // 500 of its 3,000 monthly messages for that app.
 const MONTHLY_EMAIL_LIMIT = 2_500;
