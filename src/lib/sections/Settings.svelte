@@ -16,7 +16,7 @@
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import SyncSettings from '$lib/components/SyncSettings.svelte';
 	import PrivacySettings from '$lib/components/PrivacySettings.svelte';
-	import { Save, Download, Upload, Trash2, ShieldAlert } from 'lucide-svelte';
+	import { Save, Download, Upload, Trash2, ShieldAlert, CircleHelp } from 'lucide-svelte';
 	import { downloadBlob } from '$lib/fin/export.js';
 
 	const SECOES = [
@@ -29,6 +29,7 @@
 		{ id: 'privacidade', label: () => t('settings_tab_privacidade') }
 	];
 	let secaoAtiva = $state('geral');
+	let ajudaBackupAberta = $state(false);
 
 	// Rotas disponíveis pra "Página inicial" -- mesmas do menu lateral (routes/+layout.svelte),
 	// menos a própria tela de Configurações (não faz sentido abrir o app direto nela).
@@ -303,7 +304,18 @@
 	</div>
 {:else if secaoAtiva === 'backup'}
 	<div class="card" style="max-width:560px">
-		<p class="stat-label" style="margin:0 0 4px">{t('settings_backup_titulo')}</p>
+		<p class="stat-label" style="margin:0 0 4px">
+			{t('settings_backup_titulo')}
+			<button class="sync-help-btn" onclick={() => (ajudaBackupAberta = !ajudaBackupAberta)} aria-label="Ajuda sobre backup" title="Como funciona o backup">
+				<CircleHelp size={13} />
+			</button>
+		</p>
+		{#if ajudaBackupAberta}
+		<div class="backup-help-panel">
+			<p><strong>Backup manual:</strong> Clique em "Criar backup" para baixar seus dados como arquivo JSON. No celular, o menu de compartilhamento permite salvar direto no Google Drive, iCloud ou enviar por WhatsApp.</p>
+			<p><strong>Backup automático:</strong> Uma cópia é salva automaticamente na nuvem todo dia às 03h (horário de Brasília). Os últimos 30 backups são mantidos — sem precisar fazer nada.</p>
+		</div>
+		{/if}
 		<p class="movement-meta" style="margin:0 0 16px">{t('settings_backup_sub')}</p>
 
 		{#if ultimoBackup}
@@ -422,6 +434,32 @@
 		padding: 14px 0;
 		border-bottom: 1px solid var(--border-soft);
 	}
+	.sync-help-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		border: none;
+		background: transparent;
+		cursor: pointer;
+		color: var(--text-muted);
+		padding: 0 0 0 4px;
+		vertical-align: middle;
+		border-radius: 50%;
+		transition: color .15s;
+	}
+	.sync-help-btn:hover { color: var(--accent); }
+	.backup-help-panel {
+		background: var(--bg-secondary, hsl(220 14% 96%));
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 12px 14px;
+		margin-bottom: 14px;
+		font-size: .85rem;
+		line-height: 1.6;
+		color: var(--text-secondary);
+	}
+	.backup-help-panel p { margin: 0 0 8px; }
+	.backup-help-panel p:last-child { margin: 0; }
 	.backup-status {
 		display: flex;
 		align-items: center;
