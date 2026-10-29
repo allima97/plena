@@ -70,7 +70,7 @@ export const appState = {
 		return accounts;
 	},
 	get categories() {
-		return categories;
+		return categories.slice().sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 	},
 	get transactions() {
 		return transactions;
@@ -998,7 +998,10 @@ export function exportBackup() {
 }
 
 /** Confere se um texto lido de arquivo é um backup válido do Plena, antes de restaurar de
- * verdade -- devolve { data } (pronto pra restoreBackup) ou { error } com o motivo. */
+ * verdade -- devolve { data } (pronto pra restoreBackup) ou { error } com o motivo.
+ * Aceita dois formatos:
+ *  1. Export local:    { app, version, data: { finAccounts, goals, ... } }
+ *  2. Export servidor: { records: [{collection, id, data}] }  (export de privacidade) */
 export function validateBackup(raw) {
 	let parsed;
 	try {
@@ -1006,10 +1009,31 @@ export function validateBackup(raw) {
 	} catch {
 		return { error: 'Arquivo inválido: não é um JSON legível.' };
 	}
-	if (!parsed || typeof parsed !== 'object' || !parsed.data || typeof parsed.data !== 'object') {
+	if (!parsed || typeof parsed !== 'object') {
 		return { error: 'Arquivo inválido: não parece ser um backup do Plena.' };
 	}
-	return { data: parsed.data };
+
+	// Formato 1: backup local { data: {...} }
+	if (parsed.data && typeof parsed.data === 'object') {
+		return { data: parsed.data };
+	}
+
+	// Formato 2: export de privacidade do servidor { records: [{collection, id, data}] }
+	if (Array.isArray(parsed.records)) {
+		/** @type {Record<string, unknown[]>} */
+		const data = {};
+		for (const record of parsed.records) {
+			if (!record || typeof record.collection !== 'string' || !record.data) continue;
+			if (!Array.isArray(data[record.collection])) data[record.collection] = [];
+			data[record.collection].push(record.data);
+		}
+		if (Object.keys(data).length === 0) {
+			return { error: 'Arquivo inválido: não parece ser um backup do Plena.' };
+		}
+		return { data };
+	}
+
+	return { error: 'Arquivo inválido: não parece ser um backup do Plena.' };
 }
 
 /** Restaura um backup completo, substituindo TUDO que existe hoje (local e, se online, na API).

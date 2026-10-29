@@ -152,7 +152,7 @@
 			<span>Categoria</span>
 			<select class="field-input" bind:value={filters.categoriaId}>
 				<option value="all">Todas as categorias</option>
-				{#each appState.categories as c (c.id)}
+				{#each appState.categories.slice().sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')) as c (c.id)}
 					<option value={c.id}>{c.nome}</option>
 				{/each}
 			</select>

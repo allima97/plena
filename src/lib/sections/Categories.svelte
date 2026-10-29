@@ -148,7 +148,7 @@
 	</div>
 
 	<div class="cat-rows">
-		{#each appState.categories as cat, i (cat.id)}
+		{#each appState.categories.slice().sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')) as cat, i (cat.id)}
 			{@const dot = DOT_PALETTE[i % DOT_PALETTE.length]}
 			<div class="cat-row" id="cat-{cat.id}">
 				<div class="cat-row-top" onclick={() => (expandedId = expandedId === cat.id ? null : cat.id)} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && (expandedId = expandedId === cat.id ? null : cat.id)}>
@@ -213,7 +213,7 @@
 
 						{#if cat.secundarios?.length}
 							<div class="sub-list">
-								{#each cat.secundarios as sub (sub.id)}
+								{#each (cat.secundarios || []).slice().sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')) as sub (sub.id)}
 									<span class="badge badge-gray sub-chip">
 										{sub.nome}
 										<button class="sub-remove" onclick={() => removeSubcategory(cat.id, sub.id)} aria-label="Remover subcategoria">×</button>
