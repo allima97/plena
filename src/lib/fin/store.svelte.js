@@ -311,11 +311,14 @@ export async function boot() {
 	// no localStorage mas ainda não esteja no D1 (ex.: parcelamentos criados antes
 	// da coleção ser reconhecida pela API, quando apiPut retornava 400 silencioso).
 	if (local) {
+		// Apenas coleções sincronizáveis participam da reconciliação de boot.
+		// Coleções não-sincronizáveis (finCategories, finAccounts, finTransactions,
+		// patrimony*, purchaseInstallments, report*, score*) têm o remote como fonte
+		// de verdade: itens que existam só no localStorage mas não no D1 são dados
+		// obsoletos e NÃO devem ser reenviados — isso criava duplicatas.
 		const SYNC_KEYS = [
-			'finAccounts', 'finCategories', 'finTransactions', 'reportTemplates', 'reportHistory',
 			'goals', 'resources', 'resourceMoves', 'goalCategories', 'installments', 'amortizations',
-			'patrimonyItems', 'patrimonySnapshots', 'patrimonyItemMoves', 'scoreSnapshots',
-			'purchaseInstallments', 'sales', 'salesPlans', 'salesTypes', 'salesSections'
+			'sales', 'salesPlans', 'salesTypes', 'salesSections'
 		];
 		const pushOps = [];
 		const deletedIds = new Set((remote.deletedRecords || []).map(item => `${item.collection}/${item.id}`));
