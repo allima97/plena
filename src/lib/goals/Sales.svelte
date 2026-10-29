@@ -199,6 +199,7 @@
  const superFill = $derived(Math.min(100, superPercent));
  const superPercentLabel = $derived(new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1, roundingMode: 'floor' }).format(superPercent));
  const goalColor = $derived(progressColor(goalFill / 100));
+ const superColor = $derived(progressColor(superFill / 100));
  const percentLabel = $derived(new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1, roundingMode: 'floor' }).format(goalPercent));
  // Daily pace KPI — only meaningful in the current month
  const dailyKPI = $derived(plan?.target > 0 ? dailyPaceKPI(plan.target, summary.goalBase, month) : null);
@@ -368,7 +369,7 @@
  <section class="card sales-goal" data-tourism="monthly-goal" aria-label="Atingimento da meta mensal">
   <div class="sales-goal-head">
    <div><p class="stat-label">Meta do mês</p><p class="sales-goal-value privacy-value">{fmtMoney(plan.target)}</p></div>
-   <div class="sales-goal-percent"><strong style:color={goalColor}>{percentLabel}%</strong><span class="field-hint">{goalPercent >= 100 ? 'Meta atingida' : 'da meta atingida'}</span></div>
+   <div class="sales-goal-percent"><strong style:color={goalColor}>{percentLabel}%</strong><span class="field-hint" style:color={goalColor}>{goalPercent >= 100 ? 'Meta atingida' : 'da meta atingida'}</span></div>
   </div>
   <div class="goal-progress-track" role="progressbar" aria-label="Atingimento da meta" aria-valuemin="0" aria-valuemax="100" aria-valuenow={goalFill} aria-valuetext={`${percentLabel}% da meta atingida`}>
    <div class="goal-progress-fill" style:width={`${goalFill}%`} style:background={goalColor}></div>
@@ -378,10 +379,10 @@
    <div class="super-goal" data-tourism="super-goal">
     <div class="sales-goal-head">
      <div><p class="stat-label">Supermeta</p><p class="sales-goal-value privacy-value">{fmtMoney(plan.superTarget)}</p></div>
-     <div class="sales-goal-percent"><strong>{superPercentLabel}%</strong><span class="field-hint">{summary.tier === 'super' ? 'Supermeta atingida' : 'da supermeta atingida'}</span></div>
+     <div class="sales-goal-percent"><strong style:color={superColor}>{superPercentLabel}%</strong><span class="field-hint" style:color={superColor}>{summary.tier === 'super' ? 'Supermeta atingida' : 'da supermeta atingida'}</span></div>
     </div>
     <div class="goal-progress-track" role="progressbar" aria-label="Atingimento da supermeta" aria-valuemin="0" aria-valuemax="100" aria-valuenow={superFill} aria-valuetext={`${superPercentLabel}% da supermeta atingida`}>
-     <div class="goal-progress-fill" style:width={`${superFill}%`} style:background={progressColor(superFill / 100)}></div>
+     <div class="goal-progress-fill" style:width={`${superFill}%`} style:background={superColor}></div>
     </div>
     <p class="stat-sub">Total vendido: <span class="privacy-value">{fmtMoney(summary.goalBase)}</span>{#if summary.tier !== 'super'} · Faltam <span class="privacy-value">{fmtMoney(Math.max(0, plan.superTarget - summary.goalBase))}</span>{/if}</p>
    </div>
@@ -390,7 +391,7 @@
  {#if typeKPIs.length}
   <section class="card type-goals" data-tourism="product-goal" aria-label="Metas por tipo"><h2>Metas por tipo</h2>
    {#each typeKPIs as kpi (kpi.typeId)}
-    <div class="type-goal-item"><div class="sales-goal-head"><strong>{kpi.typeName}</strong><span>{new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(kpi.sold / kpi.target * 100)}%</span></div>
+    <div class="type-goal-item"><div class="sales-goal-head"><strong>{kpi.typeName}</strong><span style:color={progressColor(kpi.pct / 100)}>{new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(kpi.sold / kpi.target * 100)}%</span></div>
     <div class="kpi-progress-track" role="progressbar" aria-label={`Meta ${kpi.typeName}`} aria-valuemin="0" aria-valuemax="100" aria-valuenow={kpi.pct}><div class="kpi-progress-fill" style:width={`${kpi.pct}%`} style:background={progressColor(kpi.pct / 100)}></div></div>
     <div class="sales-goal-head kpi-sub"><span class="privacy-value">{fmtMoney(kpi.sold)}</span><span>de {fmtMoney(kpi.target)}</span></div>
     </div>
