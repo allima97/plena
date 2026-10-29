@@ -16,6 +16,7 @@
  import { todayISO, fmtMoney, fmtDate, monthLabel } from '$lib/format.js';
  import { saleTypesCatalog, TIERS, emptyPlan, monthSummary, dailyPaceKPI } from './sales.js';
  import { filterSalesRows, salesTablePage } from './sales-table.js';
+ import { progressColor } from './metrics.js';
 
  /** @type {{ sectionId?: string, onBack?: () => void }} */
  let { sectionId = 'default', onBack = null } = $props();
@@ -197,7 +198,7 @@
  const superPercent = $derived(plan?.superTarget > 0 ? Math.max(0, summary.goalBase / plan.superTarget * 100) : 0);
  const superFill = $derived(Math.min(100, superPercent));
  const superPercentLabel = $derived(new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1, roundingMode: 'floor' }).format(superPercent));
- const goalColor = $derived(`hsl(${goalFill * 1.2} 65% 38%)`);
+ const goalColor = $derived(progressColor(goalFill / 100));
  const percentLabel = $derived(new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1, roundingMode: 'floor' }).format(goalPercent));
  // Daily pace KPI — only meaningful in the current month
  const dailyKPI = $derived(plan?.target > 0 ? dailyPaceKPI(plan.target, summary.goalBase, month) : null);
@@ -380,7 +381,7 @@
      <div class="sales-goal-percent"><strong>{superPercentLabel}%</strong><span class="field-hint">{summary.tier === 'super' ? 'Supermeta atingida' : 'da supermeta atingida'}</span></div>
     </div>
     <div class="goal-progress-track" role="progressbar" aria-label="Atingimento da supermeta" aria-valuemin="0" aria-valuemax="100" aria-valuenow={superFill} aria-valuetext={`${superPercentLabel}% da supermeta atingida`}>
-     <div class="goal-progress-fill" style:width={`${superFill}%`} style:background={`hsl(${superFill * 1.2} 65% 38%)`}></div>
+     <div class="goal-progress-fill" style:width={`${superFill}%`} style:background={progressColor(superFill / 100)}></div>
     </div>
     <p class="stat-sub">Total vendido: <span class="privacy-value">{fmtMoney(summary.goalBase)}</span>{#if summary.tier !== 'super'} · Faltam <span class="privacy-value">{fmtMoney(Math.max(0, plan.superTarget - summary.goalBase))}</span>{/if}</p>
    </div>
@@ -390,7 +391,7 @@
   <section class="card type-goals" data-tourism="product-goal" aria-label="Metas por tipo"><h2>Metas por tipo</h2>
    {#each typeKPIs as kpi (kpi.typeId)}
     <div class="type-goal-item"><div class="sales-goal-head"><strong>{kpi.typeName}</strong><span>{new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(kpi.sold / kpi.target * 100)}%</span></div>
-    <div class="kpi-progress-track" role="progressbar" aria-label={`Meta ${kpi.typeName}`} aria-valuemin="0" aria-valuemax="100" aria-valuenow={kpi.pct}><div class="kpi-progress-fill" style:width={`${kpi.pct}%`} style:background={`hsl(${kpi.pct * 1.2} 65% 38%)`}></div></div>
+    <div class="kpi-progress-track" role="progressbar" aria-label={`Meta ${kpi.typeName}`} aria-valuemin="0" aria-valuemax="100" aria-valuenow={kpi.pct}><div class="kpi-progress-fill" style:width={`${kpi.pct}%`} style:background={progressColor(kpi.pct / 100)}></div></div>
     <div class="sales-goal-head kpi-sub"><span class="privacy-value">{fmtMoney(kpi.sold)}</span><span>de {fmtMoney(kpi.target)}</span></div>
     </div>
    {/each}
