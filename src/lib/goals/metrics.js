@@ -76,7 +76,9 @@ const WARN = hexToHsl('#c38b35');
 const GOOD = hexToHsl('#23a768');
 export function progressColor(percent) {
 	const p = clamp01(percent);
-	const mix = p <= 0.5 ? mixHsl(DANGER, WARN, p / 0.5) : mixHsl(WARN, GOOD, (p - 0.5) / 0.5);
+	// Curva cúbica: mantém laranja/amarelo até ~90%, fica verde só perto de 100%
+	const c = p * p * p;
+	const mix = c <= 0.5 ? mixHsl(DANGER, WARN, c / 0.5) : mixHsl(WARN, GOOD, (c - 0.5) / 0.5);
 	return `hsl(${mix.h.toFixed(1)},${(mix.s * 100).toFixed(1)}%,${(mix.l * 100).toFixed(1)}%)`;
 }
 
