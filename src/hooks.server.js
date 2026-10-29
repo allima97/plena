@@ -23,7 +23,7 @@ const PUBLIC_ASSET_PREFIXES = ['/_app/', '/icons/'];
 const PUBLIC_ASSETS = new Set(['/favicon.svg', '/favicon.ico', '/apple-touch-icon.png', '/manifest.webmanifest', '/service-worker.js', '/robots.txt', '/privacidade.html', '/privacidade']);
 
 async function boundedBody(event, machine = false) {
-  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(event.request.method) || !event.request.body) return;
+  if (!['POST', 'PUT', 'PATCH'].includes(event.request.method) || !event.request.body) return;
   const body = await readJson(event.request, machine ? 8 * 1024 * 1024 : 262144);
   const headers = new Headers(event.request.headers); headers.delete('content-length');
   event.request = new Request(event.request.url, { method: event.request.method, headers, body: JSON.stringify(body) });

@@ -139,7 +139,12 @@ export async function DELETE({ locals, params, platform }) {
 	const deletedAt = Date.now();
 	if (isSyncable(params.collection)) {
 		await runSyncStatements(db, syncRecordStatements(db, owner, 'owner_email', { collection: params.collection, id: params.id, deleted: true, updatedAt: deletedAt }));
-	} else await db.prepare('DELETE FROM documents WHERE owner_email = ? AND collection = ? AND id = ?').bind(owner, params.collection, params.id).run();
+	} else {
+		await db.batch([
+			db.prepare('DELETE FROM documents WHERE owner_email = ? AND collection = ? AND id = ?').bind(owner, params.collection, params.id),
+			db.prepare('INSERT INTO sync_tombstones(owner, collection, id, deleted_at) VALUES (?, ?, ?, ?) ON CONFLICT(owner, collection, id) DO UPDATE SET deleted_at = excluded.deleted_at WHERE excluded.deleted_at > sync_tombstones.deleted_at').bind(owner, params.collection, params.id, deletedAt),
+		]);
+	}
 
 	// Dispara sync em background
 	if (isSyncable(params.collection)) {
