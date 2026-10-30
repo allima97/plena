@@ -80,7 +80,7 @@ export async function apiRemove(collection, id) {
 	try {
 		const res = await fetch(`/api/${collection}/${encodeURIComponent(id)}`, {
 			method: 'DELETE',
-			headers: { 'X-Plena-Owner': activeIdentity }
+			headers: { 'content-type': 'application/json', 'X-Plena-Owner': activeIdentity }
 		});
 		inspectSession(res);
 		return res.ok;
