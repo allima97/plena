@@ -370,6 +370,9 @@ export function retrySync() {
 // ---- categorias (financeiras: receita/despesa) ---------------------------
 
 export function addCategory(tipo, nome) {
+	const normalizado = nome.trim().toLocaleLowerCase('pt-BR');
+	const existente = categories.find((c) => c.tipo === tipo && c.nome.trim().toLocaleLowerCase('pt-BR') === normalizado);
+	if (existente) return existente;
 	const cat = { id: uid(), tipo, nome: nome.trim(), secundarios: [] };
 	categories = [...categories, cat];
 	write('finCategories', cat.id, cat);

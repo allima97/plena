@@ -144,11 +144,12 @@
 
 			// navigator.share: no celular abre o menu de compartilhamento nativo
 			// (Google Drive, iCloud, WhatsApp, E-mail, etc.)
-			if (navigator.canShare?.({ files: [file] })) {
+			if (navigator.share) {
 				try {
 					await navigator.share({ files: [file], title: 'Backup Plena' });
 				} catch (e) {
 					if (e?.name === 'AbortError') return; // usuário cancelou
+					// TypeError = tipo de arquivo não suportado pelo share; outros erros inesperados
 					downloadBlob(content, filename, 'application/json');
 				}
 			} else {
@@ -191,10 +192,17 @@
 	</div>
 </div>
 
-<div class="period-tabs" style="margin-bottom:20px">
+<div class="period-tabs settings-tabs-desktop" style="margin-bottom:20px">
 	{#each SECOES as s (s.id)}
 		<button type="button" class:active={secaoAtiva === s.id} onclick={() => (secaoAtiva = s.id)}>{s.label()}</button>
 	{/each}
+</div>
+<div class="settings-tab-select">
+	<select bind:value={secaoAtiva} aria-label="Seção de configurações">
+		{#each SECOES as s (s.id)}
+			<option value={s.id}>{s.label()}</option>
+		{/each}
+	</select>
 </div>
 
 {#if secaoAtiva === 'geral'}
@@ -330,7 +338,7 @@
 			</div>
 		{/if}
 
-		<div class="modal-footer" style="justify-content:flex-start;gap:12px;margin-top:16px">
+		<div class="backup-actions">
 			<button type="button" class="btn btn-primary" onclick={criarBackup} disabled={criandoBackup}>
 				<Download size={16} /> {criandoBackup ? 'Aguarde…' : t('settings_backup_criar')}
 			</button>
@@ -479,5 +487,49 @@
 		margin-left: auto;
 		font-size: 11px;
 		opacity: 0.85;
+	}
+	/* Dropdown de seção — só aparece em mobile */
+	.settings-tab-select {
+		display: none;
+		margin-bottom: 20px;
+	}
+	.settings-tab-select select {
+		width: 100%;
+		appearance: none;
+		-webkit-appearance: none;
+		background: var(--card, #fff) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 14px center;
+		box-shadow: 0 1px 4px rgba(43,61,70,.08);
+		border: none;
+		border-radius: 999px;
+		padding: 0 40px 0 18px;
+		height: 40px;
+		font-size: 13px;
+		font-weight: 700;
+		color: var(--ink);
+		cursor: pointer;
+		outline: none;
+	}
+	@media (max-width: 768px) {
+		.settings-tabs-desktop { display: none; }
+		.settings-tab-select { display: block; }
+	}
+	.backup-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 10px;
+		margin-top: 16px;
+	}
+	.backup-actions .btn {
+		flex: 1 1 auto;
+		min-width: 140px;
+	}
+	@media (max-width: 768px) {
+		.backup-actions {
+			flex-direction: column;
+		}
+		.backup-actions .btn {
+			width: 100%;
+			justify-content: center;
+		}
 	}
 </style>

@@ -94,7 +94,7 @@
 		};
 	}
 
-	const categoriasDoTipo = $derived(appState.categories.filter((c) => c.tipo === form.tipo));
+	const categoriasDoTipo = $derived(appState.categories.filter((c) => c.tipo === form.tipo).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
 	const contaSelecionada = $derived(appState.accounts.find((a) => a.id === form.contaId));
 	const categoriaSelecionada = $derived(categoriasDoTipo.find((c) => c.id === form.categoriaId));
 

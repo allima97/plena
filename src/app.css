@@ -1782,6 +1782,18 @@ table.list .num {
 .page-head .btn:not(.btn-primary):hover {
 	background: var(--border);
 }
+@media (max-width: 480px) {
+	.page-head .actions-row {
+		flex-direction: column;
+		width: 100%;
+	}
+	.page-head .actions-row .btn,
+	.page-head > .btn {
+		display: flex;
+		width: 100%;
+		justify-content: center;
+	}
+}
 
 .series-actions-row {
 	display: flex;
@@ -3443,6 +3455,14 @@ table.list .num {
 	/* Mesmo motivo do .page-head .btn acima: dentro do card branco do
 	   header, o fundo quase-branco original (#fafcfb) se perdia. */
 	background: var(--surface-3);
+}
+@media (max-width: 480px) {
+	.dash-filters {
+		flex-direction: column;
+	}
+	.dash-filters select {
+		width: 100%;
+	}
 }
 
 .hero-row {

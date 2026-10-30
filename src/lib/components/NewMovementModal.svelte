@@ -85,7 +85,7 @@
 		onClose();
 	}
 
-	const categoriasDoTipo = $derived(appState.categories.filter((c) => c.tipo === form.tipo));
+	const categoriasDoTipo = $derived(appState.categories.filter((c) => c.tipo === form.tipo).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
 	const categoriaSelecionada = $derived(appState.categories.find((c) => c.id === form.categoriaId));
 
 	function norm(s) {
@@ -212,7 +212,7 @@
 				<span>Subcategoria</span>
 				<select class="field-input" disabled={locked || !categoriaSelecionada?.secundarios?.length} bind:value={form.subcategoriaId}>
 					<option value="">Nenhuma</option>
-					{#each categoriaSelecionada?.secundarios || [] as s (s.id)}
+					{#each (categoriaSelecionada?.secundarios || []).slice().sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')) as s (s.id)}
 						<option value={s.id}>{s.nome}</option>
 					{/each}
 				</select>
