@@ -1555,13 +1555,22 @@ table.list .num {
 		transform: none;
 	}
 	.notif-drawer-item {
-		flex-direction: column;
+		flex-direction: row;
 		align-items: flex-start;
-		gap: 8px;
+		gap: 10px;
+		flex-wrap: wrap;
+	}
+	.notif-drawer-item .attention-dot {
+		margin-top: 4px;
+	}
+	.notif-drawer-text {
+		flex: 1;
+		min-width: 0;
 	}
 	.notif-drawer-item .link-more {
 		align-self: flex-start;
 		margin-top: 4px;
+		flex-basis: 100%;
 	}
 }
 .notif-drawer-head {
