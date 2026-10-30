@@ -1548,8 +1548,9 @@ table.list .num {
 	.notif-drawer {
 		right: 16px;
 		left: 16px;
-		width: auto;
+		width: calc(100% - 32px);
 		transform: none;
+		min-width: 280px;
 	}
 }
 .notif-drawer-head {
