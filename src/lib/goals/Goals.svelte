@@ -11,7 +11,8 @@
 		restoreResource,
 		restoreResourceMove,
 		restoreInstallment,
-		restoreAmortization
+		restoreAmortization,
+		goalCategoryName
 	} from '$lib/fin/store.svelte.js';
 	import { showToast } from '$lib/toast.svelte.js';
 	import { tick } from 'svelte';
@@ -23,6 +24,7 @@
 	import GoalFormModal from './GoalFormModal.svelte';
 	import ResourceFormModal from './ResourceFormModal.svelte';
 	import MoveFormModal from './MoveFormModal.svelte';
+	import MoveDetailsModal from './MoveDetailsModal.svelte';
 	import InstallmentFormModal from './InstallmentFormModal.svelte';
 	import AmortizationFormModal from './AmortizationFormModal.svelte';
 	import RowActionsModal from '$lib/components/RowActionsModal.svelte';
@@ -255,6 +257,7 @@
 	let goalModal = $state({ open: false, editing: null });
 	let resourceModal = $state({ open: false, goalId: null, editing: null });
 	let moveModal = $state({ open: false, resourceId: null, goalId: null, editing: null });
+	let moveDetailsModal = $state({ open: false, move: null, resourceId: null, goalId: null });
 	let installmentModal = $state({ open: false, goalId: null, editing: null });
 	let amortModal = $state({ open: false, goalId: null, editing: null });
 	let deleting = $state(null); // { kind, id, label, warn }
@@ -264,7 +267,7 @@
 	$effect(() => {
 		navigation.goalAction = {
 			onClick: openNewGoal,
-			disabled: !appState.ready || goalModal.open || resourceModal.open || moveModal.open || installmentModal.open || amortModal.open || installmentDetail.open || rowActions.open || !!deleting
+			disabled: !appState.ready || goalModal.open || resourceModal.open || moveModal.open || moveDetailsModal.open || installmentModal.open || amortModal.open || installmentDetail.open || rowActions.open || !!deleting
 		};
 		return () => { navigation.goalAction = null; };
 	});
@@ -486,20 +489,7 @@
 										style="padding:10px 0"
 										role="button"
 										tabindex="0"
-										onclick={() =>
-											openRowActions({
-												title: mv.description,
-												subtitle: fmtDate(mv.date),
-												details: [
-													{ label: 'Valor', value: fmtMoney(mv.amount, moeda), tone: mv.amount >= 0 ? 'positive' : 'negative' },
-													...(mv.baseAmount ? [{ label: 'Valor base', value: fmtMoney(mv.baseAmount, appState.settings.moedaPadrao) }] : []),
-													{ label: 'Data', value: fmtDate(mv.date) }
-												],
-												actions: [
-													{ label: 'Editar', icon: Pencil, onClick: () => (moveModal = { open: true, resourceId: r.id, goalId: selectedGoal.id, editing: mv }) },
-													{ label: 'Excluir', icon: Trash2, variant: 'danger', onClick: () => (deleting = { kind: 'move', id: mv.id, label: `"${mv.description}"`, warn: '' }) }
-												]
-											})}
+										onclick={() => (moveDetailsModal = { open: true, move: mv, resourceId: r.id, goalId: selectedGoal.id })}
 										onkeydown={(e) => {
 											if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click();
 										}}
@@ -914,6 +904,20 @@
 <GoalFormModal open={goalModal.open} editing={goalModal.editing} onClose={() => (goalModal = { ...goalModal, open: false })} onSaved={(g) => openGoal(g.id)} />
 <ResourceFormModal open={resourceModal.open} goalId={resourceModal.goalId} editing={resourceModal.editing} onClose={() => (resourceModal = { ...resourceModal, open: false })} />
 <MoveFormModal open={moveModal.open} resourceId={moveModal.resourceId} goalId={moveModal.goalId} editing={moveModal.editing} onClose={() => (moveModal = { ...moveModal, open: false })} />
+<MoveDetailsModal
+	open={moveDetailsModal.open}
+	move={moveDetailsModal.move}
+	goalCurrency={selectedGoal?.currency || 'BRL'}
+	onEdit={() => {
+		moveModal = { open: true, resourceId: moveDetailsModal.resourceId, goalId: moveDetailsModal.goalId, editing: moveDetailsModal.move };
+		moveDetailsModal = { ...moveDetailsModal, open: false };
+	}}
+	onDelete={() => {
+		deleting = { kind: 'move', id: moveDetailsModal.move.id, label: `"${moveDetailsModal.move.description}"`, warn: '' };
+		moveDetailsModal = { ...moveDetailsModal, open: false };
+	}}
+	onClose={() => (moveDetailsModal = { ...moveDetailsModal, open: false })}
+/>
 <InstallmentFormModal open={installmentModal.open} goalId={installmentModal.goalId} editing={installmentModal.editing} onClose={() => (installmentModal = { ...installmentModal, open: false })} />
 <AmortizationFormModal open={amortModal.open} goalId={amortModal.goalId} editing={amortModal.editing} onClose={() => (amortModal = { ...amortModal, open: false })} />
 
