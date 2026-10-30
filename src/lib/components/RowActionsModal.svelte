@@ -36,6 +36,9 @@
 			</button>
 		{/each}
 	</div>
+	<div class="modal-footer">
+		<button type="button" class="btn btn-ghost" onclick={onClose}>Cancelar</button>
+	</div>
 </Modal>
 
 <style>
@@ -75,6 +78,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
+		margin-bottom: 14px;
 	}
 	.row-actions-list.with-details {
 		margin-top: 2px;
@@ -111,5 +115,12 @@
 	}
 	.row-action-btn.danger:hover {
 		background: var(--expense-soft);
+	}
+	.modal-footer {
+		display: flex;
+		justify-content: flex-end;
+		gap: 8px;
+		padding-top: 14px;
+		border-top: 1px solid var(--border-soft);
 	}
 </style>

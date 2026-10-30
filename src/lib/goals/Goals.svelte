@@ -490,6 +490,11 @@
 											openRowActions({
 												title: mv.description,
 												subtitle: fmtDate(mv.date),
+												details: [
+													{ label: 'Valor', value: fmtMoney(mv.amount, moeda), tone: mv.amount >= 0 ? 'positive' : 'negative' },
+													...(mv.baseAmount ? [{ label: 'Valor base', value: fmtMoney(mv.baseAmount, appState.settings.moedaPadrao) }] : []),
+													{ label: 'Data', value: fmtDate(mv.date) }
+												],
 												actions: [
 													{ label: 'Editar', icon: Pencil, onClick: () => (moveModal = { open: true, resourceId: r.id, goalId: selectedGoal.id, editing: mv }) },
 													{ label: 'Excluir', icon: Trash2, variant: 'danger', onClick: () => (deleting = { kind: 'move', id: mv.id, label: `"${mv.description}"`, warn: '' }) }
