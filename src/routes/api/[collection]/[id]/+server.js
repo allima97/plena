@@ -60,6 +60,36 @@ function checkCollection(collection) {
 	return KNOWN_COLLECTIONS.includes(collection);
 }
 
+/** OPTIONS /api/:collection/:id — CORS preflight. */
+export async function OPTIONS() {
+	return new Response(null, {
+		status: 204,
+		headers: {
+			'Access-Control-Allow-Methods': 'GET, PUT, DELETE, OPTIONS',
+			'Access-Control-Allow-Headers': 'Content-Type, X-Plena-Owner'
+		}
+	});
+}
+
+/** GET /api/:collection/:id — lê um documento do usuário logado. */
+export async function GET({ locals, params }) {
+	const db = env.DB;
+	if (!db) return json({ error: 'D1 não configurado' }, { status: 503 });
+	const owner = dataOwner(locals);
+	if (!owner) return json({ error: 'unauthorized' }, { status: 401 });
+	if (!checkCollection(params.collection)) return json({ error: 'Coleção desconhecida' }, { status: 400 });
+	if (!validDocumentId(params.id)) return json({ error: 'Identificador inválido' }, { status: 400 });
+
+	await claimLegacyData(db, owner, env);
+	const record = await db.prepare('SELECT data FROM documents WHERE owner_email = ? AND collection = ? AND id = ?')
+		.bind(owner, params.collection, params.id)
+		.first();
+
+	if (!record) return json({ error: 'Documento não encontrado' }, { status: 404 });
+
+	return json(record.data);
+}
+
 /** PUT /api/:collection/:id — grava ou substitui um documento do usuário. */
 export async function PUT({ locals, params, request, platform }) {
 	const db = env.DB;
