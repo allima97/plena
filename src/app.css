@@ -1546,9 +1546,10 @@ table.list .num {
 }
 @media (max-width: 768px) {
 	.notif-drawer {
-		right: auto;
-		left: 50%;
-		transform: translateX(-50%);
+		right: 16px;
+		left: 16px;
+		width: auto;
+		transform: none;
 	}
 }
 .notif-drawer-head {
