@@ -1544,6 +1544,13 @@ table.list .num {
 	border-radius: var(--radius-lg);
 	box-shadow: var(--shadow-modal);
 }
+@media (max-width: 768px) {
+	.notif-drawer {
+		right: auto;
+		left: 50%;
+		transform: translateX(-50%);
+	}
+}
 .notif-drawer-head {
 	display: flex;
 	align-items: center;
