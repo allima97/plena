@@ -1,0 +1,1225 @@
+import { buildSalesTemplate } from '$lib/goals/sales-templates.js';
+import { validateSale, validatePlan, validateSaleType, saleTypesCatalog, validateSalesSection, forSection } from '$lib/goals/sales.js';
+import { loadLocal, saveLocal, fetchRemoteState, apiPut, apiRemove, apiImportSalesTemplate, fetchMe, setLocalIdentity } from './persist.js';
+import { seedCategories, uid } from './seed.js';
+import { todayISO } from '../format.js';
+import { downloadBlob } from './export.js';
+
+/** Preferências gerais do sistema (Configurações) -- mesclado com o que já estiver salvo, pra
+ * qualquer campo novo (adicionado numa versão mais recente do app) sempre ter um valor padrão
+ * mesmo pra quem já tinha um `settings` salvo de antes com menos campos. */
+const DEFAULT_SETTINGS = {
+	moedaPadrao: 'BRL',
+	homePage: '/',
+	monthStartDay: 1,
+	confirmExitApp: false,
+	theme: 'light',
+	primaryColor: '',
+	incomeColor: '',
+	expenseColor: '',
+	language: 'pt-BR'
+};
+
+let accounts = $state([]);
+let categories = $state([]);
+let transactions = $state([]);
+let reportTemplates = $state([]);
+let reportHistory = $state([]);
+let reportSchedule = $state({ ativo: false, templateId: null, dia: 5, hora: '08:00' });
+let alertThresholds = $state({ um: 1, tres: 3, sete: 7 });
+let budgetGlobal = $state(null); // orçamento mensal total (P3.1), distinto do orçamento por categoria
+let settings = $state({ ...DEFAULT_SETTINGS });
+
+// ---- objetivos (mesmo modelo de dados do Rumo Financeiro / nextgoals) ----
+let goals = $state([]);
+let resources = $state([]);
+let resourceMoves = $state([]);
+let goalCategories = $state([]);
+let installments = $state([]);
+let amortizations = $state([]);
+
+// ---- patrimonio (fase 4: investimentos manuais + historico mensal de patrimonio liquido) ----
+let patrimonyItems = $state([]);
+let patrimonySnapshots = $state([]);
+let patrimonyItemMoves = $state([]); // P4.4: historico de aportes/valorizacao por ativo
+
+// ---- score financeiro: historico mensal (fase P2.6) ----
+let scoreSnapshots = $state([]);
+
+// ---- parcelamentos de compras (controle sem impacto no movimento) ----
+let purchaseInstallments = $state([]);
+let sales = $state([]);
+let salesPlans = $state([]);
+let salesTypes = $state([]);
+let salesSections = $state([]);
+
+let mode = $state(/** @type {'loading'|'api'|'local'} */ ('loading'));
+let syncStatus = $state(/** @type {'synced'|'saving'|'error'} */ ('synced'));
+let pendingWrites = 0;
+let localRevision = 0;
+let lastFailedOp = /** @type {{collection:string,id:string,data?:any,remove?:boolean}|null} */ (null);
+let ready = $state(false);
+let user = $state(/** @type {{email:string,name:string|null,logoutUrl:string|null}|null} */ (null));
+
+export const appState = {
+	get sales() { return sales; },
+	get salesPlans() { return salesPlans; },
+	get salesTypes() { return salesTypes; },
+	get salesSections() { return salesSections; },
+	get accounts() {
+		return accounts;
+	},
+	get categories() {
+		return categories;
+	},
+	get transactions() {
+		return transactions;
+	},
+	get reportTemplates() {
+		return reportTemplates;
+	},
+	get reportHistory() {
+		return reportHistory;
+	},
+	get reportSchedule() {
+		return reportSchedule;
+	},
+	get alertThresholds() {
+		return alertThresholds;
+	},
+	get budgetGlobal() {
+		return budgetGlobal;
+	},
+	get settings() {
+		return settings;
+	},
+	get goals() {
+		return goals;
+	},
+	get resources() {
+		return resources;
+	},
+	get resourceMoves() {
+		return resourceMoves;
+	},
+	get goalCategories() {
+		return goalCategories;
+	},
+	get installments() {
+		return installments;
+	},
+	get amortizations() {
+		return amortizations;
+	},
+	get patrimonyItems() {
+		return patrimonyItems;
+	},
+	get patrimonySnapshots() {
+		return patrimonySnapshots;
+	},
+	get scoreSnapshots() {
+		return scoreSnapshots;
+	},
+	get patrimonyItemMoves() {
+		return patrimonyItemMoves;
+	},
+	get purchaseInstallments() {
+		return purchaseInstallments;
+	},
+	get mode() {
+		return mode;
+	},
+	get syncStatus() {
+		return syncStatus;
+	},
+	get ready() {
+		return ready;
+	},
+	get user() {
+		return user;
+	}
+};
+
+function snapshot() {
+	return {
+		finAccounts: accounts,
+		finCategories: categories,
+		finTransactions: transactions,
+		reportTemplates,
+		reportHistory,
+		reportSchedule,
+		alertThresholds,
+		budgetGlobal,
+		settings,
+		goals,
+		resources,
+		resourceMoves,
+		goalCategories,
+		installments,
+		amortizations,
+		patrimonyItems,
+		patrimonySnapshots,
+		scoreSnapshots,
+		patrimonyItemMoves,
+		purchaseInstallments,
+		sales,
+		salesPlans,
+		salesTypes,
+		salesSections
+	};
+}
+
+function persistLocalSnapshot() {
+	saveLocal(snapshot());
+}
+
+// ── Migração: dados de vendas sem sectionId → seção "Turismo" ────────────────
+// Roda uma vez: se existem vendas/planos/tipos sem sectionId e ainda não existe
+// nenhuma seção cadastrada, cria "Turismo" e reassocia todos os registros.
+function migrateLegacySalesToSection(sectionName) {
+	const hasLegacy =
+	sales.some(s => !s.sectionId) ||
+	salesPlans.some(p => !p.sectionId) ||
+	salesTypes.some(t => !t.sectionId);
+	if (!hasLegacy) return; // nada a migrar
+
+	// Usa seção existente de mesmo nome ou cria uma nova
+	let section = salesSections.find(s => !s.deleted && s.name.toLocaleLowerCase('pt-BR') === sectionName.toLocaleLowerCase('pt-BR'));
+	if (!section) {
+	section = { id: uid(), name: sectionName, deleted: false };
+	salesSections = [...salesSections, section];
+	write('salesSections', section.id, section);
+	}
+	const sid = section.id;
+
+	// Reassocia vendas
+	sales = sales.map(s => s.sectionId ? s : { ...s, sectionId: sid });
+	sales.filter(s => s.sectionId === sid && !s._migrated).forEach(s => {
+	const updated = { ...s, _migrated: true };
+	sales = sales.map(x => x.id === updated.id ? updated : x);
+	write('sales', updated.id, updated);
+	});
+
+	// Reassocia planos (o id do plano era só "YYYY-MM"; agora é "sectionId:YYYY-MM")
+	salesPlans = salesPlans.map(p => {
+	if (p.sectionId) return p;
+	// Mantém o id original para não quebrar lookup — sectionId marca o dono
+	const updated = { ...p, sectionId: sid };
+	write('salesPlans', updated.id, updated);
+	return updated;
+	});
+
+	// Reassocia tipos
+	salesTypes = salesTypes.map(t => {
+	if (t.sectionId) return t;
+	const updated = { ...t, sectionId: sid };
+	write('salesTypes', updated.id, updated);
+	return updated;
+	});
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function boot() {
+	user = await fetchMe();
+	setLocalIdentity(user?.email);
+	const local = loadLocal({ allowLegacy: user?.isLegacyDataOwner === true });
+	if (local) {
+		accounts = local.finAccounts || [];
+		categories = local.finCategories || [];
+		transactions = local.finTransactions || [];
+		reportTemplates = local.reportTemplates || [];
+		reportHistory = local.reportHistory || [];
+		reportSchedule = local.reportSchedule || { ativo: false, templateId: null, dia: 5, hora: '08:00' };
+		alertThresholds = local.alertThresholds || { um: 1, tres: 3, sete: 7 };
+		budgetGlobal = local.budgetGlobal ?? null;
+		settings = local.settings ? { ...DEFAULT_SETTINGS, ...local.settings } : { ...DEFAULT_SETTINGS };
+		goals = local.goals || [];
+		resources = local.resources || [];
+		resourceMoves = local.resourceMoves || [];
+		goalCategories = local.goalCategories || [];
+		installments = local.installments || [];
+		amortizations = local.amortizations || [];
+		patrimonyItems = local.patrimonyItems || [];
+		patrimonySnapshots = local.patrimonySnapshots || [];
+		scoreSnapshots = local.scoreSnapshots || [];
+		patrimonyItemMoves = local.patrimonyItemMoves || [];
+		purchaseInstallments = local.purchaseInstallments || [];
+		sales = local.sales || [];
+		salesPlans = local.salesPlans || [];
+		salesTypes = local.salesTypes || [];
+		salesSections = local.salesSections || [];
+	}
+	ready = true;
+	migrateLegacySalesToSection('Turismo');
+
+	const remote = await fetchRemoteState(user?.email);
+	if (!remote) {
+		mode = 'local';
+		if (!categories.length) {
+			categories = seedCategories();
+			persistLocalSnapshot();
+		}
+		return;
+	}
+
+	if (!remote.finCategories.length && !remote.finAccounts.length && !remote.finTransactions.length) {
+		const seedCats = categories.length ? categories : seedCategories();
+		const seedAccounts = accounts;
+		const seedTx = transactions;
+		await Promise.all([
+			...seedCats.map((c) => apiPut('finCategories', c.id, c)),
+			...seedAccounts.map((a) => apiPut('finAccounts', a.id, a)),
+			...seedTx.map((t) => apiPut('finTransactions', t.id, t))
+		]);
+		accounts = seedAccounts;
+		categories = seedCats;
+		transactions = seedTx;
+	} else {
+		accounts = remote.finAccounts || [];
+		categories = remote.finCategories || [];
+		transactions = remote.finTransactions || [];
+	}
+	reportTemplates = remote.reportTemplates || reportTemplates;
+	reportHistory = remote.reportHistory || reportHistory;
+	reportSchedule = remote.reportSchedule || reportSchedule;
+	alertThresholds = remote.alertThresholds || alertThresholds;
+	budgetGlobal = remote.budgetGlobal ?? budgetGlobal;
+	settings = remote.settings ? { ...DEFAULT_SETTINGS, ...remote.settings } : settings;
+	goals = remote.goals || goals;
+	resources = remote.resources || resources;
+	resourceMoves = remote.resourceMoves || resourceMoves;
+	goalCategories = remote.goalCategories || goalCategories;
+	installments = remote.installments || installments;
+	amortizations = remote.amortizations || amortizations;
+	patrimonyItems = remote.patrimonyItems || patrimonyItems;
+	patrimonySnapshots = remote.patrimonySnapshots || patrimonySnapshots;
+	scoreSnapshots = remote.scoreSnapshots || scoreSnapshots;
+	patrimonyItemMoves = remote.patrimonyItemMoves || patrimonyItemMoves;
+	purchaseInstallments = remote.purchaseInstallments || purchaseInstallments;
+	sales = remote.sales || sales;
+	salesPlans = remote.salesPlans || salesPlans;
+	salesTypes = remote.salesTypes || salesTypes;
+	salesSections = remote.salesSections || salesSections;
+
+	migrateLegacySalesToSection('Turismo');
+
+	mode = 'api';
+	persistLocalSnapshot();
+
+	// Reconcilia dados locais com o D1: envia ao servidor qualquer item que exista
+	// no localStorage mas ainda não esteja no D1 (ex.: parcelamentos criados antes
+	// da coleção ser reconhecida pela API, quando apiPut retornava 400 silencioso).
+	if (local) {
+		const SYNC_KEYS = [
+			'finAccounts', 'finCategories', 'finTransactions', 'reportTemplates', 'reportHistory',
+			'goals', 'resources', 'resourceMoves', 'goalCategories', 'installments', 'amortizations',
+			'patrimonyItems', 'patrimonySnapshots', 'patrimonyItemMoves', 'scoreSnapshots',
+			'purchaseInstallments', 'sales', 'salesPlans', 'salesTypes', 'salesSections'
+		];
+		const pushOps = [];
+		const deletedIds = new Set((remote.deletedRecords || []).map(item => `${item.collection}/${item.id}`));
+		for (const key of SYNC_KEYS) {
+			const remoteIds = new Set((remote[key] || []).map((i) => i.id));
+			for (const item of local[key] || []) {
+				if (!remoteIds.has(item.id) && !deletedIds.has(`${key}/${item.id}`)) pushOps.push(apiPut(key, item.id, item));
+			}
+		}
+		if (pushOps.length > 0) await Promise.all(pushOps);
+	}
+}
+
+function afterSync(ok, opIfFailed) {
+	pendingWrites = Math.max(0, pendingWrites - 1);
+	if (!ok) lastFailedOp = opIfFailed;
+	syncStatus = pendingWrites > 0 ? 'saving' : lastFailedOp ? 'error' : 'synced';
+}
+
+function write(collection, id, data) {
+	localRevision++;
+	persistLocalSnapshot();
+	if (mode !== 'api') return;
+	pendingWrites++;
+	syncStatus = 'saving';
+	apiPut(collection, id, data).then((ok) => afterSync(ok, { collection, id, data }));
+}
+
+function erase(collection, id) {
+	localRevision++;
+	persistLocalSnapshot();
+	if (mode !== 'api') return;
+	pendingWrites++;
+	syncStatus = 'saving';
+	apiRemove(collection, id).then((ok) => afterSync(ok, { collection, id, remove: true }));
+}
+
+/** Repete a última escrita/remoção que falhou (botão "Tentar novamente" do indicador de sincronização). */
+export function retrySync() {
+	if (!lastFailedOp) return;
+	const op = lastFailedOp;
+	lastFailedOp = null;
+	pendingWrites++;
+	syncStatus = 'saving';
+	const promise = op.remove ? apiRemove(op.collection, op.id) : apiPut(op.collection, op.id, op.data);
+	promise.then((ok) => afterSync(ok, op));
+}
+
+// ---- categorias (financeiras: receita/despesa) ---------------------------
+
+export function addCategory(tipo, nome) {
+	const cat = { id: uid(), tipo, nome: nome.trim(), secundarios: [] };
+	categories = [...categories, cat];
+	write('finCategories', cat.id, cat);
+	return cat;
+}
+
+export function renameCategory(id, nome) {
+	const cat = categories.find((c) => c.id === id);
+	if (!cat) return;
+	cat.nome = nome.trim();
+	categories = [...categories];
+	write('finCategories', id, cat);
+}
+
+export function removeCategory(id) {
+	categories = categories.filter((c) => c.id !== id);
+	erase('finCategories', id);
+}
+
+/** Reinsere uma categoria removida (mesmo id e dados), usado pelo "desfazer" do toast de exclusão. */
+export function restoreCategory(cat) {
+	categories = [...categories, cat];
+	write('finCategories', cat.id, cat);
+}
+
+/** Define (ou remove, com valor <= 0) o orçamento mensal de uma categoria de despesa --
+ * usado para a barra de progresso de uso em Categorias e o resumo no Dashboard. */
+export function setCategoryBudget(id, valor) {
+	const cat = categories.find((c) => c.id === id);
+	if (!cat) return;
+	const n = Number(valor) || 0;
+	cat.orcamentoMensal = n > 0 ? n : null;
+	categories = [...categories];
+	write('finCategories', id, cat);
+}
+
+export function addSubcategory(categoriaId, nome) {
+	const cat = categories.find((c) => c.id === categoriaId);
+	if (!cat) return null;
+	const sub = { id: uid(), nome: nome.trim() };
+	cat.secundarios = [...cat.secundarios, sub];
+	categories = [...categories];
+	write('finCategories', categoriaId, cat);
+	return sub;
+}
+
+export function renameSubcategory(categoriaId, subId, nome) {
+	const cat = categories.find((c) => c.id === categoriaId);
+	const sub = cat && cat.secundarios.find((s) => s.id === subId);
+	if (!sub) return;
+	sub.nome = nome.trim();
+	categories = [...categories];
+	write('finCategories', categoriaId, cat);
+}
+
+export function removeSubcategory(categoriaId, subId) {
+	const cat = categories.find((c) => c.id === categoriaId);
+	if (!cat) return;
+	cat.secundarios = cat.secundarios.filter((s) => s.id !== subId);
+	categories = [...categories];
+	write('finCategories', categoriaId, cat);
+}
+
+export function categoryById(id) {
+	return categories.find((c) => c.id === id) || null;
+}
+
+export function subcategoryName(categoriaId, subId) {
+	const cat = categoryById(categoriaId);
+	const sub = cat && cat.secundarios.find((s) => s.id === subId);
+	return sub ? sub.nome : '';
+}
+
+// ---- contas --------------------------------------------------------------
+
+export function addAccount(data) {
+	const acc = { id: uid(), ...data };
+	accounts = [...accounts, acc];
+	write('finAccounts', acc.id, acc);
+	return acc;
+}
+
+export function updateAccount(id, data) {
+	const idx = accounts.findIndex((a) => a.id === id);
+	if (idx === -1) return;
+	const updated = { ...accounts[idx], ...data, id };
+	accounts = accounts.map((a, i) => (i === idx ? updated : a));
+	write('finAccounts', id, updated);
+}
+
+export function removeAccount(id) {
+	accounts = accounts.filter((a) => a.id !== id);
+	erase('finAccounts', id);
+}
+
+/** Reinsere uma conta removida (mesmo id e dados), usado pelo "desfazer" do toast de exclusão. */
+export function restoreAccount(acc) {
+	accounts = [...accounts, acc];
+	write('finAccounts', acc.id, acc);
+}
+
+export function accountById(id) {
+	return accounts.find((a) => a.id === id) || null;
+}
+
+// ---- lançamentos -----------------------------------------------------------
+
+function addMonthsISO(iso, months) {
+	const [y, m, d] = iso.split('-').map(Number);
+	const date = new Date(y, m - 1 + months, d);
+	const pad = (n) => String(n).padStart(2, '0');
+	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+export function addTransaction(data) {
+	const tx = {
+		statusPagamento: 'pendente',
+		seriesId: null,
+		seriesKind: null,
+		seriesStatus: null,
+		parcelaAtual: null,
+		parcelaTotal: null,
+		...data,
+		id: uid()
+	};
+	transactions = [...transactions, tx];
+	write('finTransactions', tx.id, tx);
+	return tx;
+}
+
+export function addTransactionSeries(base, schedule, count) {
+	if (schedule === 'unica') {
+		return [addTransaction(base)];
+	}
+	const seriesId = uid();
+	const total = Math.max(1, Number(count) || 1);
+	const created = [];
+	for (let i = 0; i < total; i++) {
+		const tx = addTransaction({
+			...base,
+			data: addMonthsISO(base.data, i),
+			seriesId,
+			seriesKind: schedule,
+			seriesStatus: 'ativa',
+			parcelaAtual: i + 1,
+			parcelaTotal: schedule === 'parcelado' ? total : null
+		});
+		created.push(tx);
+	}
+	return created;
+}
+
+export function updateTransaction(id, data) {
+	const idx = transactions.findIndex((t) => t.id === id);
+	if (idx === -1) return;
+	const updated = { ...transactions[idx], ...data, id };
+	transactions = transactions.map((t, i) => (i === idx ? updated : t));
+	write('finTransactions', id, updated);
+}
+
+export function removeTransaction(id) {
+	transactions = transactions.filter((t) => t.id !== id);
+	erase('finTransactions', id);
+}
+
+/** Reinsere um lançamento removido (mesmo id e dados), usado pelo "desfazer" do toast de exclusão. */
+export function restoreTransaction(tx) {
+	transactions = [...transactions, tx];
+	write('finTransactions', tx.id, tx);
+}
+
+export function setPaymentStatus(id, status) {
+	updateTransaction(id, { statusPagamento: status });
+}
+
+export function manageSeries(seriesId, action) {
+	const novoStatus = action === 'pausar' ? 'pausada' : action === 'retomar' ? 'ativa' : 'cancelada';
+	transactions = transactions.map((t) =>
+		t.seriesId === seriesId && t.statusPagamento !== 'pago' ? { ...t, seriesStatus: novoStatus } : t
+	);
+	transactions.filter((t) => t.seriesId === seriesId).forEach((t) => write('finTransactions', t.id, t));
+}
+
+export function editSeries(seriesId, data) {
+	transactions = transactions.map((t) =>
+		t.seriesId === seriesId && t.statusPagamento !== 'pago' ? { ...t, ...data, id: t.id, seriesId: t.seriesId } : t
+	);
+	transactions.filter((t) => t.seriesId === seriesId).forEach((t) => write('finTransactions', t.id, t));
+}
+
+export function seriesOf(seriesId) {
+	return transactions.filter((t) => t.seriesId === seriesId).sort((a, b) => a.data.localeCompare(b.data));
+}
+
+// ---- transferências entre contas -----------------------------------------
+// Duas transações (despesa na origem, receita no destino) ligadas por
+// transferId e marcadas com isTransferencia, para não distorcer receitas e
+// despesas nos relatórios (ver totals()/byCategory() em derived.js), embora
+// cada perna continue afetando o saldo da sua própria conta normalmente.
+
+export function addTransfer({ contaOrigemId, contaDestinoId, valor, data, descricao }) {
+	const contaOrigem = accountById(contaOrigemId);
+	const contaDestino = accountById(contaDestinoId);
+	const transferId = uid();
+	const base = {
+		valor: Number(valor) || 0,
+		data,
+		categoriaId: '',
+		subcategoriaId: '',
+		formaPagamento: null,
+		statusPagamento: 'pago',
+		isTransferencia: true,
+		transferId
+	};
+	const saida = addTransaction({
+		...base,
+		tipo: 'despesa',
+		contaId: contaOrigemId,
+		descricao: descricao?.trim() || `Transferência para ${contaDestino?.nome || 'outra conta'}`
+	});
+	const entrada = addTransaction({
+		...base,
+		tipo: 'receita',
+		contaId: contaDestinoId,
+		descricao: descricao?.trim() || `Transferência de ${contaOrigem?.nome || 'outra conta'}`
+	});
+	return { saida, entrada };
+}
+
+export function transferPairOf(transferId) {
+	return transactions.filter((t) => t.transferId === transferId);
+}
+
+export function removeTransfer(transferId) {
+	transferPairOf(transferId).forEach((t) => removeTransaction(t.id));
+}
+
+// ---- relatórios: modelos, histórico e agendamento ------------------------
+
+export function saveReportTemplate(nome, filtros) {
+	const tpl = { id: uid(), nome: nome.trim(), filtros };
+	reportTemplates = [...reportTemplates, tpl];
+	write('reportTemplates', tpl.id, tpl);
+	return tpl;
+}
+
+export function updateReportTemplate(id, nome, filtros) {
+	const idx = reportTemplates.findIndex((t) => t.id === id);
+	if (idx === -1) return;
+	const updated = { ...reportTemplates[idx], nome: nome.trim(), filtros };
+	reportTemplates = reportTemplates.map((t, i) => (i === idx ? updated : t));
+	write('reportTemplates', id, updated);
+}
+
+export function removeReportTemplate(id) {
+	reportTemplates = reportTemplates.filter((t) => t.id !== id);
+	erase('reportTemplates', id);
+	if (reportSchedule.templateId === id) setReportSchedule({ ...reportSchedule, templateId: null, ativo: false });
+}
+
+export function addReportHistory(entry) {
+	const item = { id: uid(), criadoEm: new Date().toISOString(), ...entry };
+	reportHistory = [item, ...reportHistory].slice(0, 30);
+	write('reportHistory', item.id, item);
+	return item;
+}
+
+export function setReportSchedule(schedule) {
+	reportSchedule = { ...reportSchedule, ...schedule };
+	persistLocalSnapshot();
+	if (mode === 'api') apiPut('reportSchedule', 'singleton', reportSchedule);
+}
+
+export function setAlertThresholds(thresholds) {
+	alertThresholds = { ...alertThresholds, ...thresholds };
+	persistLocalSnapshot();
+	if (mode === 'api') apiPut('alertThresholds', 'singleton', alertThresholds);
+}
+
+export function setBudgetGlobal(valor) {
+	const n = Number(valor) || 0;
+	budgetGlobal = n > 0 ? n : null;
+	persistLocalSnapshot();
+	if (mode === 'api') apiPut('budgetGlobal', 'singleton', budgetGlobal);
+}
+
+/** Preferências gerais do sistema -- hoje só a moeda padrão (contas, extrato, cálculos gerais);
+ * objetivos individuais podem divergir dela (ver goal.currency em GoalFormModal.svelte). */
+export function setSettings(patch) {
+	settings = { ...settings, ...patch };
+	persistLocalSnapshot();
+	if (mode === 'api') apiPut('settings', 'singleton', settings);
+}
+
+// ============================================================================
+// ---- objetivos (Rumo Financeiro / nextgoals, portado por completo) --------
+// ============================================================================
+
+export function addGoal(data) {
+	const g = { id: uid(), createdAt: new Date().toISOString(), archived: false, ...data };
+	goals = [...goals, g];
+	write('goals', g.id, g);
+	return g;
+}
+
+export function updateGoal(id, patch) {
+	const idx = goals.findIndex((g) => g.id === id);
+	if (idx === -1) return;
+	const updated = { ...goals[idx], ...patch, id };
+	goals = goals.map((g, i) => (i === idx ? updated : g));
+	write('goals', id, updated);
+}
+
+/** Apaga o objetivo e tudo que pertence a ele: recursos, movimentações, prestações e amortizações. */
+export function removeGoal(id) {
+	const resIds = resources.filter((r) => r.goalId === id).map((r) => r.id);
+	const moveIds = resourceMoves.filter((m) => resIds.includes(m.resourceId)).map((m) => m.id);
+	const instIds = installments.filter((i) => i.goalId === id).map((i) => i.id);
+	const amortIds = amortizations.filter((a) => a.goalId === id).map((a) => a.id);
+
+	goals = goals.filter((g) => g.id !== id);
+	resources = resources.filter((r) => r.goalId !== id);
+	resourceMoves = resourceMoves.filter((m) => !resIds.includes(m.resourceId));
+	installments = installments.filter((i) => i.goalId !== id);
+	amortizations = amortizations.filter((a) => a.goalId !== id);
+
+	erase('goals', id);
+	resIds.forEach((rid) => erase('resources', rid));
+	moveIds.forEach((mid) => erase('resourceMoves', mid));
+	instIds.forEach((iid) => erase('installments', iid));
+	amortIds.forEach((aid) => erase('amortizations', aid));
+}
+
+export function goalById(id) {
+	return goals.find((g) => g.id === id) || null;
+}
+
+// ---- recursos (potes de dinheiro dentro de um objetivo) -------------------
+
+export function addResource(goalId, data, initialBalance = 0) {
+	const r = { id: uid(), goalId, createdAt: new Date().toISOString(), name: data.name, group: data.group || 'outros' };
+	resources = [...resources, r];
+	write('resources', r.id, r);
+	const initial = Number(initialBalance) || 0;
+	if (initial !== 0) {
+		addResourceMove(r.id, goalId, { date: todayISO(), description: 'Saldo inicial', amount: initial });
+	}
+	return r;
+}
+
+export function updateResource(id, patch) {
+	const idx = resources.findIndex((r) => r.id === id);
+	if (idx === -1) return;
+	const updated = { ...resources[idx], ...patch, id };
+	resources = resources.map((r, i) => (i === idx ? updated : r));
+	write('resources', id, updated);
+}
+
+export function removeResource(id) {
+	const moveIds = resourceMoves.filter((m) => m.resourceId === id).map((m) => m.id);
+	resources = resources.filter((r) => r.id !== id);
+	resourceMoves = resourceMoves.filter((m) => m.resourceId !== id);
+	erase('resources', id);
+	moveIds.forEach((mid) => erase('resourceMoves', mid));
+}
+
+/** Reinsere um recurso removido (mesmo id e dados), usado pelo "desfazer" do toast de exclusão.
+ * As movimentações desse recurso são restauradas separadamente com restoreResourceMove. */
+export function restoreResource(r) {
+	resources = [...resources, r];
+	write('resources', r.id, r);
+}
+
+export function addResourceMove(resourceId, goalId, data) {
+	const m = { id: uid(), resourceId, goalId, categoryId: null, ...data };
+	resourceMoves = [...resourceMoves, m];
+	write('resourceMoves', m.id, m);
+	return m;
+}
+
+export function updateResourceMove(id, patch) {
+	const idx = resourceMoves.findIndex((m) => m.id === id);
+	if (idx === -1) return;
+	const updated = { ...resourceMoves[idx], ...patch, id };
+	resourceMoves = resourceMoves.map((m, i) => (i === idx ? updated : m));
+	write('resourceMoves', id, updated);
+}
+
+export function removeResourceMove(id) {
+	resourceMoves = resourceMoves.filter((m) => m.id !== id);
+	erase('resourceMoves', id);
+}
+
+/** Reinsere uma movimentação de recurso removida (mesmo id e dados), usado pelo "desfazer" do toast de exclusão. */
+export function restoreResourceMove(m) {
+	resourceMoves = [...resourceMoves, m];
+	write('resourceMoves', m.id, m);
+}
+
+// ---- categorias de movimentações de objetivo (separado das categorias financeiras) ----
+
+export function addGoalCategory(name, countsInPace = true) {
+	const c = { id: uid(), name, countsInPace: countsInPace !== false };
+	goalCategories = [...goalCategories, c];
+	write('goalCategories', c.id, c);
+	return c;
+}
+
+/** Resolve um nome digitado para o id de uma categoria já existente (case-insensitive), criando se necessário. */
+export function resolveGoalCategoryId(name) {
+	const trimmed = (name || '').trim();
+	if (!trimmed) return null;
+	const existing = goalCategories.find((c) => c.name.toLowerCase() === trimmed.toLowerCase());
+	return existing ? existing.id : addGoalCategory(trimmed, true).id;
+}
+
+export function goalCategoryName(id) {
+	const c = goalCategories.find((x) => x.id === id);
+	return c ? c.name : '';
+}
+
+// ---- prestações (financiamento) -------------------------------------------
+
+export function addInstallment(goalId, data) {
+	const i = { id: uid(), goalId, ...data };
+	installments = [...installments, i];
+	write('installments', i.id, i);
+	adjustRemainingTerm(goalId, -1);
+	return i;
+}
+
+/** Ajusta "parcelas restantes atualmente" do objetivo (quando o usuário rastreia esse número à
+ * mão, por causa de amortizações de prazo que fogem da conta simples parcelas pagas − prazo
+ * inicial) sempre que uma prestação é lançada (-1) ou removida (+1, sem passar do prazo inicial). */
+function adjustRemainingTerm(goalId, delta) {
+	const goal = goals.find((g) => g.id === goalId);
+	if (!goal || goal.remainingTermMonths == null) return;
+	const max = Number(goal.initialTermMonths) > 0 ? Number(goal.initialTermMonths) : Infinity;
+	const next = Math.min(max, Math.max(0, Number(goal.remainingTermMonths) + delta));
+	updateGoal(goalId, { remainingTermMonths: next });
+}
+
+export function updateInstallment(id, patch) {
+	const idx = installments.findIndex((i) => i.id === id);
+	if (idx === -1) return;
+	const updated = { ...installments[idx], ...patch, id };
+	installments = installments.map((i, k) => (k === idx ? updated : i));
+	write('installments', id, updated);
+}
+
+export function removeInstallment(id) {
+	const goalId = installments.find((i) => i.id === id)?.goalId;
+	installments = installments.filter((i) => i.id !== id);
+	erase('installments', id);
+	if (goalId) adjustRemainingTerm(goalId, 1);
+}
+
+/** Reinsere uma prestação removida (mesmo id e dados), usado pelo "desfazer" do toast de exclusão. */
+export function restoreInstallment(i) {
+	installments = [...installments, i];
+	write('installments', i.id, i);
+	adjustRemainingTerm(i.goalId, -1);
+}
+
+// ---- amortizações extras (fora do financiamento) --------------------------
+
+export function addAmortization(goalId, data) {
+	const a = { id: uid(), goalId, ...data };
+	amortizations = [...amortizations, a];
+	write('amortizations', a.id, a);
+	return a;
+}
+
+export function updateAmortization(id, patch) {
+	const idx = amortizations.findIndex((a) => a.id === id);
+	if (idx === -1) return;
+	const updated = { ...amortizations[idx], ...patch, id };
+	amortizations = amortizations.map((a, i) => (i === idx ? updated : a));
+	write('amortizations', id, updated);
+}
+
+export function removeAmortization(id) {
+	amortizations = amortizations.filter((a) => a.id !== id);
+	erase('amortizations', id);
+}
+
+/** Reinsere uma amortização removida (mesmo id e dados), usado pelo "desfazer" do toast de exclusão. */
+export function restoreAmortization(a) {
+	amortizations = [...amortizations, a];
+	write('amortizations', a.id, a);
+}
+
+// ---- patrimonio (fase 4: ativos rastreados manualmente + historico mensal) ----
+
+export function addPatrimonyItem(data) {
+	const p = { id: uid(), createdAt: new Date().toISOString(), ...data };
+	patrimonyItems = [...patrimonyItems, p];
+	write('patrimonyItems', p.id, p);
+	return p;
+}
+
+export function updatePatrimonyItem(id, patch) {
+	const idx = patrimonyItems.findIndex((p) => p.id === id);
+	if (idx === -1) return;
+	const updated = { ...patrimonyItems[idx], ...patch, id };
+	patrimonyItems = patrimonyItems.map((p, i) => (i === idx ? updated : p));
+	write('patrimonyItems', id, updated);
+}
+
+export function removePatrimonyItem(id) {
+	const moveIds = patrimonyItemMoves.filter((m) => m.itemId === id).map((m) => m.id);
+	patrimonyItems = patrimonyItems.filter((p) => p.id !== id);
+	patrimonyItemMoves = patrimonyItemMoves.filter((m) => m.itemId !== id);
+	erase('patrimonyItems', id);
+	moveIds.forEach((mid) => erase('patrimonyItemMoves', mid));
+}
+
+/** Reinsere um item de patrimônio removido (mesmo id e dados), usado pelo "desfazer" do toast de
+ * exclusão. O histórico de aportes/valorização desse item é restaurado à parte, chamando
+ * restorePatrimonyItemMove pra cada evento salvo antes da exclusão. */
+export function restorePatrimonyItem(p) {
+	patrimonyItems = [...patrimonyItems, p];
+	write('patrimonyItems', p.id, p);
+}
+
+export function restorePatrimonyItemMove(m) {
+	patrimonyItemMoves = [...patrimonyItemMoves, m];
+	write('patrimonyItemMoves', m.id, m);
+}
+
+/** Registra um evento de aporte ou valorização/desvalorização de um ativo, e ajusta o valor
+ * atual do item de acordo -- P4.4: separa "dinheiro que eu coloquei" de "o mercado rendeu",
+ * o que também alimenta a quebra de Aportes x Valorização na evolução patrimonial. */
+export function addPatrimonyItemMove(itemId, data) {
+	const m = { id: uid(), itemId, ...data };
+	patrimonyItemMoves = [...patrimonyItemMoves, m];
+	write('patrimonyItemMoves', m.id, m);
+	const item = patrimonyItems.find((p) => p.id === itemId);
+	if (item) {
+		const updated = { ...item, valor: (Number(item.valor) || 0) + (Number(data.valor) || 0) };
+		patrimonyItems = patrimonyItems.map((p) => (p.id === itemId ? updated : p));
+		write('patrimonyItems', itemId, updated);
+	}
+	return m;
+}
+
+export function removePatrimonyItemMove(id) {
+	const m = patrimonyItemMoves.find((x) => x.id === id);
+	patrimonyItemMoves = patrimonyItemMoves.filter((x) => x.id !== id);
+	erase('patrimonyItemMoves', id);
+	if (m) {
+		const item = patrimonyItems.find((p) => p.id === m.itemId);
+		if (item) {
+			const updated = { ...item, valor: (Number(item.valor) || 0) - (Number(m.valor) || 0) };
+			patrimonyItems = patrimonyItems.map((p) => (p.id === m.itemId ? updated : p));
+			write('patrimonyItems', m.itemId, updated);
+		}
+	}
+}
+
+/** Grava (ou substitui) o retrato do patrimônio líquido do mês `mKey` -- id determinístico
+ * para nunca duplicar snapshot do mesmo mês, só atualizar o mais recente conforme o usuário usa o app. */
+export function upsertPatrimonySnapshot(mKey, data) {
+	const idx = patrimonySnapshots.findIndex((s) => s.id === mKey);
+	const updated = { id: mKey, mKey, ...data };
+	if (idx === -1) {
+		patrimonySnapshots = [...patrimonySnapshots, updated];
+	} else {
+		if (JSON.stringify(patrimonySnapshots[idx]) === JSON.stringify(updated)) return;
+		patrimonySnapshots = patrimonySnapshots.map((s, i) => (i === idx ? updated : s));
+	}
+	write('patrimonySnapshots', mKey, updated);
+}
+
+/** Grava (ou substitui) o retrato do score financeiro do mês `mKey` -- mesmo padrão
+ * determinístico de upsertPatrimonySnapshot, para construir o histórico organicamente. */
+export function upsertScoreSnapshot(mKey, data) {
+	const idx = scoreSnapshots.findIndex((s) => s.id === mKey);
+	const updated = { id: mKey, mKey, ...data };
+	if (idx === -1) {
+		scoreSnapshots = [...scoreSnapshots, updated];
+	} else {
+		if (JSON.stringify(scoreSnapshots[idx]) === JSON.stringify(updated)) return;
+		scoreSnapshots = scoreSnapshots.map((s, i) => (i === idx ? updated : s));
+	}
+	write('scoreSnapshots', mKey, updated);
+}
+
+// ============================================================================
+// ---- parcelamentos de compras (controle sem impacto no movimento) ---------
+// ============================================================================
+
+export function addPurchaseInstallment(data) {
+	const p = { id: uid(), createdAt: new Date().toISOString(), payments: [], ...data };
+	purchaseInstallments = [...purchaseInstallments, p];
+	write('purchaseInstallments', p.id, p);
+	return p;
+}
+
+export function updatePurchaseInstallment(id, patch) {
+	const idx = purchaseInstallments.findIndex((p) => p.id === id);
+	if (idx === -1) return;
+	const updated = { ...purchaseInstallments[idx], ...patch, id };
+	purchaseInstallments = purchaseInstallments.map((p, i) => (i === idx ? updated : p));
+	write('purchaseInstallments', id, updated);
+}
+
+export function removePurchaseInstallment(id) {
+	purchaseInstallments = purchaseInstallments.filter((p) => p.id !== id);
+	erase('purchaseInstallments', id);
+}
+
+/** Reinsere um parcelamento removido (mesmo id e dados), usado pelo "desfazer" do toast de exclusão. */
+export function restorePurchaseInstallment(p) {
+	purchaseInstallments = [...purchaseInstallments, p];
+	write('purchaseInstallments', p.id, p);
+}
+
+// ============================================================================
+// ---- backup completo (Configurações > Exportar/Importar) -----------------
+// ============================================================================
+
+/** Baixa um .json com TODOS os dados do usuário -- pensado pra ser salvo onde ele quiser
+ * (Google Drive, Dropbox, localmente...) pelo próprio menu de compartilhar do celular/navegador,
+ * já que o Plena não integra direto com essas contas. */
+export function exportBackup() {
+	const payload = { app: 'plena', version: 1, exportedAt: new Date().toISOString(), data: snapshot() };
+	downloadBlob(JSON.stringify(payload, null, 2), `plena-backup-${todayISO()}.json`, 'application/json');
+}
+
+/** Confere se um texto lido de arquivo é um backup válido do Plena, antes de restaurar de
+ * verdade -- devolve { data } (pronto pra restoreBackup) ou { error } com o motivo. */
+export function validateBackup(raw) {
+	let parsed;
+	try {
+		parsed = JSON.parse(raw);
+	} catch {
+		return { error: 'Arquivo inválido: não é um JSON legível.' };
+	}
+	if (!parsed || typeof parsed !== 'object' || !parsed.data || typeof parsed.data !== 'object') {
+		return { error: 'Arquivo inválido: não parece ser um backup do Plena.' };
+	}
+	return { data: parsed.data };
+}
+
+/** Restaura um backup completo, substituindo TUDO que existe hoje (local e, se online, na API).
+ * Irreversível -- a tela de Configurações já sugere fazer um backup do estado atual antes. */
+export async function restoreBackup(data) {
+	accounts = data.finAccounts || [];
+	categories = data.finCategories || [];
+	transactions = data.finTransactions || [];
+	reportTemplates = data.reportTemplates || [];
+	reportHistory = data.reportHistory || [];
+	reportSchedule = data.reportSchedule || { ativo: false, templateId: null, dia: 5, hora: '08:00' };
+	alertThresholds = data.alertThresholds || { um: 1, tres: 3, sete: 7 };
+	budgetGlobal = data.budgetGlobal ?? null;
+	settings = data.settings ? { ...DEFAULT_SETTINGS, ...data.settings } : settings;
+	goals = data.goals || [];
+	resources = data.resources || [];
+	resourceMoves = data.resourceMoves || [];
+	goalCategories = data.goalCategories || [];
+	installments = data.installments || [];
+	amortizations = data.amortizations || [];
+	patrimonyItems = data.patrimonyItems || [];
+	patrimonySnapshots = data.patrimonySnapshots || [];
+	scoreSnapshots = data.scoreSnapshots || [];
+	patrimonyItemMoves = data.patrimonyItemMoves || [];
+	purchaseInstallments = data.purchaseInstallments || [];
+	sales = data.sales || [];
+	salesPlans = data.salesPlans || [];
+	salesTypes = data.salesTypes || [];
+	salesSections = data.salesSections || [];
+
+	persistLocalSnapshot();
+	if (mode !== 'api') return;
+
+	await Promise.all([
+		...accounts.map((a) => apiPut('finAccounts', a.id, a)),
+		...categories.map((c) => apiPut('finCategories', c.id, c)),
+		...transactions.map((t) => apiPut('finTransactions', t.id, t)),
+		...reportTemplates.map((r) => apiPut('reportTemplates', r.id, r)),
+		...reportHistory.map((r) => apiPut('reportHistory', r.id, r)),
+		...goals.map((g) => apiPut('goals', g.id, g)),
+		...resources.map((r) => apiPut('resources', r.id, r)),
+		...resourceMoves.map((m) => apiPut('resourceMoves', m.id, m)),
+		...goalCategories.map((c) => apiPut('goalCategories', c.id, c)),
+		...installments.map((i) => apiPut('installments', i.id, i)),
+		...amortizations.map((a) => apiPut('amortizations', a.id, a)),
+		...patrimonyItems.map((p) => apiPut('patrimonyItems', p.id, p)),
+		...patrimonySnapshots.map((s) => apiPut('patrimonySnapshots', s.id, s)),
+		...patrimonyItemMoves.map((m) => apiPut('patrimonyItemMoves', m.id, m)),
+		...scoreSnapshots.map((s) => apiPut('scoreSnapshots', s.id, s)),
+		...purchaseInstallments.map((p) => apiPut('purchaseInstallments', p.id, p)),
+		...sales.map((p) => apiPut('sales', p.id, p)),
+		...salesPlans.map((p) => apiPut('salesPlans', p.id, p)),
+		...salesTypes.map((p) => apiPut('salesTypes', p.id, p)),
+		...salesSections.map((p) => apiPut('salesSections', p.id, p)),
+		apiPut('reportSchedule', 'singleton', reportSchedule),
+		apiPut('alertThresholds', 'singleton', alertThresholds),
+		apiPut('budgetGlobal', 'singleton', budgetGlobal),
+		apiPut('settings', 'singleton', settings)
+	]);
+}
+
+// ============================================================================
+// ---- apagar dados (Configurações > Apagar dados) --------------------------
+// ============================================================================
+
+/** false se algum lançamento ainda referencia uma categoria -- apagar todas as categorias nesse
+ * caso deixaria lançamentos "órfãos" (sem categoria), então a tela de Configurações bloqueia. */
+export function canClearCategories() {
+	return !transactions.some((t) => t.categoriaId);
+}
+
+/** Apaga TODOS os lançamentos (Movimentações). Irreversível -- sugerir backup antes. */
+export function clearAllMovements() {
+	const ids = transactions.map((t) => t.id);
+	transactions = [];
+	ids.forEach((id) => erase('finTransactions', id));
+}
+
+/** Apaga TODAS as categorias -- só quando não há nenhum lançamento vinculado (ver
+ * canClearCategories). Devolve false sem fazer nada se o bloqueio se aplicar. */
+export function clearAllCategories() {
+	if (!canClearCategories()) return false;
+	const ids = categories.map((c) => c.id);
+	categories = [];
+	ids.forEach((id) => erase('finCategories', id));
+	return true;
+}
+
+/** Apaga TODOS os registros do app (contas, categorias, lançamentos, objetivos, patrimônio...) --
+ * mantém preferências/configurações (moeda, tema, etc.) como estão. Irreversível -- sugerir
+ * backup antes. */
+export function clearAllData() {
+	const ids = {
+		finAccounts: accounts.map((a) => a.id),
+		finCategories: categories.map((c) => c.id),
+		finTransactions: transactions.map((t) => t.id),
+		reportTemplates: reportTemplates.map((r) => r.id),
+		reportHistory: reportHistory.map((r) => r.id),
+		goals: goals.map((g) => g.id),
+		resources: resources.map((r) => r.id),
+		resourceMoves: resourceMoves.map((m) => m.id),
+		goalCategories: goalCategories.map((c) => c.id),
+		installments: installments.map((i) => i.id),
+		amortizations: amortizations.map((a) => a.id),
+		patrimonyItems: patrimonyItems.map((p) => p.id),
+		patrimonySnapshots: patrimonySnapshots.map((s) => s.id),
+		patrimonyItemMoves: patrimonyItemMoves.map((m) => m.id),
+		scoreSnapshots: scoreSnapshots.map((s) => s.id),
+		purchaseInstallments: purchaseInstallments.map((p) => p.id),
+		sales: sales.map((p) => p.id),
+		salesPlans: salesPlans.map((p) => p.id),
+		salesTypes: salesTypes.map((p) => p.id),
+		salesSections: salesSections.map((p) => p.id)
+	};
+
+	accounts = [];
+	categories = [];
+	transactions = [];
+	reportTemplates = [];
+	reportHistory = [];
+	goals = [];
+	resources = [];
+	resourceMoves = [];
+	goalCategories = [];
+	installments = [];
+	amortizations = [];
+	patrimonyItems = [];
+	patrimonySnapshots = [];
+	patrimonyItemMoves = [];
+	scoreSnapshots = [];
+	purchaseInstallments = [];
+	sales = [];
+	salesPlans = [];
+	salesTypes = [];
+	salesSections = [];
+
+	for (const [collection, list] of Object.entries(ids)) {
+		list.forEach((id) => erase(collection, id));
+	}
+}
+
+export function saveSale(data) {
+ validateSale(data);
+ const sale = { ...data, id: data.id || uid() };
+ sales = [...sales.filter((s) => s.id !== sale.id), sale];
+ write('sales', sale.id, sale);
+}
+export function removeSale(id) {
+ sales = sales.filter((s) => s.id !== id);
+ erase('sales', id);
+}
+export function saveSalesPlan(data) {
+ validatePlan(data);
+ salesPlans = [...salesPlans.filter((p) => p.id !== data.id), data];
+ write('salesPlans', data.id, data);
+}
+
+export function saveSaleType(data) {
+ const type = { ...data, id: data.id || uid(), name: data.name.trim(), deleted: !!data.deleted };
+ validateSaleType(type);
+ const secId = type.sectionId || 'default';
+ const scoped = forSection(secId, { salesTypes, sales, salesPlans });
+ if (!type.deleted && saleTypesCatalog(scoped.salesTypes, scoped.sales, scoped.salesPlans).some(t => !t.deleted && t.id !== type.id && t.name.toLocaleLowerCase('pt-BR') === type.name.toLocaleLowerCase('pt-BR'))) throw new Error('Já existe um tipo com esse nome nesta seção.');
+ salesTypes = [...salesTypes.filter(t => t.id !== type.id), type];
+ write('salesTypes', type.id, type);
+}
+
+// ---- Seções de Vendas ----
+
+export function saveSalesSection(data) {
+	const section = { ...data, id: data.id || uid(), name: data.name.trim(), deleted: !!data.deleted };
+	validateSalesSection(section);
+	if (!section.deleted && salesSections.some(s => !s.deleted && s.id !== section.id && s.name.toLocaleLowerCase('pt-BR') === section.name.toLocaleLowerCase('pt-BR'))) throw new Error('Já existe uma seção com esse nome.');
+	salesSections = [...salesSections.filter(s => s.id !== section.id), section];
+	write('salesSections', section.id, section);
+}
+
+// Updating the shared collections must never repeat boot/seeding or touch private finance data.
+export async function refreshSharedState(canRefresh = () => true) {
+  if (mode !== 'api' || pendingWrites || lastFailedOp || !user?.email) return;
+  const revision = localRevision;
+  const owner = user.email;
+  const remote = await fetchRemoteState(owner);
+  if (!remote || user?.email !== owner || revision !== localRevision || pendingWrites || !canRefresh()) return;
+  const replace = (current, next) => Array.isArray(next) && JSON.stringify(current) !== JSON.stringify(next) ? next : current;
+  goals = replace(goals, remote.goals);
+  resources = replace(resources, remote.resources);
+  resourceMoves = replace(resourceMoves, remote.resourceMoves);
+  goalCategories = replace(goalCategories, remote.goalCategories);
+  installments = replace(installments, remote.installments);
+  amortizations = replace(amortizations, remote.amortizations);
+  salesSections = replace(salesSections, remote.salesSections);
+  salesTypes = replace(salesTypes, remote.salesTypes);
+  sales = replace(sales, remote.sales);
+  salesPlans = replace(salesPlans, remote.salesPlans);
+  persistLocalSnapshot();
+}
+
+export async function createSalesSectionFromTemplate(input) {
+  const built = buildSalesTemplate(input);
+  if (salesSections.some(section => !section.deleted && section.id !== built.section.id && section.name.toLocaleLowerCase('pt-BR') === built.section.name.toLocaleLowerCase('pt-BR'))) throw new Error('Já existe uma seção com esse nome.');
+  let result;
+  const remote = mode === 'api';
+  if (remote) { pendingWrites++; syncStatus = 'saving'; }
+  try { result = remote ? await apiImportSalesTemplate(input) : built; }
+  finally { if (remote) { pendingWrites = Math.max(0, pendingWrites - 1); syncStatus = pendingWrites ? 'saving' : lastFailedOp ? 'error' : 'synced'; } }
+  salesSections = [...salesSections.filter(section => section.id !== result.section.id), result.section];
+  const ids = new Set(result.types.map(type => type.id));
+  salesTypes = [...salesTypes.filter(type => !ids.has(type.id)), ...result.types];
+  localRevision++;
+  persistLocalSnapshot();
+  return result.section;
+}
